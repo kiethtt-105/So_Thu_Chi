@@ -86,6 +86,7 @@ header{background:color-mix(in srgb,var(--bg) 80%,transparent)}
 
 .fp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.fp label{font-size:11px;color:var(--mut)}.fp select,.fp input{width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);margin-top:2px}.fp .w{grid-column:1/-1}
 .tsum{display:flex;gap:8px;margin:8px 0;font-size:12px;flex-wrap:wrap}.tsum span{background:var(--card);border-radius:10px;padding:6px 10px}.dh.over{color:var(--chi);font-weight:700}
+@media(max-width:899px){nav button{font-size:10.5px;padding:6px 1px}}.addb{width:100%;margin:6px 0 14px;padding:11px;border-radius:14px;border:2px dashed var(--line);color:var(--acc2);font-weight:700}
 </style></head><body>
 <section id="login"><form id="lf"><svg width="56" height="56" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#fff"/><path d="M30 62l14-14 10 10 18-22" stroke="#0B4F59" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
 <h1>Sổ Thu Chi</h1><p>Nhập mật khẩu để mở sổ</p><input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="Mật khẩu" autofocus><button class="go" id="lb">Mở sổ</button><div id="lerr" role="alert"></div></form></section>
@@ -110,7 +111,7 @@ async function api(a,d={}){let r;const ac=new AbortController(),tm=setTimeout(()
 const j=await r.json();if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),2600)}
 function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.sig=sigOf(j);if(j.h)S.h=j.h;S.ready=true;sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat});$('#st').textContent='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}
-const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim]),POLL_MS=2000;
+const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim,j.trash,j.rec]),POLL_MS=2000;
 const setLive=s=>{const e=$('#live');if(!e||e.dataset.s===s)return;e.dataset.s=s;e.className='live '+s;e.lastChild.textContent={ok:'Live',err:'Mất kết nối',wait:'Đang kết nối'}[s]};
 async function sync(quiet){$('#rf').classList.add('spin');try{apply(await api('all'));S.err='';setLive('ok');render()}catch(e){setLive('err');S.err=e.message;if(!quiet)toast(e.message);$('#st').textContent='Chưa đồng bộ được';if(!S.ready)render()}$('#rf').classList.remove('spin')}
 async function push(a,d,undo){S.busy++;$('#rf').classList.add('spin');try{apply(await api(a,d));toast('Đã lưu')}catch(e){undo();toast('Chưa lưu được: '+e.message)}S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
@@ -181,7 +182,7 @@ S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
 document.addEventListener('input',e=>{const t=e.target;if(!t.classList||!t.classList.contains('ba'))return;const neg=t.value.trim().startsWith('-'),v=t.value.replace(/[^\d]/g,''),a=S.acc[+t.dataset.i];
 t.value=(neg?'-':'')+(v?num(+v):'');if(!a)return;if(v)S.act[a.name]=(neg?-1:1)*Number(v);else delete S.act[a.name];reconUpdate()});
 function render(){$('#nav').innerHTML=NAV.map(([k,l,i])=>`<button class="${S.tab===k?'on':''}" data-tab="${k}"><span aria-hidden="true">${i}</span>${l}</button>`).join('');
-$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,acc:accs,cat:cats,rec:recon}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
+$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,acc:accs,cat:cats,rec:recon,mg:mgPage,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
 document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-csv],[data-retry],[data-bdo]');if(!t)return;const d=t.dataset;
 if(d.tab){S.tab=d.tab;scrollTo(0,0)}else if(d.m)S.m=shift(S.m,+d.m);else if(d.f)S.f=d.f;else if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));else if(d.bdo)return doBal(d.bdo);else if('csv' in d)return csv();else if('retry' in d){S.err='';render();return sync()}render()});
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const p=e.target.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p)}});
@@ -199,7 +200,7 @@ ${ty==='Chuyển khoản'?`<label class="w">Đến tài khoản<select id="ft"><
 function pull(){const g=i=>($(i)||{}).value;E.date=g('#fd')||E.date;E.acc=g('#fc')||E.acc;E.note=g('#fn')||'';if($('#ft'))E.accTo=g('#ft');if($('#fp')){E.cat=g('#fp');E.sub=g('#fs')||''}const raw=($('#fa').value||'').replace(/[^\d-]/g,'');E.amount=Number(raw)||0}
 $('#ov').addEventListener('click',e=>{if(e.target.id==='ov')return closeForm();const d=e.target.closest('[data-ty],[data-save],[data-del]');if(!d)return;
 if(d.dataset.ty){pull();E.type=d.dataset.ty;E.cat=E.sub='';form();return}
-if('del' in d.dataset){if(!confirm('Xóa giao dịch này?'))return;const old=S.tx.slice();S.tx=S.tx.filter(x=>x.id!==E.id);closeForm();render();push('del',{id:E.id},()=>S.tx=old);return}
+if('del' in d.dataset){if(!confirm('Chuyển giao dịch vào Thùng rác? Dữ liệu vẫn được lưu ở tab DaXoa và có thể khôi phục.'))return;const old=S.tx.slice();S.tx=S.tx.filter(x=>x.id!==E.id);closeForm();render();push('del',{id:E.id},()=>S.tx=old);return}
 pull();const ty=E.type;let er='';if(!E.amount||(E.amount<0&&ty!=='Điều chỉnh'))er='Nhập số tiền lớn hơn 0';else if(!E.acc)er='Chọn tài khoản';else if(ty==='Chuyển khoản'&&!E.accTo)er='Chọn tài khoản nhận';else if(ty!=='Chuyển khoản'&&ty!=='Điều chỉnh'&&(!E.cat||!E.sub))er='Chọn hạng mục và chi tiết';
 if(er)return toast(er);const row={id:E.id,date:E.date,type:ty,amount:E.amount,acc:E.acc,accTo:ty==='Chuyển khoản'?E.accTo:'',cat:ty==='Chuyển khoản'||ty==='Điều chỉnh'?'':E.cat,sub:ty==='Chuyển khoản'||ty==='Điều chỉnh'?'':E.sub,note:E.note},old=S.tx.slice();
 S.tx=S.tx.filter(x=>x.id!==row.id).concat(row);S.m=row.date.slice(0,7);closeForm();render();push(E.isNew?'add':'upd',{row},()=>S.tx=old)});
@@ -223,7 +224,7 @@ const donut=rows.length?`<div class="card"><h3>Cơ cấu chi tiêu</h3><div clas
 const bad=S.bad?`<div id="warn">⚠️ Sheet có ${S.bad} dòng dữ liệu sai — hệ thống đã tự sửa/khôi phục khi có thể.</div>`:'';
 h=h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',bad+ins+donut+'<div class="card"><h3>Chi theo hạng mục</h3>');
 return h.replace(/<div class="bar"><div><span>([^<]*)<\/span>/g,(m,k)=>`<div class="bar" style="--bc:${colOf(k,rows.findIndex(r=>esc(r[0])===k))}"><div><span>${emo(k)} ${k}</span>`)};
-const _apply=apply;apply=function(j){S.bad=j.bad||0;if(j.lim&&Object.keys(j.lim).length){S.lim=j.lim;localStorage.lim=JSON.stringify(j.lim)}_apply(j)};
+const _apply=apply;apply=function(j){S.bad=j.bad||0;S.trash=j.trash||[];S.rec=j.rec||[];if(j.lim&&Object.keys(j.lim).length){S.lim=j.lim;localStorage.lim=JSON.stringify(j.lim)}_apply(j)};
 
 const eye=document.createElement('button');eye.className='ib';eye.setAttribute('aria-label','Ẩn/hiện số dư');eye.textContent='👁';
 if(localStorage.hb==='1')document.body.classList.add('hb');eye.onclick=()=>{localStorage.hb=document.body.classList.toggle('hb')?1:0};$('#tg').before(eye);
@@ -273,5 +274,33 @@ const days=new Set(M.map(t=>t.date));let ov=0;if(L.d){const d={};M.forEach(t=>d[
 const card=`<div class="card"><h3>Hạn mức chi <button class="chip" style="float:right;padding:3px 10px" data-x="lim">⚙ Thiết lập</button></h3>${b||'<p class="note">Chưa đặt hạn mức. Bấm Thiết lập để đặt hạn mức theo ngày, tháng và hạng mục.</p>'}${L.d&&ov?`<p class="note" style="color:var(--chi)">⚠️ ${ov} ngày trong tháng vượt hạn mức ngày.</p>`:''}</div>`;
 return h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',card+'<div class="card"><h3>Chi theo hạng mục</h3>')};
 const _push=push;push=async function(a,d,u){await _push(a,d,u);if(a!=='del'&&d.row&&d.row.type==='Chi'&&S.lim.d){const v=S.tx.filter(t=>t.type==='Chi'&&t.date===d.row.date).reduce((x,t)=>x+t.amount,0);if(v>S.lim.d)toast('⚠️ Vượt hạn mức chi ngày: '+vnd(v)+' / '+vnd(S.lim.d))}};
+
+// ===== QUẢN LÝ + ĐỊNH KỲ + THÙNG RÁC =====
+S.trash=S.trash||[];S.rec=S.rec||[];NAV.push(['mg','Quản lý','⚙'],['tr','Thùng rác','🗑']);
+const KT={gd:'Giao dịch',tk:'Tài khoản',dm:'Hạng mục'};
+function mgPage(){const g={};S.cat.forEach((c,i)=>{(g[c.t+'|'+c.p]=g[c.t+'|'+c.p]||[]).push([c,i])});
+return `<h3 style="margin:8px 2px">Tài khoản</h3><div class="card" style="padding:4px 16px">${S.acc.map((a,i)=>`<button class="tx" data-ed="tk:${i}"><span class="dot">🏦</span><span class="m"><b>${esc(a.name)}</b><small>${esc(a.type)} · đầu kỳ ${num(a.open)}</small></span><b>›</b></button>`).join('')||empty('Chưa có tài khoản','')}</div><button class="addb" data-ed="tk:new">+ Thêm tài khoản</button>
+<h3 style="margin:8px 2px">Hạng mục</h3>${Object.entries(g).map(([k,v])=>{const[t,p]=k.split('|');return `<div class="card"><h3>${emo(p)} ${esc(p)} <small class="${t==='Thu'?'thu':'chi'}">${t}</small></h3><div class="chips" style="flex-wrap:wrap;margin:0">${v.map(([c,i])=>`<button class="chip" data-ed="dm:${i}">${esc(c.c)}</button>`).join('')}</div></div>`}).join('')}<button class="addb" data-ed="dm:new">+ Thêm hạng mục</button>
+<h3 style="margin:8px 2px">Giao dịch định kỳ</h3><div class="card" style="padding:4px 16px">${S.rec.map((r,i)=>`<button class="tx" data-ed="rec:${i}"><span class="dot">🔁</span><span class="m"><b>${esc(r.sub||r.cat||r.type)}</b><small>Ngày ${r.day} hằng tháng · ${esc(r.acc)}</small></span><b class="${CLS[r.type]}">${num(r.amount)}</b></button>`).join('')||empty('Chưa có giao dịch định kỳ','Tiền nhà, internet, lương… sẽ tự tạo đúng ngày.')}</div><button class="addb" data-ed="rec:new">+ Thêm giao dịch định kỳ</button>`}
+function trashPage(){return `<div class="card"><h3>Thùng rác</h3><p class="note">Mọi mục đã xóa được lưu vĩnh viễn ở tab DaXoa trên Google Sheet, không bao giờ bị xóa thật.</p>${S.trash.map((t,i)=>`<div class="acc"><span><b style="font-weight:500">${KT[t.k]||''}: ${esc(t.k==='gd'?(t.sub||t.cat||t.type)+' · '+num(t.amount):t.k==='tk'?t.id:t.cat+' › '+t.sub)}</b><small>${t.k==='gd'?esc(t.date+' · '+t.acc):''} Xóa lúc ${esc(t.at)}</small></span><button class="chip" data-rs="${i}">Khôi phục</button></div>`).join('')||empty('Thùng rác trống','')}</div>`}
+async function act(a,d,msg){S.busy++;try{apply(await api(a,d));toast(msg);closeForm()}catch(e){toast(e.message)}S.busy--;render()}
+let ED=null;
+function ed(kind,o,idx){const L=[...new Set(S.cat.map(c=>c.p))],nm=S.acc.map(a=>a.name),isN=idx==null;ED={kind,o,idx};
+const F={tk:[['name','Tên tài khoản','text',o.name],['type','Loại','text',o.type,['Tiền mặt','Ngân hàng','Thẻ tín dụng','Ví điện tử','Tiết kiệm']],['open','Số dư ban đầu','number',o.open]],
+dm:[['t','Loại','select',o.t||'Chi',['Chi','Thu']],['p','Hạng mục cha','text',o.p,L],['c','Chi tiết','text',o.c]],
+rec:[['type','Loại','select',o.type||'Chi',['Chi','Thu']],['amount','Số tiền','number',o.amount],['acc','Tài khoản','select',o.acc||nm[0],nm],['cat','Hạng mục','text',o.cat,L],['sub','Chi tiết','text',o.sub,S.cat.map(c=>c.c)],['note','Ghi chú','text',o.note],['day','Ngày trong tháng (1–31)','number',o.day||1]]}[kind];
+$('#sh').innerHTML=`<h3 style="margin-bottom:10px">${isN?'Thêm':'Sửa'} ${{tk:'tài khoản',dm:'hạng mục',rec:'giao dịch định kỳ'}[kind]}</h3><div class="f">${F.map(([id,lb,ty,v,ls])=>`<label class="${id==='note'||id==='name'||id==='c'?'w':''}">${lb}${ty==='select'?`<select id="e_${id}">${ls.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}</select>`:`<input id="e_${id}" type="${ty}" ${ty==='number'?'inputmode="numeric"':''} value="${esc(v??'')}" ${ls?`list="dl_${id}"`:''}>${ls?`<datalist id="dl_${id}">${[...new Set(ls)].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`:''}`}</label>`).join('')}</div><button class="save" data-esave>Lưu</button>${isN?'':'<button class="del" data-edel>Chuyển vào Thùng rác</button>'}`;$('#ov').classList.add('open')}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-ed],[data-rs]');if(!t)return;
+if(t.dataset.rs!=null){const x=S.trash[+t.dataset.rs];return x&&act('restore',{at:x.at,kind:x.k},'Đã khôi phục')}
+const[k,i]=t.dataset.ed.split(':'),src={tk:S.acc,dm:S.cat,rec:S.rec}[k];ed(k,i==='new'?{}:{...src[+i]},i==='new'?null:+i)});
+$('#sh').addEventListener('click',e=>{if(e.target.closest('[data-dup]')){E={...E,id:'G'+Date.now().toString(36),date:ymd(new Date()),isNew:true};form();return}if(!ED)return;const v=id=>($('#e_'+id)||{}).value,{kind,o,idx}=ED;
+if(e.target.closest('[data-esave]')){if(kind==='tk')return act('accSave',{acc:{name:v('name').trim(),type:v('type'),open:+v('open')||0},old:o.name},'Đã lưu');
+if(kind==='dm')return act('catSave',{cat:{t:v('t'),p:v('p').trim(),c:v('c').trim()},old:idx==null?null:{t:o.t,p:o.p,c:o.c}},'Đã lưu');
+if(kind==='rec'){const r={id:o.id||Date.now().toString(36),type:v('type'),amount:+v('amount')||0,acc:v('acc'),cat:v('cat').trim(),sub:v('sub').trim(),note:v('note'),day:Math.min(31,Math.max(1,+v('day')||1))};if(!r.amount)return toast('Nhập số tiền');const L=S.rec.slice();idx==null?L.push(r):L[idx]=r;return act('recSet',{rec:L},'Đã lưu định kỳ')}}
+if(e.target.closest('[data-edel]')){if(!confirm('Chuyển vào Thùng rác? Dữ liệu vẫn được lưu ở tab DaXoa.'))return;
+if(kind==='tk')return act('accDel',{name:o.name},'Đã chuyển vào Thùng rác');if(kind==='dm')return act('catDel',{cat:{t:o.t,p:o.p,c:o.c}},'Đã chuyển vào Thùng rác');
+if(kind==='rec')return act('recSet',{rec:S.rec.filter((_,i)=>i!==idx)},'Đã xóa định kỳ')}
+});
+const _form=form;form=function(){ED=null;_form();if(!E.isNew)$('#sh').insertAdjacentHTML('beforeend','<button class="chip" data-dup style="margin-top:8px;width:100%">⧉ Nhân đôi giao dịch</button>')};
 if(alive())boot();
 </script></body></html>
