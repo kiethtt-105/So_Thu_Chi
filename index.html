@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F1F3F8"><meta name="color-scheme" content="light dark"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#F3F4F6"><meta name="color-scheme" content="light dark"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Sổ Thu Chi</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232447D6'/%3E%3Cpath d='M30 62l14-14 10 10 18-22' stroke='%23fff' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<script>/* đặt chế độ tối trước khi vẽ trang, tránh nháy sáng */try{var t=localStorage.theme||(localStorage.dark==="1"?"dark":localStorage.dark==="0"?"light":"auto");if(t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark");document.querySelector("meta[name=theme-color]").content="#080C16"}}catch(e){}</script>
+<script>try{var t=localStorage.theme||(localStorage.dark==="1"?"dark":localStorage.dark==="0"?"light":"auto");if(t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark");document.querySelector("meta[name=theme-color]").content="#0F1218"}}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Sổ Thu Chi">
@@ -13,8 +13,8 @@
 <section id="login"><form id="lf"><div class="logo"><svg class="i" viewBox="0 0 24 24"><path d="M5 16l5-5 4 4 6-8"/></svg></div>
 <h1>Sổ Thu Chi</h1><p>Nhập mật khẩu để mở sổ</p><input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="Mật khẩu" autofocus><button class="go" id="lb">Mở sổ</button><div id="lerr" role="alert"></div></form></section>
 <div id="app" class="hide">
-<aside id="sb"></aside>
 <div class="wrap">
+<aside id="sd"><div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></span><span>Sổ Thu Chi</span></div><nav id="tb" aria-label="Điều hướng"></nav></aside>
 <header class="top"><div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></span><span>Sổ Thu Chi<small id="st2"></small></span></div><span id="st"></span>
 <span class="live wait" id="live" role="status" aria-live="polite"><i></i><b>Đang kết nối</b></span>
 <button class="ib hide" id="isb" data-a="issues" aria-label="Dữ liệu cần sửa" title="Dữ liệu cần kiểm tra"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18h.01"/></svg><span class="bdg" id="isn">0</span></button>

@@ -1,56 +1,68 @@
-/* Sổ Thu Chi — service worker: chạy offline, hiện thông báo, nhận push */
-const V = 'stc-v3';
+const V = 'stc-v4';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/app.js', 'js/notify.js', 'js/upload.js', 'js/main.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(V).then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(V)
+      .then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {}))))
+      .then(() => self.skipWaiting())
+  );
 });
+
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== V).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', e => {
-  const r = e.request; if (r.method !== 'GET') return;
+  const r = e.request;
+  if (r.method !== 'GET') return;
   const u = new URL(r.url);
-  if (u.origin === location.origin) {            // file của ứng dụng: ưu tiên bản mới, mất mạng thì dùng bản đã lưu
-    e.respondWith(fetch(r).then(res => {
-      if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put(r, cp)) }
-      return res;
-    }).catch(() => caches.match(r).then(m => m || caches.match('index.html'))));
-  } else if (/(^|\.)(googleapis|gstatic)\.com$/.test(u.hostname)) {   // font chữ
-    e.respondWith(caches.open(V).then(c => c.match(r).then(m => {
-      const f = fetch(r).then(res => { if (res.ok || res.type === 'opaque') c.put(r, res.clone()); return res }).catch(() => m);
-      return m || f;
+  if (u.origin === location.origin) {
+    e.respondWith(
+      fetch(r)
+        .then(res => {
+          if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put(r, cp)); }
+          return res;
+        })
+        .catch(() => caches.match(r).then(m => m || caches.match('index.html')))
+    );
+  } else if (/(^|\.)(googleapis|gstatic)\.com$/.test(u.hostname)) {
+    e.respondWith(caches.open(V).then(c => c.match(r).then(hit => {
+      const net = fetch(r)
+        .then(res => { if (res.ok || res.type === 'opaque') c.put(r, res.clone()); return res; })
+        .catch(() => hit);
+      return hit || net;
     })));
   }
 });
 
-/* bấm vào thông báo → mở / quay lại ứng dụng */
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || './index.html';
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => {
-    for (const c of l) if ('focus' in c) return c.focus();
-    return self.clients.openWindow(url);
+  const d = e.notification.data || {};
+  const url = d.url || './';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) {
+      if ('focus' in c) {
+        c.postMessage({ type: 'open-tab', tab: d.tab || '' });
+        return c.focus();
+      }
+    }
+    return self.clients.openWindow(url + (d.tab ? '#' + d.tab : ''));
   }));
 });
 
-/* sẵn sàng cho push từ máy chủ (khi có dịch vụ push) */
 self.addEventListener('push', e => {
-  let d = {}; try { d = e.data ? e.data.json() : {} } catch (x) { d = { body: e.data && e.data.text() } }
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data && e.data.text() }; }
   e.waitUntil(self.registration.showNotification(d.title || 'Sổ Thu Chi', {
-    body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: d.tag || 'stc', data: { url: d.url || './index.html' }
-  }));
-});
-/* Dán vào CUỐI file sw.js hiện có của bạn.
- * Khi người dùng bấm vào thông báo: đóng thông báo, đưa cửa sổ ứng dụng lên trước và mở đúng trang (Giao dịch, Báo cáo, Hạn mức…). */
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  const d = e.notification.data || {}, url = d.url || './';
-  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    for (const c of list) {
-      if ('focus' in c) { c.postMessage({ type: 'open-tab', tab: d.tab || '' }); return c.focus() }
-    }
-    return clients.openWindow(url + (d.tab ? '#' + d.tab : ''));
+    body: d.body || '',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-192.png',
+    tag: d.tag || 'stc',
+    data: { url: d.url || './index.html', tab: d.tab || '' }
   }));
 });
