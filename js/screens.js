@@ -44,7 +44,8 @@ function txs() {
     const dsum = {};
     l.forEach(t => { if (t.type === S.f && (S.f === 'Thu' || S.f === 'Chi'))
         dsum[t.date] = (dsum[t.date] || 0) + t.amount; });
-    const thu = l.filter(t => t.type === 'Thu').reduce((a, t) => a + t.amount, 0), chi = l.filter(t => t.type === 'Chi').reduce((a, t) => a + t.amount, 0), dt = {};
+    const hs = heldSet(), isOwn = t => !hs.has(t.acc) && !(t.accTo && hs.has(t.accTo)), lo = hs.size ? l.filter(isOwn) : l, nHeld = l.length - lo.length;
+    const thu = lo.filter(t => t.type === 'Thu').reduce((a, t) => a + t.amount, 0), chi = lo.filter(t => t.type === 'Chi').reduce((a, t) => a + t.amount, 0), dt = {};
     stx().forEach(t => { if (t.type === 'Chi')
         dt[t.date] = (dt[t.date] || 0) + t.amount; });
     const ld = limOf('Ngày', '');
@@ -64,7 +65,7 @@ ${S.rg === 'c' ? `<label class="l">Từ ngày<input type="date" id="x_d1" value=
 <label class="l">Tài khoản<select id="x_acc">${op(S.acc.map(a => a.name), S.xa, 'Tất cả')}</select></label><label class="l">Hạng mục<select id="x_cat">${op(pars, S.xc, 'Tất cả')}</select></label>
 <label class="l">Số tiền từ<input type="number" id="x_mn" inputmode="numeric" value="${S.mn}"></label><label class="l">Đến<input type="number" id="x_mx" inputmode="numeric" value="${S.mx}"></label>
 <label class="l w">Sắp xếp<select id="x_so">${[['dn', 'Mới nhất trước'], ['do', 'Cũ nhất trước'], ['ah', 'Số tiền: cao → thấp'], ['al', 'Số tiền: thấp → cao']].map(([k, v]) => `<option value="${k}" ${S.so === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div><button class="btn" data-a="rs">Xóa bộ lọc</button></div>` : ''}
-<div class="sum"><span>${l.length} giao dịch</span><span class="thu sens">Thu ${vnd(thu)}</span><span class="chi sens">Chi ${vnd(chi)}</span><span class="sens">Ròng ${vnd(thu - chi)}</span></div>
+<div class="sum"><span>${l.length} giao dịch</span><span class="thu sens">Thu ${vnd(thu)}</span><span class="chi sens">Chi ${vnd(chi)}</span><span class="sens">Ròng ${vnd(thu - chi)}</span>${nHeld ? `<span class="mut" title="Tài khoản Giữ Hộ không tính vào thu, chi, ròng">không tính ${nHeld} giao dịch Giữ Hộ</span>` : ''}</div>
 <div class="card flush">${l.length ? h : empty('Không có giao dịch', 'Thử đổi bộ lọc hoặc khoảng thời gian.')}</div>`;
 }
 function limPage() {

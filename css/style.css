@@ -327,3 +327,24 @@ html.sbc .nbd{display:none}
 .ctot span{color:var(--mut);font-weight:600}.ctot small{margin-left:6px;font-weight:500}
 .ctot b{font-size:22px;font-variant-numeric:tabular-nums}
 @media(max-width:480px){.rr .cnt{width:38px;height:38px}.cr{grid-template-columns:76px 12px 74px 1fr;gap:6px}}
+
+/* ---- Màn hình rất rộng / trình duyệt thu nhỏ (zoom 50%, 2K, 4K, TV):
+   phóng giao diện theo bậc để chữ và các khối không bị nhỏ li ti, không còn khoảng trống hai bên.
+   Media query tính theo chiều rộng thật của cửa sổ nên không bị lặp vòng. ---- */
+html{--z:1}
+@media(min-width:2200px){html{--z:1.25;zoom:var(--z)}}
+@media(min-width:2700px){html{--z:1.5;zoom:var(--z)}}
+@media(min-width:3200px){html{--z:1.75;zoom:var(--z)}}
+@media(min-width:3700px){html{--z:2;zoom:var(--z)}}
+@media(min-width:4600px){html{--z:2.5;zoom:var(--z)}}
+@media(min-width:7000px){html{--z:3.5;zoom:var(--z)}}
+/* các đơn vị vh/vw không tự co theo zoom nên chia lại cho --z */
+.wrap{min-height:calc(100vh / var(--z))}
+.sheet{max-height:calc(92dvh / var(--z))}
+#cf .msg{max-height:calc(40dvh / var(--z))}
+#toast{width:min(450px,calc((100vw - 24px) / var(--z)))}
+@media(min-width:960px){
+  .mdl{max-height:calc(100dvh / var(--z) - var(--hd) - 30px)}
+  .ov.open .sheet{width:min(540px,calc(92vw / var(--z)))}
+}
+@media print{html{zoom:1!important}}
