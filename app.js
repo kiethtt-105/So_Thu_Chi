@@ -53,30 +53,28 @@ function ask(title,msg,o){o=o||{};return new Promise(res=>{const c=$('#cf');$('#
   kd=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();done(true)}};
   $('#cfo').onclick=()=>done(true);$('#cfn').onclick=()=>done(false);c.onclick=e=>{if(e.target===c)done(false)};document.addEventListener('keydown',kd,true)})}
 let UNDO=null;   // {fn,t}: thao tác hoàn tác gần nhất (nút trên toast hoặc Ctrl+Z)
-function toast(t,u){const e=$('#toast');e.textContent=t;e.classList.toggle('u',!!u);
-  if(u){const b=document.createElement('button');b.type='button';b.textContent='Hoàn tác';b.onclick=()=>{if(UNDO&&UNDO.fn===u){UNDO=null;e.classList.remove('on');u()}};e.appendChild(b);UNDO={fn:u,t:Date.now()}}
-  e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),u?8000:3200)}
+// toast() / notify() nằm trong notify.js
 const typing=()=>{const a=document.activeElement;return !!(a&&a.closest&&a.closest('#v')&&/INPUT|SELECT|TEXTAREA/.test(a.tagName))};
 let inflight=false,fails=0,skip=0;
 async function sync(manual){   // máy chủ → web
-  if(inflight||(!manual&&(S.busy||document.hidden)))return;if(!manual&&fails>3&&++skip%5)return;
+  if(inflight||(!manual&&(S.busy||(document.hidden&&!pushOn()))))return;if(!manual&&fails>3&&++skip%5)return;
   inflight=true;if(manual)spin(1);
   try{const first=!S.synced,j=await call([],manual?'':S.rev);S.synced=true;fails=0;setLive('ok');S.err='';
-    if(apply(j)){if(!first&&!manual)toast('Dữ liệu vừa được cập nhật');if(typing())S.dirty=true;else render()}else if(manual)toast('Đã đồng bộ')}
+    const old=new Set(S.tx.map(t=>t.id));if(apply(j)){if(!first&&!manual)notifyNew(S.tx.filter(t=>!old.has(t.id)));if(typing())S.dirty=true;else render()}else if(manual)toast('Đã đồng bộ')}
   catch(e){fails++;setLive('err');S.err=e.message;if(manual)toast(e.message);$('#st').textContent='Chưa đồng bộ được';if(!S.ready)render()}
   inflight=false;if(manual)spin(0)}
 let chain=Promise.resolve();
 function commit(ops,o={}){   // web → máy chủ: gửi thao tác, nhận lại toàn bộ dữ liệu thật (thay mọi dự đoán cục bộ)
   if(o.local)o.local();render();S.busy++;spin(1);
   chain=chain.then(async()=>{let res={ok:true};
-    try{apply(await call(ops,''));setLive('ok');toast(o.ok||'Đã lưu',o.undo)}
-    catch(e){res={ok:false,err:e.message};toast('Chưa lưu được: '+e.message);try{apply(await call([],''))}catch(_){}}
+    try{apply(await call(ops,''));setLive('ok');notify(o.ok||'Đã lưu',{undo:o.undo})}
+    catch(e){res={ok:false,err:e.message};notify('Chưa lưu được: '+e.message,{title:'Lỗi',err:1});try{apply(await call([],''))}catch(_){}}
     S.busy--;if(!S.busy)spin(0);render();return res});
   return chain}
 async function act(ops,msg){const r=await commit(ops,{ok:msg});if(r.ok)closeSheet();else{const o=$('#ov.open #sh');if(o){let m=$('#serr');if(!m){m=document.createElement('p');m.id='serr';m.className='chi';m.style.cssText='margin-top:10px;font-size:13px';o.appendChild(m)}m.textContent='Lỗi: '+r.err}}return r}
 function lock(){sessionStorage.clear();localStorage.removeItem('sess');$('#app').classList.add('hide');$('#login').classList.remove('hide');$('#pw').value='';closeSheet()}
 $('#lf').onsubmit=ev=>{ev.preventDefault();if($('#pw').value===PASS){touch();boot()}else{$('#lerr').textContent='Mật khẩu không đúng';$('#lf').classList.remove('shake');void $('#lf').offsetWidth;$('#lf').classList.add('shake');$('#pw').select()}};
-function boot(){$('#login').classList.add('hide');$('#app').classList.remove('hide');render();sync(true)}
+function boot(){$('#login').classList.add('hide');$('#app').classList.remove('hide');render();sync(true);if(typeof pushInit==='function')pushInit()}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(!alive())return lock();sync(false)});
 setInterval(()=>{if(!alive()){if(!$('#app').classList.contains('hide'))lock();return}sync(false)},POLL_MS);
 document.addEventListener('focusout',()=>setTimeout(()=>{if(S.dirty&&!typing()){S.dirty=false;render()}},60));
@@ -103,7 +101,7 @@ function limCalc(){const today=ymd(new Date()),chi=S.tx.filter(t=>t.type==='Chi'
   .sort((a,b)=>(a.cat?1:0)-(b.cat?1:0)||a.name.localeCompare(b.name,'vi'))}
 function limWarn(r){if(!r||r.type!=='Chi')return;const W=[],sm=f=>S.tx.filter(t=>t.type==='Chi'&&f(t)).reduce((x,t)=>x+t.amount,0);
   S.lim.forEach(L=>{if(L.cat&&L.cat!==r.cat)return;const v=L.per==='Ngày'?sm(t=>t.date===r.date&&(!L.cat||t.cat===L.cat)):sm(t=>mOf(t)===mOf(r)&&(!L.cat||t.cat===L.cat));if(v>L.v)W.push((L.cat||'Tổng chi')+' vượt '+vnd(v-L.v)+(L.per==='Ngày'?' trong ngày':' trong tháng'))});
-  if(W.length)setTimeout(()=>toast('⚠️ '+W.join(' · '),UNDO&&Date.now()-UNDO.t<9000?UNDO.fn:null),1500)}
+  if(W.length)setTimeout(()=>notify(W.join(' · '),{title:'Vượt hạn mức',ico:'⚠️',err:1,undo:UNDO&&Date.now()-UNDO.t<9000?UNDO.fn:null}),1500)}
 
 /* =============== THÀNH PHẦN CHUNG =============== */
 const empty=(a,b='')=>`<div class="empty"><b>${a}</b>${b}</div>`;
@@ -117,7 +115,7 @@ S.tx.map((t,i)=>[t,i]).sort((x,y)=>x[0].date.localeCompare(y[0].date)||tm(x[0]).
 const x=t.amount;B[t.acc]=(B[t.acc]||0)+(t.type==='Thu'||t.type==='Điều chỉnh'?x:-x);if(t.type==='Chuyển khoản'&&t.accTo)B[t.accTo]=(B[t.accTo]||0)+x;m[t.id]=B[t.acc]});
 _bk={t:S.tx,a:S.acc,n:S.tx.length,m};return m}
 function txRow(t){const c=CLS[t.type],ttl=t.type==='Chuyển khoản'?`${esc(t.acc)} → ${esc(t.accTo)}`:esc(t.sub||t.cat||(t.type==='Chi'||t.type==='Thu'?'Chưa phân loại':t.type)),ico=t.type==='Chuyển khoản'?'⇄':t.type==='Điều chỉnh'?'±':emo(t.sub||t.cat);
-return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(t.note||t.cat||'')}${t.type==='Chuyển khoản'?'':(t.note||t.cat?' · ':'')+esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${t.type==='Chi'?'−':t.type==='Thu'?'+':''}${num(t.amount)}</b>${balMap()[t.id]!==undefined?`<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(balMap()[t.id])}</small>`:''}</span></button>`}
+return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(noteTxt(t.note)||t.cat||'')+(hasImg(t.note)?' 📎':'')}${t.type==='Chuyển khoản'?'':(noteTxt(t.note)||t.cat||hasImg(t.note)?' · ':'')+esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${t.type==='Chi'?'−':t.type==='Thu'?'+':''}${num(t.amount)}</b>${balMap()[t.id]!==undefined?`<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(balMap()[t.id])}</small>`:''}</span></button>`}
 function donut(rows,tot,off=0,fi=emo){if(!rows.length||!tot)return empty('Chưa có dữ liệu');const R=48,C=2*Math.PI*R;let o=0;
 return `<div class="cd"><svg width="132" height="132" viewBox="0 0 120 120" role="img" aria-label="Biểu đồ cơ cấu">${rows.map(([k,v],i)=>{const l=v/tot*C,x=`<circle r="${R}" cx="60" cy="60" fill="none" stroke="${col(i+off)}" stroke-width="18" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-o}" transform="rotate(-90 60 60)"/>`;o+=l;return x}).join('')}<text x="60" y="58" text-anchor="middle" font-size="9" fill="var(--mut)">${rows.length} nhóm</text><text x="60" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${tot>=1e6?(tot/1e6).toFixed(1)+'tr':Math.round(tot/1e3)+'k'}</text></svg>
 <ul>${rows.slice(0,6).map(([k,v],i)=>`<li><i style="background:${col(i+off)}"></i><span>${fi(k)} ${esc(k)}</span><b>${Math.round(v/tot*100)}%</b></li>`).join('')}</ul></div>`}
@@ -145,7 +143,7 @@ return head('Tổng quan',mlabel(S.m)+' · '+M.length+' giao dịch')+issueBanne
 <div class="card"><div class="ch">Hạn mức chi <button class="chip" data-tab="lim">Chi tiết</button></div>${limHtml||empty('Chưa đặt hạn mức','Vào mục Hạn mức để thiết lập.')}${ov?`<p class="chi" style="font-size:13px;margin-top:10px">⚠️ ${ov} hạn mức đang bị vượt</p>`:''}</div></div>`}
 
 function txs(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>{if(S.rg==='m'&&!inM(t,S.m))return false;if(S.rg==='c'&&((S.d1&&t.date<S.d1)||(S.d2&&t.date>S.d2)))return false;if(S.f!=='all'&&t.type!==S.f)return false;if(S.xa&&t.acc!==S.xa&&t.accTo!==S.xa)return false;if(S.xc&&t.cat!==S.xc)return false;if(S.mn!==''&&t.amount<+S.mn)return false;if(S.mx!==''&&t.amount>+S.mx)return false;
-return !q||[t.note,t.cat,t.sub,t.acc,t.accTo,String(t.amount)].join(' ').toLowerCase().includes(q)});
+return !q||[noteTxt(t.note),t.cat,t.sub,t.acc,t.accTo,String(t.amount)].join(' ').toLowerCase().includes(q)});
 const ds=S.so==='dn'||S.so==='do';l.sort({dn:(a,b)=>b.date.localeCompare(a.date),do:(a,b)=>a.date.localeCompare(b.date),ah:(a,b)=>b.amount-a.amount,al:(a,b)=>a.amount-b.amount}[S.so]);
 const dsum={};l.forEach(t=>{if(t.type===S.f&&(S.f==='Thu'||S.f==='Chi'))dsum[t.date]=(dsum[t.date]||0)+t.amount});const thu=l.filter(t=>t.type==='Thu').reduce((a,t)=>a+t.amount,0),chi=l.filter(t=>t.type==='Chi').reduce((a,t)=>a+t.amount,0),dt={};S.tx.forEach(t=>{if(t.type==='Chi')dt[t.date]=(dt[t.date]||0)+t.amount});const ld=limOf('Ngày','');
 let h='',last='';l.forEach(t=>{if(ds&&t.date!==last){last=t.date;const dd=new Date(t.date+'T00:00'),ov=ld&&dt[t.date]>ld;h+=`<div class="dh ${ov?'over':''}"><span>${dd.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'})}</span><span class="sens">${S.f==='Thu'?(dsum[t.date]?'thu '+num(dsum[t.date]):''):S.f==='Chi'||S.f==='all'?(dt[t.date]?'chi '+num(dt[t.date])+(ov?' ⚠️ vượt hạn mức ngày':''):''):''}</span></div>`}h+=txRow(t)});
@@ -225,7 +223,7 @@ const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p
 /* =============== KHUNG & SỰ KIỆN =============== */
 function nav(){$('#sb').innerHTML=`<div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></span>Sổ Thu Chi</div>`+TABS.map(([k,l,gr])=>(gr?`<div class="g">${gr}</div>`:'')+`<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${l}</button>`).join('')+`<div class="foot">Phím tắt: <b>N</b> thêm · <b>C</b> gõ nhanh · <b>/</b> tìm · <b>Ctrl+Z</b> hoàn tác</div>`;
 $('#bn').innerHTML=MOB.map(k=>{const t=TABS.find(x=>x[0]===k);return `<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${t[1]}</button>`}).join('')+`<button class="${MOB.includes(S.tab)?'':'on'}" data-a="more">${ic('more')}${MOB.includes(S.tab)?'Thêm':TABS.find(x=>x[0]===S.tab)[1]}</button>`;
-const n=S.issues.length;$('#isb').classList.toggle('hide',!n);$('#isn').textContent=n>99?'99+':n;if(typeof qbNav==='function')qbNav()}
+const n=S.issues.length;$('#isb').classList.toggle('hide',!n);$('#isn').textContent=n>99?'99+':n;if(typeof qbNav==='function')qbNav();if(typeof nbUpdate==='function')nbUpdate()}
 function render(){nav();$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,rp:reportPage,rec:recon,lim:limPage,acc:accs,cat:cats,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
 const go=t=>{S.tab=t;location.hash=t;scrollTo(0,0);closeSheet();render()};
 document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-a],[data-bdo],[data-ed],[data-rs]');if(!t||t.closest('#ov'))return;const d=t.dataset;
@@ -248,19 +246,19 @@ const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""'
 
 /* =============== HỘP THOẠI =============== */
 const openSheet=()=>$('#ov').classList.add('open'),closeSheet=()=>$('#ov').classList.remove('open');
-function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['rec','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button><button class="row" data-a3="bk">${ic('dl')}<span class="m"><b>Tải bản sao lưu (JSON)</b><small>Giao dịch, tài khoản, hạng mục, hạn mức</small></span></button><button class="row" data-a3="bkgs">${ic('dl')}<span class="m"><b>Sao lưu trực tuyến</b><small>Lưu thêm một bản sao toàn bộ dữ liệu</small></span></button></div>`;ED=null;E=null;openSheet()}
+function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['rec','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-nt="open">${ic('bell')}<span class="m"><b>Thông báo &amp; ứng dụng</b><small>Bật thông báo, cài đặt ứng dụng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button><button class="row" data-a3="bk">${ic('dl')}<span class="m"><b>Tải bản sao lưu (JSON)</b><small>Giao dịch, tài khoản, hạng mục, hạn mức</small></span></button><button class="row" data-a3="bkgs">${ic('dl')}<span class="m"><b>Sao lưu trực tuyến</b><small>Lưu thêm một bản sao toàn bộ dữ liệu</small></span></button></div>`;ED=null;E=null;openSheet()}
 function openIssues(){const L=S.issues;ED=null;E=null;$('#sh').innerHTML=`<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0,80).map(i=>`<div class="iss ${i.lv}"><b>${esc(SN[i.sheet]||i.sheet)} · dòng ${i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length>80?`<p class="mut" style="margin-top:8px">… và ${L.length-80} mục nữa</p>`:''}`;openSheet()}
 function catFields(ty,cat,sub,ip,is){const L=S.cat.map((c,i)=>({...c,i})).filter(c=>c.t===ty),pars=[...new Set(L.map(c=>c.p))],o=c=>`<option value="${c.i}" ${c.p===cat&&c.c===sub?'selected':''}>${esc(c.c)}</option>`;
 return `<label>Hạng mục<select id="${ip}"><option value="">Chọn…</option>${pars.map(p=>`<option ${p===cat?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Chi tiết<select id="${is}"><option value="">${cat?'Chọn…':'Chọn (tự điền hạng mục)…'}</option>${cat?L.filter(c=>c.p===cat).map(o).join(''):pars.map(p=>`<optgroup label="${esc(p)}">${L.filter(c=>c.p===p).map(o).join('')}</optgroup>`).join('')}</select></label>`}
 const hm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-function openForm(t,ty){E=t?{...t,time:(t.at||'').slice(11,16)}:{id:newId(),date:ymd(new Date()),time:hm(new Date()),type:ty||'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',isNew:true};ED=null;form();openSheet()}
+function openForm(t,ty){E=t?{...t,note:noteTxt(t.note),imgs:splitImg(t.note).imgs,time:(t.at||'').slice(11,16)}:{id:newId(),date:ymd(new Date()),time:hm(new Date()),type:ty||'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',imgs:[],isNew:true};ED=null;form();openSheet()}
 function form(){const ty=E.type,op=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
 $('#sh').innerHTML=`<div class="seg">${TYPES.map(x=>`<button data-ty="${x}" class="${x===ty?'on':''}">${x==='Chuyển khoản'?'Chuyển':x}</button>`).join('')}</div>${tplRow()}
 <input class="amt money ${CLS[ty]}" ${ty==='Điều chỉnh'?'data-neg="1"':''} id="fa" inputmode="${ty==='Điều chỉnh'?'text':'numeric'}" placeholder="0" value="${E.amount?num(E.amount):''}" aria-label="Số tiền"><div class="f">
 <label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time||''}"></label><label class="w">${ty==='Chuyển khoản'?'Từ tài khoản':'Tài khoản'}<select id="fc">${op(S.acc.map(a=>a.name),E.acc)}</select></label>
 ${ty==='Chuyển khoản'?`<label class="w">Đến tài khoản<select id="ft"><option value="">Chọn…</option>${op(S.acc.map(a=>a.name).filter(n=>n!==E.acc),E.accTo)}</select></label>`:ty==='Điều chỉnh'?'':catFields(ty,E.cat,E.sub,'fp','fs')}
-<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label></div>
-<button class="btn p w" data-save>${E.isNew?'Lưu giao dịch':'Lưu thay đổi'}</button><button class="btn w" data-tplsave style="margin-top:6px">☆ Lưu thành mẫu</button>${E.isNew?'':'<button class="btn w" data-dup>⧉ Nhân đôi giao dịch</button><button class="btn d w" data-del style="margin-top:2px">Xóa giao dịch</button>'}`}
+<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="w" id="att"></div></div>
+<button class="btn p w" data-save>${E.isNew?'Lưu giao dịch':'Lưu thay đổi'}</button><button class="btn w" data-tplsave style="margin-top:6px">☆ Lưu thành mẫu</button>${E.isNew?'':'<button class="btn w" data-dup>⧉ Nhân đôi giao dịch</button><button class="btn d w" data-del style="margin-top:2px">Xóa giao dịch</button>'}`;renderAtt()}
 function pull(){const g=i=>($(i)||{}).value;E.date=g('#fd')||E.date;if($('#fh'))E.time=g('#fh');E.acc=g('#fc')||E.acc;E.note=g('#fn')||'';if($('#ft'))E.accTo=g('#ft');E.amount=pm($('#fa').value)}
 function openLim(){ED=null;E=null;const pars=[...new Set(S.cat.filter(c=>c.t==='Chi').map(c=>c.p))],orph=[...new Set(S.lim.filter(l=>l.cat&&!pars.includes(l.cat)).map(l=>l.cat))],all=['',...pars,...orph];
 const list=per=>all.map(p=>`<label class="${p===''?'w':''}">${p===''?'∑ Tổng chi (tất cả hạng mục)':emo(p)+' '+esc(p)+(orph.includes(p)?' ⚠️ hạng mục này không còn tồn tại':'')}<input class="lm money" data-per="${per}" data-cat="${esc(p)}" inputmode="numeric" placeholder="Để trống = không đặt" title="Để trống hoặc nhập 0 để bỏ hạn mức" value="${limOf(per,p)?num(limOf(per,p)):''}"></label>`).join('');
@@ -291,8 +289,8 @@ if(q('[data-ty]')){pull();E.type=q('[data-ty]').dataset.ty;E.cat=E.sub='';form()
 if(q('[data-dup]')){pull();E={...E,id:newId(),date:ymd(new Date()),isNew:true};form();return}
 if(q('[data-del]')){if(!await ask('Chuyển giao dịch vào Thùng rác?','Bạn có thể khôi phục lại trong Thùng rác.',{danger:1,ok:'Xóa'}))return;const id=E.id;closeSheet();txDel(id);return}
 if(q('[data-save]')){pull();const ty=E.type;let er='';
- if(!E.amount)er='Nhập số tiền';else if(E.amount<0&&ty!=='Điều chỉnh')er='Số tiền phải lớn hơn 0';else if(!E.acc)er='Chọn tài khoản';else if(ty==='Chuyển khoản'&&!E.accTo)er='Chọn tài khoản nhận';else if(ty==='Chuyển khoản'&&E.accTo===E.acc)er='Tài khoản nguồn và nhận phải khác nhau';else if(ty!=='Chuyển khoản'&&ty!=='Điều chỉnh'&&(!E.cat||!E.sub))er='Chọn hạng mục và chi tiết';if(er)return toast(er);
- const x=ty==='Chuyển khoản'||ty==='Điều chỉnh',row={id:E.id,date:E.date,type:ty,amount:E.amount,acc:E.acc,accTo:ty==='Chuyển khoản'?E.accTo:'',cat:x?'':E.cat,sub:x?'':E.sub,note:E.note};if(E.time){row.at=E.date+'T'+E.time+':00'}else if(E.at){row.at=E.at}
+ if(!E.amount)er='Nhập số tiền';else if(E.amount<0&&ty!=='Điều chỉnh')er='Số tiền phải lớn hơn 0';else if(!E.acc)er='Chọn tài khoản';else if(ty==='Chuyển khoản'&&!E.accTo)er='Chọn tài khoản nhận';else if(ty==='Chuyển khoản'&&E.accTo===E.acc)er='Tài khoản nguồn và nhận phải khác nhau';else if(ty!=='Chuyển khoản'&&ty!=='Điều chỉnh'&&(!E.cat||!E.sub))er='Chọn hạng mục và chi tiết';if(er)return toast(er);if(E.up)return toast('Đang tải ảnh lên, vui lòng chờ…');
+ const x=ty==='Chuyển khoản'||ty==='Điều chỉnh',row={id:E.id,date:E.date,type:ty,amount:E.amount,acc:E.acc,accTo:ty==='Chuyển khoản'?E.accTo:'',cat:x?'':E.cat,sub:x?'':E.sub,note:joinImg(E.note,E.imgs)};if(E.time){row.at=E.date+'T'+E.time+':00'}else if(E.at){row.at=E.at}
  closeSheet();txSave(row)}});
 
 /* ===== features ===== */
@@ -707,6 +705,3 @@ document.addEventListener('click', e => {
   S.rpv = b.dataset.rp; render();
 });
 
-
-/* ---- khởi động ---- */
-if(alive())boot();

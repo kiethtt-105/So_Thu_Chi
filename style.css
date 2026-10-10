@@ -183,3 +183,32 @@ body:not(.dark) .kpi.h{background:linear-gradient(135deg,#0E1B2C 0%,#0F5A5E 100%
 .tip.r:after{left:auto;right:-8px}
 .tip:hover:after,.tip:focus:after{opacity:1;visibility:visible;transform:none}
 @media print{.tip{display:none!important}}
+
+
+/* ---------- Thông báo dạng app (banner kiểu thông báo điện thoại) ---------- */
+#toast{top:calc(12px + env(safe-area-inset-top));bottom:auto;left:50%;width:min(440px,calc(100vw - 24px));max-width:none;padding:11px 14px;border-radius:18px;display:flex;align-items:center;gap:12px;background:color-mix(in srgb,var(--card) 94%,transparent);color:var(--ink);border:1px solid var(--line);box-shadow:0 14px 40px #0b122040;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transform:translate(-50%,-26px);z-index:90;font-weight:400;text-align:left}
+#toast.on{transform:translate(-50%,0);pointer-events:auto}
+#toast .ni{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--accl);font-size:18px}
+#toast.err .ni{background:color-mix(in srgb,var(--chi) 16%,transparent)}
+#toast .nb{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+#toast .nb b{font-size:11.5px;font-weight:600;color:var(--mut);letter-spacing:.2px}
+#toast .nb span{font-size:13.5px;line-height:1.38;white-space:pre-line;overflow-wrap:anywhere}
+#toast em{font-style:normal;font-size:11px;color:var(--mut);align-self:flex-start;margin-top:2px}
+#toast button{color:var(--acc);font-weight:700;padding:6px 10px;border-radius:8px;background:var(--accl)}#toast button:hover{background:var(--accl);filter:brightness(.96)}
+
+/* ---------- Ảnh đính kèm ---------- */
+.att-i{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 12px}
+.att-i a{color:var(--acc);font-weight:600}
+.att-i button{width:20px;height:20px;border-radius:50%;line-height:1;color:var(--mut);font-size:15px}.att-i button:hover{background:var(--soft);color:var(--ink)}
+.att-i.bad{border-color:var(--chi);color:var(--chi)}
+.att-add{cursor:pointer;border-style:dashed;color:var(--acc);font-weight:600}
+.spn{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:stcspin .7s linear infinite;vertical-align:-2px}
+@keyframes stcspin{to{transform:rotate(360deg)}}
+
+/* ---------- Chế độ ứng dụng (đã cài) ---------- */
+html{-webkit-tap-highlight-color:transparent}
+body{overscroll-behavior-y:none}
+@media (display-mode:standalone){body{-webkit-user-select:none;user-select:none}input,textarea,select{-webkit-user-select:text;user-select:text}}
+
+.att-i.bad{white-space:normal;max-width:100%;border-radius:14px;line-height:1.4;align-items:flex-start;padding-top:7px;padding-bottom:7px}
+.sheet{overflow-x:hidden}
