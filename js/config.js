@@ -1,5 +1,5 @@
 window.CONFIG = {
   PASS: "0000",
-  API: "https://script.google.com/macros/s/AKfycbx9e1JnJhVgvDzBH2eNTK7-YIJ0JXOV16u5Q3aqmYqCgipogEkSvH6xzO8nII3ATSpB/exec",  
-};
+  API: "https://script.google.com/macros/s/AKfycbxqJM-PSvtGLZrXqIIakF3WWfGgEjFqeAAoVoHI_BZe8Xt60iNm15-r6f2fWpDUqBw3/exec"
+}
 

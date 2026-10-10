@@ -42,3 +42,15 @@ self.addEventListener('push', e => {
     body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: d.tag || 'stc', data: { url: d.url || './index.html' }
   }));
 });
+/* Dán vào CUỐI file sw.js hiện có của bạn.
+ * Khi người dùng bấm vào thông báo: đóng thông báo, đưa cửa sổ ứng dụng lên trước và mở đúng trang (Giao dịch, Báo cáo, Hạn mức…). */
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const d = e.notification.data || {}, url = d.url || './';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) {
+      if ('focus' in c) { c.postMessage({ type: 'open-tab', tab: d.tab || '' }); return c.focus() }
+    }
+    return clients.openWindow(url + (d.tab ? '#' + d.tab : ''));
+  }));
+});
