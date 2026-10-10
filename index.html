@@ -83,6 +83,9 @@ header{background:color-mix(in srgb,var(--bg) 80%,transparent)}
 @media(min-width:900px){main:has(.dash){max-width:1100px}.dash{grid-template-columns:1fr 1fr}.dash>.hero,.dash>.mn,.dash>.ins,.dash>#warn,.dash>.two,.dash>.calc{grid-column:1/-1}}
 .sm{display:grid;gap:8px;font-size:14px}.sm div{display:flex;justify-content:space-between}.sm div:last-child{border-top:1px solid var(--line);padding-top:8px;font-weight:700}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;text-align:center;font-size:11px}.cal i{font-style:normal;color:var(--mut)}.cal span{border-radius:10px;padding:6px 0;min-height:44px;background:var(--bg)}.cal span b{display:block;font-size:13px}.cal span small{font-size:10px;color:var(--chi);font-weight:700}
+
+.fp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.fp label{font-size:11px;color:var(--mut)}.fp select,.fp input{width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);margin-top:2px}.fp .w{grid-column:1/-1}
+.tsum{display:flex;gap:8px;margin:8px 0;font-size:12px;flex-wrap:wrap}.tsum span{background:var(--card);border-radius:10px;padding:6px 10px}.dh.over{color:var(--chi);font-weight:700}
 </style></head><body>
 <section id="login"><form id="lf"><svg width="56" height="56" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#fff"/><path d="M30 62l14-14 10 10 18-22" stroke="#0B4F59" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
 <h1>Sổ Thu Chi</h1><p>Nhập mật khẩu để mở sổ</p><input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="Mật khẩu" autofocus><button class="go" id="lb">Mở sổ</button><div id="lerr" role="alert"></div></form></section>
@@ -107,7 +110,7 @@ async function api(a,d={}){let r;const ac=new AbortController(),tm=setTimeout(()
 const j=await r.json();if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),2600)}
 function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.sig=sigOf(j);if(j.h)S.h=j.h;S.ready=true;sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat});$('#st').textContent='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}
-const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat]),POLL_MS=2000;
+const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim]),POLL_MS=2000;
 const setLive=s=>{const e=$('#live');if(!e||e.dataset.s===s)return;e.dataset.s=s;e.className='live '+s;e.lastChild.textContent={ok:'Live',err:'Mất kết nối',wait:'Đang kết nối'}[s]};
 async function sync(quiet){$('#rf').classList.add('spin');try{apply(await api('all'));S.err='';setLive('ok');render()}catch(e){setLive('err');S.err=e.message;if(!quiet)toast(e.message);$('#st').textContent='Chưa đồng bộ được';if(!S.ready)render()}$('#rf').classList.remove('spin')}
 async function push(a,d,undo){S.busy++;$('#rf').classList.add('spin');try{apply(await api(a,d));toast('Đã lưu')}catch(e){undo();toast('Chưa lưu được: '+e.message)}S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
@@ -220,7 +223,7 @@ const donut=rows.length?`<div class="card"><h3>Cơ cấu chi tiêu</h3><div clas
 const bad=S.bad?`<div id="warn">⚠️ Sheet có ${S.bad} dòng dữ liệu sai — hệ thống đã tự sửa/khôi phục khi có thể.</div>`:'';
 h=h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',bad+ins+donut+'<div class="card"><h3>Chi theo hạng mục</h3>');
 return h.replace(/<div class="bar"><div><span>([^<]*)<\/span>/g,(m,k)=>`<div class="bar" style="--bc:${colOf(k,rows.findIndex(r=>esc(r[0])===k))}"><div><span>${emo(k)} ${k}</span>`)};
-const _apply=apply;apply=function(j){S.bad=j.bad||0;_apply(j)};
+const _apply=apply;apply=function(j){S.bad=j.bad||0;if(j.lim&&Object.keys(j.lim).length){S.lim=j.lim;localStorage.lim=JSON.stringify(j.lim)}_apply(j)};
 
 const eye=document.createElement('button');eye.className='ib';eye.setAttribute('aria-label','Ẩn/hiện số dư');eye.textContent='👁';
 if(localStorage.hb==='1')document.body.classList.add('hb');eye.onclick=()=>{localStorage.hb=document.body.classList.toggle('hb')?1:0};$('#tg').before(eye);
@@ -234,5 +237,41 @@ const cal=`<div class="card cal-w cal" style="display:block"><h3>Lịch chi tiê
 const sm=`<div class="card"><h3>Tổng quan tháng</h3><div class="sm"><div><span>Tổng thu</span><b class="thu">${vnd(thu)}</b></div><div><span>Tổng chi</span><b class="chi">${vnd(chi)}</b></div><div><span>Chênh lệch</span><b>${vnd(thu-chi)}</b></div></div></div>`;
 h=h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',dn('Thu','Thu tiền')+sm+'<div class="card"><h3>Chi theo hạng mục</h3>');
 return '<div class="dash">'+h+cal.replace('class="card cal-wrap"','class="card calc"')+'</div>'};
+
+// ===== LỌC / SẮP XẾP / HẠN MỨC =====
+try{S.lim=JSON.parse(localStorage.lim||'null')||{d:0,m:0,c:{}}}catch(e){S.lim={d:0,m:0,c:{}}}
+Object.assign(S,{rg:'m',so:'dn',xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',fo:false});
+txs=function(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>{
+if(S.rg==='m'&&t.date.slice(0,7)!==S.m)return false;if(S.rg==='c'&&((S.d1&&t.date<S.d1)||(S.d2&&t.date>S.d2)))return false;
+if(S.f!=='all'&&t.type!==S.f)return false;if(S.xa&&t.acc!==S.xa&&t.accTo!==S.xa)return false;if(S.xc&&t.cat!==S.xc)return false;
+if(S.mn!==''&&t.amount<+S.mn)return false;if(S.mx!==''&&t.amount>+S.mx)return false;
+return !q||[t.note,t.cat,t.sub,t.acc,t.accTo,String(t.amount)].join(' ').toLowerCase().includes(q)});
+const dsort=S.so==='dn'||S.so==='do';l.sort({dn:(a,b)=>b.date.localeCompare(a.date),do:(a,b)=>a.date.localeCompare(b.date),ah:(a,b)=>b.amount-a.amount,al:(a,b)=>a.amount-b.amount}[S.so]);
+const thu=l.filter(t=>t.type==='Thu').reduce((a,t)=>a+t.amount,0),chi=l.filter(t=>t.type==='Chi').reduce((a,t)=>a+t.amount,0),dt={};l.forEach(t=>{if(t.type==='Chi')dt[t.date]=(dt[t.date]||0)+t.amount});
+let h='',last='';l.forEach(t=>{if(dsort&&t.date!==last){last=t.date;const d=new Date(t.date+'T00:00'),ov=S.lim.d&&dt[t.date]>S.lim.d;h+=`<div class="dh ${ov?'over':''}">${d.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'})}${dt[t.date]?' · chi '+num(dt[t.date])+(ov?' ⚠️ vượt hạn mức':''):''}</div>`}h+=txRow(t)});
+const op=(a,v,ph)=>`<option value="">${ph}</option>`+a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join(''),pars=[...new Set(S.cat.map(c=>c.p))],n=[S.xa,S.xc,S.mn,S.mx,S.d1,S.d2].filter(x=>x!=='').length+(S.rg!=='m'?1:0);
+return `${S.rg==='m'?monthNav():''}<input class="search" id="q" placeholder="Tìm theo ghi chú, hạng mục, số tiền" value="${esc(S.q)}"><div class="chips">${['all',...TYPES].map(t=>`<button class="chip ${S.f===t?'on':''}" data-f="${t}">${t==='all'?'Tất cả':t}</button>`).join('')}<button class="chip ${n?'on':''}" data-x="fo">⚙ Bộ lọc${n?' ('+n+')':''}</button></div>
+${S.fo?`<div class="card"><div class="fp"><label class="w">Thời gian<select id="x_rg"><option value="m" ${S.rg==='m'?'selected':''}>Theo tháng đang xem</option><option value="a" ${S.rg==='a'?'selected':''}>Toàn bộ thời gian</option><option value="c" ${S.rg==='c'?'selected':''}>Khoảng ngày tùy chọn</option></select></label>
+${S.rg==='c'?`<label>Từ ngày<input type="date" id="x_d1" value="${S.d1}"></label><label>Đến ngày<input type="date" id="x_d2" value="${S.d2}"></label>`:''}
+<label>Tài khoản<select id="x_acc">${op(S.acc.map(a=>a.name),S.xa,'Tất cả')}</select></label><label>Hạng mục<select id="x_cat">${op(pars,S.xc,'Tất cả')}</select></label>
+<label>Số tiền từ<input type="number" id="x_mn" inputmode="numeric" value="${S.mn}"></label><label>Đến<input type="number" id="x_mx" inputmode="numeric" value="${S.mx}"></label>
+<label class="w">Sắp xếp<select id="x_so">${[['dn','Mới nhất trước'],['do','Cũ nhất trước'],['ah','Số tiền: cao → thấp'],['al','Số tiền: thấp → cao']].map(([k,v])=>`<option value="${k}" ${S.so===k?'selected':''}>${v}</option>`).join('')}</select></label></div><button class="chip" data-x="rs">Xóa bộ lọc</button></div>`:''}
+<div class="tsum"><span>${l.length} giao dịch</span><span class="thu">Thu ${vnd(thu)}</span><span class="chi">Chi ${vnd(chi)}</span><span>Ròng ${vnd(thu-chi)}</span></div>
+<div class="card" style="padding:4px 16px">${l.length?h:empty('Không có giao dịch','Thử đổi bộ lọc hoặc khoảng thời gian.')}</div><button class="chip" data-csv>Tải CSV toàn bộ</button>`};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-x]');if(!t)return;const x=t.dataset.x;
+if(x==='fo')S.fo=!S.fo;else if(x==='rs'){Object.assign(S,{xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',so:'dn',rg:'m',f:'all',q:''})}else if(x==='lim')return openLim();render()});
+document.addEventListener('change',e=>{const k={x_rg:'rg',x_acc:'xa',x_cat:'xc',x_mn:'mn',x_mx:'mx',x_so:'so',x_d1:'d1',x_d2:'d2'}[e.target.id];if(k){S[k]=e.target.value;render()}});
+function openLim(){const L=S.lim,pars=[...new Set(S.cat.filter(c=>c.t==='Chi').map(c=>c.p))];
+$('#sh').innerHTML=`<h3 style="margin-bottom:6px">Hạn mức chi</h3><p class="note">Để trống hoặc 0 = không giới hạn. Đồng bộ qua Google Sheet.</p><div class="f"><label>Mỗi ngày (₫)<input id="l_d" type="number" inputmode="numeric" value="${L.d||''}"></label><label>Mỗi tháng (₫)<input id="l_m" type="number" inputmode="numeric" value="${L.m||''}"></label><label class="w" style="font-weight:700;margin-top:8px">Theo hạng mục (mỗi tháng)</label>${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_c" data-p="${esc(p)}" type="number" inputmode="numeric" value="${(L.c||{})[p]||''}"></label>`).join('')}</div><button class="save" data-lsave>Lưu hạn mức</button>`;$('#ov').classList.add('open')}
+$('#sh').addEventListener('click',async e=>{if(!e.target.closest('[data-lsave]'))return;const c={};document.querySelectorAll('.l_c').forEach(i=>{if(+i.value>0)c[i.dataset.p]=+i.value});
+S.lim={d:+$('#l_d').value||0,m:+$('#l_m').value||0,c};localStorage.lim=JSON.stringify(S.lim);closeForm();render();try{apply(await api('lim',{lim:S.lim}));toast('Đã lưu hạn mức');render()}catch(er){toast('Đã lưu trên máy này, chưa đồng bộ: '+er.message)}});
+const _home3=home;
+home=function(){let h=_home3();const L=S.lim||{},now=ymd(new Date()),M=S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m),tot=M.reduce((a,t)=>a+t.amount,0),td=S.tx.filter(t=>t.type==='Chi'&&t.date===now).reduce((a,t)=>a+t.amount,0);
+const bar=(lb,v,lim)=>{const r=v/lim,c=r>1?'var(--chi)':r>.8?'var(--dc)':'var(--thu)';return `<div class="bar" style="--bc:${c}"><div><span>${lb}</span><b>${vnd(v)} / ${vnd(lim)} <small style="color:${c}">${Math.round(r*100)}%</small></b></div><i><s style="width:${Math.min(100,r*100)}%"></s></i></div>`};
+let b='';if(L.d)b+=bar('Hôm nay',td,L.d);if(L.m)b+=bar(mlabel(S.m),tot,L.m);const by={};M.forEach(t=>by[t.cat]=(by[t.cat]||0)+t.amount);Object.entries(L.c||{}).forEach(([k,v])=>b+=bar(emo(k)+' '+esc(k),by[k]||0,v));
+const days=new Set(M.map(t=>t.date));let ov=0;if(L.d){const d={};M.forEach(t=>d[t.date]=(d[t.date]||0)+t.amount);ov=Object.values(d).filter(v=>v>L.d).length}
+const card=`<div class="card"><h3>Hạn mức chi <button class="chip" style="float:right;padding:3px 10px" data-x="lim">⚙ Thiết lập</button></h3>${b||'<p class="note">Chưa đặt hạn mức. Bấm Thiết lập để đặt hạn mức theo ngày, tháng và hạng mục.</p>'}${L.d&&ov?`<p class="note" style="color:var(--chi)">⚠️ ${ov} ngày trong tháng vượt hạn mức ngày.</p>`:''}</div>`;
+return h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',card+'<div class="card"><h3>Chi theo hạng mục</h3>')};
+const _push=push;push=async function(a,d,u){await _push(a,d,u);if(a!=='del'&&d.row&&d.row.type==='Chi'&&S.lim.d){const v=S.tx.filter(t=>t.type==='Chi'&&t.date===d.row.date).reduce((x,t)=>x+t.amount,0);if(v>S.lim.d)toast('⚠️ Vượt hạn mức chi ngày: '+vnd(v)+' / '+vnd(S.lim.d))}};
 if(alive())boot();
 </script></body></html>
