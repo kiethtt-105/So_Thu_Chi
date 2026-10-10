@@ -92,7 +92,7 @@ function dongBo(ops, clientRev) {
     finally { cache.remove('rev'); lock.releaseLock(); }
   }
   let rev = cache.get('rev'), state = null;
-  if (!rev) { state = readAll(); rev = hash(state); cache.put('rev', rev, 60); }
+  if (!rev) { state = readAll(); rev = hash(state); cache.put('rev', rev, 15); }
   if (!ops.length && clientRev && clientRev === rev) return { ok: true, same: true, rev };
   return Object.assign({ ok: true, rev }, state || readAll());
 }
@@ -139,7 +139,7 @@ function getCtx() { return _ctx || (_ctx = makeCtx(accRows(), catRows())); }
 
 function readTx(ctx, issues) {
   const g = need(TAB.tx), n = g.getLastRow(); if (n < 2) return [];
-  const V = g.getRange(2, 1, n - 1, 9).getValues(), res = [], seen = {};
+  const V = g.getRange(2, 1, n - 1, 10).getValues(), res = [], seen = {};
   V.forEach((v, i) => {
     if (v.every(x => x === '')) return;
     const row = i + 2, o = txObj(v), P = txProblems(o, ctx), bad = P.some(p => p.lv === 'err');
@@ -147,7 +147,7 @@ function readTx(ctx, issues) {
     if (bad) return;
     let id = o.id; if (!id || seen[id]) id = '@' + row;
     seen[id] = 1;
-    res.push({ id, date: day(parseDate(o.date)), type: fixType(o.type), amount: parseNum(o.amount), acc: o.acc, accTo: o.accTo, cat: o.cat, sub: o.sub, note: o.note });
+    res.push({ id, date: day(parseDate(o.date)), type: fixType(o.type), amount: parseNum(o.amount), acc: o.acc, accTo: o.accTo, cat: o.cat, sub: o.sub, note: o.note, at: v[9] instanceof Date ? Utilities.formatDate(v[9], tz(), "yyyy-MM-dd'T'HH:mm:ss") : '' });
   });
   return res;
 }
@@ -257,9 +257,30 @@ function saveTx(r) {
   clearFlags(g, row, 9);
   safe(() => sdcRow(g, row), null);   // công thức "Số dư cuối" cho dòng mới
 }
+/* Xóa dòng an toàn: dòng đang bị BỘ LỌC ẩn thì deleteRow() không xóa được (hoặc xóa hụt) → gỡ bộ lọc, xóa, dựng lại bộ lọc cũ. */
+function deleteRowSafe_(g, row) {
+  const f = g.getFilter(); let keep = null;
+  if (f) {
+    const r = f.getRange(), c0 = r.getColumn(), nc = r.getNumColumns(), cr = {};
+    for (let c = c0; c < c0 + nc; c++) { const k = f.getColumnFilterCriteria(c); if (k) cr[c] = k; }
+    keep = { r1: r.getRow(), c0, nr: r.getNumRows(), nc, cr };
+    f.remove();
+  }
+  try { g.deleteRow(row); }
+  finally {
+    if (keep) {
+      const nr = Math.max(1, keep.nr - (row >= keep.r1 && row < keep.r1 + keep.nr ? 1 : 0)), nf = g.getRange(keep.r1, keep.c0, nr, keep.nc).createFilter();
+      Object.keys(keep.cr).forEach(c => { try { nf.setColumnFilterCriteria(+c, keep.cr[c]); } catch (x) {} });
+    }
+  }
+}
 function delTx(id) {
   const row = findRow(id); if (!row) return;
-  const g = need(TAB.tx); arch(g.getRange(row, 1, 1, 9).getValues()[0], 'gd'); g.deleteRow(row);
+  const g = need(TAB.tx), vals = g.getRange(row, 1, 1, 9).getValues()[0];
+  deleteRowSafe_(g, row); SpreadsheetApp.flush();
+  const again = findRow(id);
+  if (again && again === row && str(g.getRange(row, 1).getValue()) === str(id)) throw new Error('Không xóa được dòng ' + row + ' trong GiaoDich (kiểm tra bộ lọc / vùng được bảo vệ).');
+  arch(vals, 'gd');   // chỉ lưu Thùng rác SAU KHI đã xóa được → không bị đếm trùng
 }
 function rewriteTx(col, ncols, fn) {
   const g = need(TAB.tx), n = g.getLastRow(); if (n < 2) return 0;
@@ -398,6 +419,9 @@ function revalidateAll() {
   const T = flagTx(2, need(TAB.tx).getLastRow(), ctx), all = T.concat(A, C, L).filter(r => r.P.length);
   return { err: all.filter(r => r.P.some(p => p.lv === 'err')).length, warn: all.filter(r => !r.P.some(p => p.lv === 'err')).length };
 }
+
+/* Xóa / chèn / sắp xếp dòng, đổi cột trong Gsheet KHÔNG bắn onEdit → dùng onChange để web thấy ngay */
+function onChangeInstalled(e) { try { CacheService.getScriptCache().remove('rev'); } catch (x) {} }
 
 /* ======================= SỬA TAY TRÊN GSHEET → BÁO LỖI NGAY ======================= */
 function onEditInstalled(e) {
@@ -566,18 +590,17 @@ function sdcCol_(g) {
   const lc = g.getLastColumn(); if (lc < 1) return 0;
   return g.getRange(1, 1, 1, lc).getValues()[0].findIndex(h => str(h) === SDC_HEAD) + 1;
 }
-// = số dư đầu kỳ + ảnh hưởng mọi giao dịch có ngày < ngày dòng r + các giao dịch cùng ngày từ dòng 2 đến dòng r (không dùng LET/LAMBDA)
+// = số dư đầu kỳ + ảnh hưởng của mọi giao dịch xảy ra trước (hoặc đúng) dòng r.
+// Thứ tự: Ngày (B) rồi đến giờ của "Tạo lúc" (J); trùng giờ thì theo vị trí dòng. Không phụ thuộc thứ tự dòng trong sheet.
 function sdcFormula_(r) {
-  const net = (d, b, c, e, f, k) => {
-    const x = '$E' + r;
-    return 'SUMIFS(' + d + ',' + e + ',' + x + ',' + c + ',"Thu",' + b + ',' + k + ')-SUMIFS(' + d + ',' + e + ',' + x + ',' + c + ',"Chi",' + b + ',' + k + ')' +
-      '+SUMIFS(' + d + ',' + e + ',' + x + ',' + c + ',"Điều chỉnh",' + b + ',' + k + ')-SUMIFS(' + d + ',' + e + ',' + x + ',' + c + ',"Chuyển khoản",' + b + ',' + k + ')' +
-      '+SUMIFS(' + d + ',' + f + ',' + x + ',' + c + ',"Chuyển khoản",' + b + ',' + k + ')';
-  };
+  const N = 1000, R = c => '$' + c + '$2:$' + c + '$' + N;
+  const key = '(' + R('B') + '+MOD(' + R('J') + ',1))', me = '($B' + r + '+MOD($J' + r + ',1))';
+  const cond = '((' + key + '<' + me + ')+(' + key + '=' + me + ')*(ROW(' + R('B') + ')<=' + r + '))';
+  const C = R('C'), D = R('D');
+  const sign = '((' + C + '="Thu")-(' + C + '="Chi")+(' + C + '="Điều chỉnh")-(' + C + '="Chuyển khoản"))';
+  const body = '(' + R('E') + '=$E' + r + ')*' + sign + '*' + D + '+(' + R('F') + '=$E' + r + ')*(' + C + '="Chuyển khoản")*' + D;
   return '=IF(OR($A' + r + '="",NOT(ISNUMBER($B' + r + ')),$E' + r + '=""),"",' +
-    'IFERROR(VLOOKUP($E' + r + ',TaiKhoan!$A$2:$C$21,3,FALSE),0)' +
-    '+' + net('$D:$D', '$B:$B', '$C:$C', '$E:$E', '$F:$F', '"<"&$B' + r) +
-    '+' + net('$D$2:$D' + r, '$B$2:$B' + r, '$C$2:$C' + r, '$E$2:$E' + r, '$F$2:$F' + r, '$B' + r) + ')';
+    'IFERROR(VLOOKUP($E' + r + ',TaiKhoan!$A$2:$C$21,3,FALSE),0)+SUMPRODUCT(' + cond + '*(' + body + ')))';
 }
 function sdcRow(g, row) { const c = sdcCol_(g); if (c) g.getRange(row, c).setFormula(sdcFormula_(row)); }
 function datSoDuCuoi_() {
@@ -712,9 +735,10 @@ function applyValidation() {
   h.getRange(2, 3, hr).setNumberFormat('#,##0').setDataValidation(V().requireNumberGreaterThan(0).setAllowInvalid(false).setHelpText('Hạn mức > 0').build());
 }
 function installTriggers() {
-  const mine = ['onEditInstalled', 'tuSua', 'heal', 'tuSuaGsheet'];
+  const mine = ['onEditInstalled', 'onChangeInstalled', 'tuSua', 'heal', 'tuSuaGsheet'];
   ScriptApp.getProjectTriggers().forEach(t => { if (mine.includes(t.getHandlerFunction())) ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('onEditInstalled').forSpreadsheet(ss()).onEdit().create();
+  ScriptApp.newTrigger('onChangeInstalled').forSpreadsheet(ss()).onChange().create();
   ScriptApp.newTrigger('tuSua').timeBased().everyMinutes(10).create();
 }
 
