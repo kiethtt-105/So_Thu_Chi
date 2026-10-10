@@ -1,8 +1,4 @@
-const IMG_RE = /https:\/\/drive\.google\.com\/file\/d\/[\w-]+\/view\S*/g;
 const IMG_MAX = 1600, IMG_KB = 300;
-const splitImg = n => { n = String(n || ''); return { text: n.replace(IMG_RE, '').replace(/\s+/g, ' ').trim(), imgs: n.match(IMG_RE) || [] }; };
-const noteTxt = n => splitImg(n).text, hasImg = n => splitImg(n).imgs.length > 0;
-const joinImg = (t, a) => [String(t || '').trim(), ...(a || [])].filter(Boolean).join(' ');
 function viaImg(f) {
     return new Promise((ok, no) => { const u = URL.createObjectURL(f), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); ok(i); }; i.onerror = () => { URL.revokeObjectURL(u); no(Error('Không đọc được ảnh này')); }; i.src = u; });
 }

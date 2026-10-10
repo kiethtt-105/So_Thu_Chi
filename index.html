@@ -7,7 +7,7 @@
 <script>try{var t=localStorage.theme||(localStorage.dark==="1"?"dark":localStorage.dark==="0"?"light":"auto");if(t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark");document.querySelector("meta[name=theme-color]").content="#0F1218"}}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Sổ Thu Chi">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/icon.png"><meta name="apple-mobile-web-app-title" content="Sổ Thu Chi">
 <link rel="stylesheet" href="css/style.css">
 </head><body>
 <section id="login"><form id="lf"><div class="logo"><svg class="i" viewBox="0 0 24 24"><path d="M5 16l5-5 4 4 6-8"/></svg></div>
@@ -28,8 +28,19 @@
 </div>
 <div class="ov" id="ov"><div class="sheet" id="sh" role="dialog" aria-modal="true"></div></div><div id="cf" role="alertdialog" aria-modal="true"><div class="box"><div class="ic" id="cfi"></div><h4 id="cft"></h4><div class="msg" id="cfm"></div><div class="bt"><button id="cfn">Hủy</button><button class="ok" id="cfo">OK</button></div></div></div><div id="toast" role="status"></div>
 <script src="js/config.js"></script>
-<script src="js/app.js"></script>
+<script src="js/core.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/data.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/events.js"></script>
+<script src="js/forms.js"></script>
+<script src="js/txform.js"></script>
+<script src="js/quick.js"></script>
+<script src="js/report.js"></script>
+<script src="js/lists.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/upload.js"></script>
+<script src="js/trend.js"></script>
+<script src="js/goals.js"></script>
 <script src="js/main.js"></script>
 </body></html>

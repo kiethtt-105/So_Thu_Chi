@@ -1,5 +1,5 @@
-const V = 'stc-v4';
-const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/app.js', 'js/notify.js', 'js/upload.js', 'js/main.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const V = 'stc-v5';
+const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/core.js', 'js/sync.js', 'js/data.js', 'js/screens.js', 'js/events.js', 'js/forms.js', 'js/txform.js', 'js/quick.js', 'js/report.js', 'js/lists.js', 'js/notify.js', 'js/upload.js', 'js/trend.js', 'js/goals.js', 'js/main.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -60,8 +60,8 @@ self.addEventListener('push', e => {
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data && e.data.text() }; }
   e.waitUntil(self.registration.showNotification(d.title || 'Sổ Thu Chi', {
     body: d.body || '',
-    icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
+    icon: 'icons/icon.png',
+    badge: 'icons/icon.png',
     tag: d.tag || 'stc',
     data: { url: d.url || './index.html', tab: d.tab || '' }
   }));
