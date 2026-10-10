@@ -112,7 +112,7 @@ async function showSys(title, body, o) {
         return false;
     o = o || {};
     const opt = {
-        body, icon: 'icons/icon.png', badge: 'icons/icon.png', tag: o.tag || 'stc', renotify: true, lang: 'vi',
+        body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: o.tag || 'stc', renotify: true, lang: 'vi',
         requireInteraction: !!o.sticky, vibrate: [80, 40, 80], data: { tab: o.tab || '', url: location.href.split('#')[0] }
     };
     try {
