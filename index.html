@@ -66,6 +66,7 @@ nav button{flex:1;padding:6px;font-size:12px;color:var(--mut);display:grid;justi
 <div class="ov" id="ov"><div class="sheet" id="sh" role="dialog" aria-modal="true"></div></div><div id="toast" role="status"></div>
 <script>
 const PASS='0000'; // mật khẩu đăng nhập (đổi tại đây)
+const TTL=12*3600e3,alive=()=>{const t=+localStorage.sess||0;return t&&Date.now()-t<TTL},touch=()=>{localStorage.sess=Date.now()};
 const API='https://script.google.com/macros/s/AKfycbxYb3wpByClOV4omgi7xDjtix9pL_l6OOYit139McWLPkFOR8c9kDjJufRTFi2BAB1Q/exec';
 const $=s=>document.querySelector(s),vnd=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n))+' ₫',num=n=>new Intl.NumberFormat('vi-VN').format(n);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -78,14 +79,16 @@ async function api(a,d={}){let r;try{r=await fetch(API,{method:'POST',body:JSON.
 const j=await r.json();if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),2600)}
 function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.ready=true;sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat});$('#st').textContent='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}
-async function sync(quiet){$('#rf').classList.add('spin');try{apply(await api('all'));render()}catch(e){if(!quiet)toast(e.message);$('#st').textContent='Chưa đồng bộ được'}$('#rf').classList.remove('spin')}
+async function sync(quiet){$('#rf').classList.add('spin');try{apply(await api('all'));S.err='';touch();render()}catch(e){S.err=e.message;if(!quiet)toast(e.message);$('#st').textContent='Chưa đồng bộ được';if(!S.ready)render()}$('#rf').classList.remove('spin')}
 async function push(a,d,undo){S.busy++;$('#rf').classList.add('spin');try{apply(await api(a,d));toast('Đã lưu')}catch(e){undo();toast('Chưa lưu được: '+e.message)}S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
-function lock(){sessionStorage.clear();$('#app').classList.add('hide');$('#login').classList.remove('hide');$('#pw').value='';$('#ov').classList.remove('open')}
-$('#lf').onsubmit=ev=>{ev.preventDefault();if($('#pw').value===PASS){sessionStorage.tk='1';boot()}
+function lock(){sessionStorage.clear();localStorage.removeItem('sess');$('#app').classList.add('hide');$('#login').classList.remove('hide');$('#pw').value='';$('#ov').classList.remove('open')}
+$('#lf').onsubmit=ev=>{ev.preventDefault();if($('#pw').value===PASS){touch();boot()}
 else{$('#lerr').textContent='Mật khẩu không đúng';$('#lf').classList.remove('shake');void $('#lf').offsetWidth;$('#lf').classList.add('shake');$('#pw').select()}};
 function boot(){$('#login').classList.add('hide');$('#app').classList.remove('hide');render();sync(true)}
 $('#rf').onclick=()=>sync();$('#lo').onclick=lock;$('#fab').onclick=()=>openForm();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&sessionStorage.tk)sync(true)});setInterval(()=>{if(!document.hidden&&sessionStorage.tk&&!S.busy)sync(true)},60000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(!alive())return lock();sync(true)});
+setInterval(()=>{if(alive()){if(!document.hidden&&!S.busy)sync(true)}else if(!$('#app').classList.contains('hide'))lock()},60000);
+['click','keydown'].forEach(t=>document.addEventListener(t,()=>{if(alive())touch()},{passive:true}));
 // ---- tính toán
 const sums=m=>{let thu=0,chi=0;S.tx.forEach(t=>{if(t.date.slice(0,7)!==m)return;if(t.type==='Thu')thu+=t.amount;if(t.type==='Chi')chi+=t.amount});return{thu,chi}};
 const bal=a=>{let b=a.open;S.tx.forEach(t=>{const x=t.amount;if(t.acc===a.name){if(t.type==='Thu'||t.type==='Điều chỉnh')b+=x;else b-=x}if(t.type==='Chuyển khoản'&&t.accTo===a.name)b+=x});return b};
@@ -113,10 +116,11 @@ return `${monthNav()}<input class="search" id="q" placeholder="Tìm theo ghi ch�
 function accs(){const t=S.acc.reduce((s,a)=>s+bal(a),0);return `<div class="hero"><small>Tổng tài sản</small><div class="big">${vnd(t)}</div></div><div class="card" style="padding:4px 16px">${S.acc.map(a=>{const b=bal(a);return `<div class="acc"><span><b style="font-weight:500">${esc(a.name)}</b><small>${esc(a.type)}</small></span><b class="${b<0?'chi':''}">${vnd(b)}</b></div>`}).join('')||empty('Chưa có tài khoản','Thêm trong sheet TaiKhoan.')}</div><p class="empty" style="padding:0">Thêm hoặc đổi tên tài khoản ở sheet TaiKhoan trong Google Sheets.</p>`}
 function cats(){const g={};S.cat.filter(c=>c.t==='Chi').forEach(c=>(g[c.p]=g[c.p]||[]).push(c.c));const sp={};S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).forEach(t=>sp[t.sub]=(sp[t.sub]||0)+t.amount);
 return monthNav()+Object.entries(g).map(([p,k])=>`<div class="card"><h3>${esc(p)}</h3>${k.map(c=>`<div class="acc" style="padding:8px 0"><span>${esc(c)}</span><b class="${sp[c]?'chi':''}" style="font-weight:${sp[c]?700:400}">${sp[c]?vnd(sp[c]):'–'}</b></div>`).join('')}</div>`).join('')||empty('Chưa có hạng mục','Thêm trong sheet DanhMuc.')}
+const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p style="color:var(--chi);margin-bottom:10px">${esc(S.err==='Failed to fetch'||S.err==='Không có kết nối mạng'?'Không kết nối được tới Apps Script':S.err)}</p><p style="color:var(--mut);font-size:13px">Kiểm tra: (1) đã dán Code.gs mới và Deploy phiên bản mới; (2) quyền truy cập là Anyone; (3) Google Sheet có đủ 4 sheet TongQuan, GiaoDich, TaiKhoan, DanhMuc.</p><button class="save" data-retry>Thử lại</button></div>`;
 function render(){$('#nav').innerHTML=NAV.map(([k,l,i])=>`<button class="${S.tab===k?'on':''}" data-tab="${k}"><span aria-hidden="true">${i}</span>${l}</button>`).join('');
-$('#v').innerHTML=!S.ready?'<div class="sk"></div><div class="sk"></div><div class="sk"></div>':{home,tx:txs,acc:accs,cat:cats}[S.tab]()}
-document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-csv]');if(!t)return;const d=t.dataset;
-if(d.tab){S.tab=d.tab;scrollTo(0,0)}else if(d.m)S.m=shift(S.m,+d.m);else if(d.f)S.f=d.f;else if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));else if('csv' in d)return csv();render()});
+$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,acc:accs,cat:cats}[S.tab]()}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-csv],[data-retry]');if(!t)return;const d=t.dataset;
+if(d.tab){S.tab=d.tab;scrollTo(0,0)}else if(d.m)S.m=shift(S.m,+d.m);else if(d.f)S.f=d.f;else if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));else if('csv' in d)return csv();else if('retry' in d){S.err='';render();return sync()}render()});
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const p=e.target.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p)}});
 function csv(){const r=[['ID','Ngày','Loại','Số tiền','Tài khoản','Tài khoản đến','Hạng mục cha','Hạng mục con','Ghi chú'],...S.tx.map(t=>[t.id,t.date,t.type,t.amount,t.acc,t.accTo,t.cat,t.sub,t.note])];
 const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='so-thu-chi.csv';a.click()}
@@ -137,5 +141,5 @@ pull();const ty=E.type;let er='';if(!E.amount||(E.amount<0&&ty!=='Điều chỉn
 if(er)return toast(er);const row={id:E.id,date:E.date,type:ty,amount:E.amount,acc:E.acc,accTo:ty==='Chuyển khoản'?E.accTo:'',cat:ty==='Chuyển khoản'||ty==='Điều chỉnh'?'':E.cat,sub:ty==='Chuyển khoản'||ty==='Điều chỉnh'?'':E.sub,note:E.note},old=S.tx.slice();
 S.tx=S.tx.filter(x=>x.id!==row.id).concat(row);S.m=row.date.slice(0,7);closeForm();render();push(E.isNew?'add':'upd',{row},()=>S.tx=old)});
 $('#ov').addEventListener('input',e=>{if(e.target.id==='fa'){const neg=e.target.value.trim().startsWith('-'),v=e.target.value.replace(/[^\d]/g,'');e.target.value=(neg?'-':'')+(v?num(+v):'')}if(e.target.id==='fc'||e.target.id==='fp'){pull();form();$('#'+e.target.id).focus()}});
-if(sessionStorage.tk)boot();
+if(alive())boot();
 </script></body></html>
