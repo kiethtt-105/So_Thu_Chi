@@ -1,5 +1,5 @@
 /************************************************************
- * SỔ THU CHI — Code.gs (v5, đã gộp công thức + Số dư cuối)
+ * SỔ THU CHI — Code.gs (v6: ảnh có cột riêng, Số dư cuối tính bằng script)
  *
  * Hàm chính:
  *   dongBo(ops, rev)  : đồng bộ 2 CHIỀU (web ⇄ Gsheet)
@@ -10,7 +10,7 @@
  * TongQuan: chỉ bị ghi lại khi bạn bấm menu "Khôi phục công thức ngay".
  ************************************************************/
 
-const VER = 'v5';
+const VER = 'v6';
 const FALLBACK_SHEET_ID = '10yJGQB7IalkqKE8b1nYu2YG78DOURNTtss7sPRbwmKE';
 const TAB = { tx: 'GiaoDich', acc: 'TaiKhoan', cat: 'DanhMuc', lim: 'HanMuc', del: 'DaXoa', fx: '_CongThuc' };
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'];
@@ -19,6 +19,13 @@ const PERIODS = ['Ngày', 'Tháng'];
 const MAX_ACC = 20, MAX_CAT = 99, MAX_LIM = 200;
 const RED = '#fecaca', YEL = '#fef3c7';   // màu tô ô lỗi / ô cảnh báo
 const SDC_HEAD = 'Số dư cuối';
+const IMG_HEAD = 'Ảnh';
+const IMG_RE = /https:\/\/drive\.google\.com\/file\/d\/[\w-]+\/view\S*/g;
+// Tách / gộp liên kết ảnh Drive khỏi ô Ghi chú (web vẫn gửi/nhận dạng "ghi chú + link", sheet thì lưu riêng 2 cột)
+const splitImg_ = n => { n = String(n == null ? '' : n); return { text: n.replace(IMG_RE, '').replace(/\s+/g, ' ').trim(), imgs: n.match(IMG_RE) || [] }; };
+const uniq_ = a => a.filter((x, i) => a.indexOf(x) === i);
+const joinImg_ = (t, a) => [str(t)].concat(a || []).filter(Boolean).join(' ');
+const noteWeb_ = (note, cell) => { const sp = splitImg_(note); return joinImg_(sp.text, uniq_(sp.imgs.concat(splitImg_(cell).imgs))); };
 // Công thức hỏng / bị "đóng băng" thành hằng số (=0, =#REF!, =#VALUE!...) KHÔNG bao giờ được lưu hay khôi phục làm bản chuẩn
 const badFx = f => /#(REF|VALUE|ERROR|NAME|N\/A|DIV)/i.test(f) || /^=\s*-?\d+(\.\d+)?\s*$/.test(String(f));
 
@@ -75,6 +82,7 @@ function doGet() { return out({ ok: true, name: 'So Thu Chi API', ver: VER }); }
 function doPost(e) {
   try {
     const d = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (d.img) return out(uploadImage(d.img));
     return out(dongBo(d.ops, d.rev));
   } catch (err) { return out({ ok: false, err: err.message || String(err) }); }
 }
@@ -88,7 +96,7 @@ function dongBo(ops, clientRev) {
   const cache = CacheService.getScriptCache();
   if (ops.length) {
     const lock = LockService.getScriptLock(); lock.waitLock(25000);
-    try { _ctx = null; ops.forEach(applyOp); SpreadsheetApp.flush(); }
+    try { _ctx = null; ops.forEach(applyOp); safe(capNhatSoDuCuoi_, null); SpreadsheetApp.flush(); }
     finally { cache.remove('rev'); lock.releaseLock(); }
   }
   let rev = cache.get('rev'), state = null;
@@ -139,7 +147,7 @@ function getCtx() { return _ctx || (_ctx = makeCtx(accRows(), catRows())); }
 
 function readTx(ctx, issues) {
   const g = need(TAB.tx), n = g.getLastRow(); if (n < 2) return [];
-  const V = g.getRange(2, 1, n - 1, 10).getValues(), res = [], seen = {};
+  const V = g.getRange(2, 1, n - 1, 10).getValues(), res = [], seen = {}, ic = imgCol_(g), IM = ic ? g.getRange(2, ic, n - 1, 1).getValues() : null;
   V.forEach((v, i) => {
     if (v.every(x => x === '')) return;
     const row = i + 2, o = txObj(v), P = txProblems(o, ctx), bad = P.some(p => p.lv === 'err');
@@ -147,7 +155,7 @@ function readTx(ctx, issues) {
     if (bad) return;
     let id = o.id; if (!id || seen[id]) id = '@' + row;
     seen[id] = 1;
-    res.push({ id, date: day(parseDate(o.date)), type: fixType(o.type), amount: parseNum(o.amount), acc: o.acc, accTo: o.accTo, cat: o.cat, sub: o.sub, note: o.note, at: v[9] instanceof Date ? Utilities.formatDate(v[9], tz(), "yyyy-MM-dd'T'HH:mm:ss") : '' });
+    res.push({ id, date: day(parseDate(o.date)), type: fixType(o.type), amount: parseNum(o.amount), acc: o.acc, accTo: o.accTo, cat: o.cat, sub: o.sub, note: noteWeb_(o.note, IM ? IM[i][0] : ''), at: v[9] instanceof Date ? Utilities.formatDate(v[9], tz(), "yyyy-MM-dd'T'HH:mm:ss") : '' });
   });
   return res;
 }
@@ -246,7 +254,7 @@ function nextTxRow(g) {
   return last + 1;
 }
 function saveTx(r) {
-  const o = { id: str(r.id), date: r.date, type: fixType(r.type) || str(r.type), amount: r.amount, acc: str(r.acc), accTo: str(r.accTo), cat: str(r.cat), sub: str(r.sub), note: str(r.note) };
+  const sp = splitImg_(r.note), o = { id: str(r.id), date: r.date, type: fixType(r.type) || str(r.type), amount: r.amount, acc: str(r.acc), accTo: str(r.accTo), cat: str(r.cat), sub: str(r.sub), note: sp.text };
   if (o.type === 'Chuyển khoản') o.cat = o.sub = ''; else if (o.type === 'Điều chỉnh') o.cat = o.sub = o.accTo = ''; else o.accTo = '';
   const P_ = txProblems(o, getCtx()); if (P_.length) throw new Error(P_[0].msg);
   const g = need(TAB.tx); let row = findRow(o.id);
@@ -255,7 +263,7 @@ function saveTx(r) {
   if (row) g.getRange(row, 1, 1, 9).setValues([arr]);
   else { row = nextTxRow(g); g.getRange(row, 1, 1, 10).setValues([arr.concat([new Date()])]); }
   clearFlags(g, row, 9);
-  safe(() => sdcRow(g, row), null);   // công thức "Số dư cuối" cho dòng mới
+  setImgs_(g, row, sp.imgs);          // liên kết ảnh → cột "Ảnh" riêng
 }
 /* Xóa dòng an toàn: dòng đang bị BỘ LỌC ẩn thì deleteRow() không xóa được (hoặc xóa hụt) → gỡ bộ lọc, xóa, dựng lại bộ lọc cũ. */
 function deleteRowSafe_(g, row) {
@@ -276,7 +284,8 @@ function deleteRowSafe_(g, row) {
 }
 function delTx(id) {
   const row = findRow(id); if (!row) return;
-  const g = need(TAB.tx), vals = g.getRange(row, 1, 1, 9).getValues()[0];
+  const g = need(TAB.tx), vals = g.getRange(row, 1, 1, 9).getValues()[0], icd = imgCol_(g);
+  vals[8] = noteWeb_(vals[8], icd ? g.getRange(row, icd).getValue() : '');   // Thùng rác giữ cả link ảnh
   deleteRowSafe_(g, row); SpreadsheetApp.flush();
   const again = findRow(id);
   if (again && again === row && str(g.getRange(row, 1).getValue()) === str(id)) throw new Error('Không xóa được dòng ' + row + ' trong GiaoDich (kiểm tra bộ lọc / vùng được bảo vệ).');
@@ -383,7 +392,7 @@ function restore(at, kind) {
   const d = dx(), v = d.getDataRange().getValues(), i = v.findIndex((r, k) => k > 0 && String(r[9]) === at && r[10] === kind && r[11] === '');
   if (i < 0) throw new Error('Không tìm thấy mục đã xóa');
   const r = v[i];
-  if (kind === 'gd') { const g = need(TAB.tx); if (!findRow(r[0])) { const row = nextTxRow(g); g.getRange(row, 1, 1, 10).setValues([r.slice(0, 9).concat([new Date()])]); safe(() => sdcRow(g, row), null); } }
+  if (kind === 'gd') { const g = need(TAB.tx); if (!findRow(r[0])) { const row = nextTxRow(g), sp = splitImg_(r[8]), a9 = r.slice(0, 9); a9[8] = sp.text; g.getRange(row, 1, 1, 10).setValues([a9.concat([new Date()])]); setImgs_(g, row, sp.imgs); } }
   else if (kind === 'tk') saveAcc({ name: r[0], type: r[2], open: r[3] });
   else if (kind === 'dm') saveCat({ t: r[2], p: r[6], c: r[7] });
   d.getRange(i + 1, 12).setValue(nowStr());
@@ -421,7 +430,12 @@ function revalidateAll() {
 }
 
 /* Xóa / chèn / sắp xếp dòng, đổi cột trong Gsheet KHÔNG bắn onEdit → dùng onChange để web thấy ngay */
-function onChangeInstalled(e) { try { CacheService.getScriptCache().remove('rev'); } catch (x) {} }
+function onChangeInstalled(e) {
+  try { CacheService.getScriptCache().remove('rev'); } catch (x) {}
+  if (e && e.changeType === 'EDIT') return;                         // sửa ô đã có onEditInstalled lo
+  const lock = LockService.getScriptLock(); if (!lock.tryLock(5000)) return;
+  try { safe(capNhatSoDuCuoi_, null); } finally { lock.releaseLock(); }
+}
 
 /* ======================= SỬA TAY TRÊN GSHEET → BÁO LỖI NGAY ======================= */
 function onEditInstalled(e) {
@@ -446,6 +460,7 @@ function onEditInstalled(e) {
       const sel = { [TAB.acc]: A, [TAB.cat]: C, [TAB.lim]: L }[name] || [];
       sel.filter(x => x.n >= first && x.n <= last && x.P.length).forEach(x => msgs.push('Dòng ' + x.n + ': ' + x.P.map(p => p.msg).join('; ')));
     }
+    if (name === TAB.tx || name === TAB.acc) safe(capNhatSoDuCuoi_, null);   // tính lại "Số dư cuối"
   } finally { lock.releaseLock(); }
   if (msgs.length) ss().toast(msgs.slice(0, 4).join('\n'), 'Sổ Thu Chi · ' + name, 15);
 }
@@ -484,6 +499,8 @@ function suaGsheet(silent) {
     const f = healFormulas(); L.push(f.first ? '• Công thức: lần đầu — đã lưu công thức hiện tại làm chuẩn (' + f.saved + ' vùng)' : '• Công thức: đã khôi phục ' + f.fixed + ' ô/dòng');
     if (!silent) L.push(datTatCa_());
     const n = normalizeTx(2, need(TAB.tx).getLastRow()); L.push('• Chuẩn hóa GiaoDich: sửa ' + n + ' ô (ID / ngày / loại / số tiền)');
+    const ta = tachAnh_(); if (ta) L.push('• Đã tách link ảnh khỏi Ghi chú sang cột "' + IMG_HEAD + '": ' + ta + ' dòng');
+    capNhatSoDuCuoi_();
     if (!silent) { applyValidation(); installTriggers(); L.push('• Đã cài ràng buộc nhập liệu và trigger tự động'); }
     const v = revalidateAll(); L.push('• Kiểm tra dữ liệu: ' + v.err + ' dòng LỖI (đỏ, không tính vào số liệu), ' + v.warn + ' dòng cảnh báo (vàng)');
     CacheService.getScriptCache().remove('rev'); SpreadsheetApp.flush();
@@ -531,6 +548,7 @@ function healFormulas() {
       const z = ZONES.find(x => x.sheet === sn), s = opt(sn); if (!z || !s) return;
       if (mode === 'cell') { const r = s.getRange(key); if (r.getFormulaR1C1() !== f1) { r.setFormulaR1C1(f1); fixed++; } return; }
       const [c, top] = String(key).split(':').map(Number), lr = s.getLastRow(); if (lr < top) return;
+      if (sn === TAB.tx && c === sdcCol_(s)) return;                    // "Số dư cuối" là giá trị do script tính, không khôi phục công thức
       if (mode === 'array') {
         const a = s.getRange(top, c);
         if (a.getFormulaR1C1() !== f1) { if (lr > top) s.getRange(top + 1, c, lr - top, 1).clearContent(); a.setFormulaR1C1(f1); fixed++; }
@@ -585,39 +603,67 @@ function datDanhMuc_() {
   return last - 1;
 }
 
-/* ---- Cột "Số dư cuối" ở GiaoDich ---- */
-function sdcCol_(g) {
+/* ---- Cột phụ của GiaoDich: "Số dư cuối" (tính bằng script) và "Ảnh" ---- */
+function findCol_(g, head) {
   const lc = g.getLastColumn(); if (lc < 1) return 0;
-  return g.getRange(1, 1, 1, lc).getValues()[0].findIndex(h => str(h) === SDC_HEAD) + 1;
+  return g.getRange(1, 1, 1, lc).getValues()[0].findIndex(h => str(h) === head) + 1;
 }
-// = số dư đầu kỳ + ảnh hưởng của mọi giao dịch xảy ra trước (hoặc đúng) dòng r.
-// Thứ tự: Ngày (B) rồi đến giờ của "Tạo lúc" (J); trùng giờ thì theo vị trí dòng. Không phụ thuộc thứ tự dòng trong sheet.
-function sdcFormula_(r) {
-  const N = 1000, R = c => '$' + c + '$2:$' + c + '$' + N;
-  const key = '(' + R('B') + '+MOD(' + R('J') + ',1))', me = '($B' + r + '+MOD($J' + r + ',1))';
-  const cond = '((' + key + '<' + me + ')+(' + key + '=' + me + ')*(ROW(' + R('B') + ')<=' + r + '))';
-  const C = R('C'), D = R('D');
-  const sign = '((' + C + '="Thu")-(' + C + '="Chi")+(' + C + '="Điều chỉnh")-(' + C + '="Chuyển khoản"))';
-  const body = '(' + R('E') + '=$E' + r + ')*' + sign + '*' + D + '+(' + R('F') + '=$E' + r + ')*(' + C + '="Chuyển khoản")*' + D;
-  return '=IF(OR($A' + r + '="",NOT(ISNUMBER($B' + r + ')),$E' + r + '=""),"",' +
-    'IFERROR(VLOOKUP($E' + r + ',TaiKhoan!$A$2:$C$21,3,FALSE),0)+SUMPRODUCT(' + cond + '*(' + body + ')))';
-}
-function sdcRow(g, row) { const c = sdcCol_(g); if (c) g.getRange(row, c).setFormula(sdcFormula_(row)); }
-function datSoDuCuoi_() {
-  const g = need(TAB.tx); let c = sdcCol_(g);
-  if (!c) {
-    c = Math.max(g.getLastColumn() + 1, 11);                      // luôn nằm sau cột J
-    if (g.getMaxColumns() < c) g.insertColumnsAfter(g.getMaxColumns(), c - g.getMaxColumns());
-    g.getRange(1, 10).copyTo(g.getRange(1, c), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
-    g.getRange(1, c).setValue(SDC_HEAD).setNote('Số dư của tài khoản (cột Tài khoản) ngay sau giao dịch này.\nChuyển khoản: số dư của tài khoản nguồn.');
-    g.setColumnWidth(c, 120);
-  }
-  const lr = g.getLastRow(); if (lr < 2) return c;
-  const ids = g.getRange(2, 1, lr - 1, 1).getValues(), rg = g.getRange(2, c, lr - 1, 1);
-  rg.setFormulas(ids.map((v, i) => [str(v[0]) ? sdcFormula_(i + 2) : '']));
-  rg.setNumberFormat('#,##0').setHorizontalAlignment('right');
+const sdcCol_ = g => findCol_(g, SDC_HEAD);
+const imgCol_ = g => findCol_(g, IMG_HEAD);
+function ensureCol_(g, head, note, w) {
+  let c = findCol_(g, head); if (c) return c;
+  c = Math.max(g.getLastColumn() + 1, 11);                         // luôn nằm sau cột J
+  if (g.getMaxColumns() < c) g.insertColumnsAfter(g.getMaxColumns(), c - g.getMaxColumns());
+  g.getRange(1, 10).copyTo(g.getRange(1, c), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  g.getRange(1, c).setValue(head); if (note) g.getRange(1, c).setNote(note);
+  g.setColumnWidth(c, w || 120);
   return c;
 }
+function setImgs_(g, row, imgs) {
+  let c = imgCol_(g);
+  if (!c) { if (!imgs.length) return; c = ensureCol_(g, IMG_HEAD, 'Liên kết ảnh đính kèm (Google Drive). Nhiều ảnh: mỗi ảnh một dòng.', 260); }
+  g.getRange(row, c).setValue(imgs.join('\n'));
+}
+// Chuyển link ảnh còn nằm trong Ghi chú sang cột "Ảnh"
+function tachAnh_() {
+  const g = need(TAB.tx), n = g.getLastRow(); if (n < 2) return 0;
+  const N = g.getRange(2, 9, n - 1, 1).getValues(), idx = [];
+  N.forEach((v, i) => { if (splitImg_(v[0]).imgs.length) idx.push(i); });
+  if (!idx.length) return 0;
+  const c = ensureCol_(g, IMG_HEAD, 'Liên kết ảnh đính kèm (Google Drive). Nhiều ảnh: mỗi ảnh một dòng.', 260), I = g.getRange(2, c, n - 1, 1).getValues();
+  idx.forEach(i => { const sp = splitImg_(N[i][0]); I[i][0] = uniq_(sp.imgs.concat(splitImg_(I[i][0]).imgs)).join('\n'); N[i][0] = sp.text; });
+  g.getRange(2, 9, n - 1, 1).setValues(N); g.getRange(2, c, n - 1, 1).setValues(I);
+  return idx.length;
+}
+
+/* Số dư của tài khoản NGAY SAU mỗi giao dịch. Xếp theo Ngày (B) → giờ của "Tạo lúc" (J) → vị trí dòng.
+ * Thu / Điều chỉnh: cộng · Chi: trừ · Chuyển khoản: trừ TK nguồn, cộng TK nhận (hiển thị số dư TK nguồn).
+ * rows: [{i, k:'yyyy-MM-dd HH:mm:ss', type, amt, acc, accTo}] ; open: {tên TK: số dư ban đầu} → {i: số dư} */
+function tinhSoDuCuoi_(rows, open) {
+  const bal = Object.assign({}, open), res = {}, g = a => bal[a] || 0;
+  rows.slice().sort((a, b) => a.k < b.k ? -1 : a.k > b.k ? 1 : a.i - b.i).forEach(t => {
+    if (t.type === 'Chuyển khoản') { bal[t.acc] = g(t.acc) - t.amt; if (t.accTo) bal[t.accTo] = g(t.accTo) + t.amt; }
+    else if (t.type === 'Chi') bal[t.acc] = g(t.acc) - t.amt;
+    else bal[t.acc] = g(t.acc) + t.amt;
+    res[t.i] = Math.round(bal[t.acc] * 100) / 100;
+  });
+  return res;
+}
+function capNhatSoDuCuoi_() {
+  const g = need(TAB.tx), c = ensureCol_(g, SDC_HEAD, 'Số dư của tài khoản (cột Tài khoản) ngay sau giao dịch này.\nChuyển khoản: số dư của tài khoản nguồn.\nScript tự tính lại mỗi khi dữ liệu đổi — không cần sửa tay.', 120);
+  const n = g.getLastRow(); if (n < 2) return c;
+  const V = g.getRange(2, 1, n - 1, 10).getValues(), open = {}, rows = [];
+  accRows().forEach(r => { if (!r.empty && r.item.name) open[r.item.name] = r.item.open; });
+  V.forEach((v, i) => {
+    const dt = parseDate(v[1]), amt = parseNum(v[3]), type = fixType(v[2]), acc = str(v[4]);
+    if (!dt || amt === null || !type || !acc) return;
+    rows.push({ i, k: day(dt) + ' ' + (v[9] instanceof Date ? Utilities.formatDate(v[9], tz(), 'HH:mm:ss') : '00:00:00'), type, amt, acc, accTo: str(v[5]) });
+  });
+  const res = tinhSoDuCuoi_(rows, open);
+  g.getRange(2, c, n - 1, 1).setValues(V.map((v, i) => [res[i] === undefined ? '' : res[i]])).setNumberFormat('#,##0').setHorizontalAlignment('right');
+  return c;
+}
+const datSoDuCuoi_ = capNhatSoDuCuoi_;
 
 /* ---- TongQuan (B3 Năm, B4 Tháng · B6:B16 chỉ số · A20:C34 chi theo hạng mục cha · A38:C45 thu theo nguồn · E10:H23 theo tháng · K:O cột phụ ẩn) ---- */
 function datTongQuan_() {

@@ -133,7 +133,7 @@ const y=+S.m.slice(0,4),mo=+S.m.slice(5),dim=new Date(y,mo,0).getDate(),off=(new
 const cmx=Math.max(1,...Object.values(dc)),sh=n=>n>=1e6?(n/1e6).toFixed(1)+'tr':Math.round(n/1e3)+'k';
 const dnum=S.m===ymd(new Date()).slice(0,7)?new Date().getDate():dim,big=chiM(S.m).sort((a,b)=>b.amount-a.amount)[0],LC=limCalc(),rec=M.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
 const limHtml=LC.map(x=>limBar(x,(x.cat?emo(x.cat)+' ':'')+esc(x.name)+' · '+(x.per==='Ngày'?'hôm nay':'tháng'))).join(''),ov=LC.filter(x=>x.over).length;
-return head('Tổng quan',mlabel(S.m)+' · '+M.length+' giao dịch')+issueBanner()+backupBanner()+
+return head('Tổng quan',mlabel(S.m)+' · '+M.length+' giao dịch')+issueBanner()+
 `<div class="kpis">${kpi('Tổng tài sản',vnd(total),'',S.acc.length+' tài khoản','h')}${kpi('Thu',vnd(thu),'thu','Tháng này')}${kpi('Chi',vnd(chi),'chi','TB '+vnd(chi/dnum)+'/ngày')}${kpi('Còn lại',vnd(thu-chi),thu-chi<0?'chi':'','Tiết kiệm '+(thu?Math.round((thu-chi)/thu*100):0)+'%')}</div>
 <div class="grid a"><div class="card"><div class="ch">Thu chi 12 tháng <small><span class="thu">■</span> thu &nbsp;<span class="chi">■</span> chi</small></div><svg viewBox="0 0 480 154" width="100%" role="img" aria-label="Biểu đồ thu chi 12 tháng">${ch}</svg></div>
 <div class="card"><div class="ch">Cơ cấu chi tiêu <small>${big?'Lớn nhất '+num(big.amount):''}</small></div>${donut(rows,chi)}</div></div>
@@ -246,7 +246,7 @@ const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""'
 
 /* =============== HỘP THOẠI =============== */
 const openSheet=()=>$('#ov').classList.add('open'),closeSheet=()=>$('#ov').classList.remove('open');
-function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['rec','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-nt="open">${ic('bell')}<span class="m"><b>Thông báo &amp; ứng dụng</b><small>Bật thông báo, cài đặt ứng dụng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button><button class="row" data-a3="bk">${ic('dl')}<span class="m"><b>Tải bản sao lưu (JSON)</b><small>Giao dịch, tài khoản, hạng mục, hạn mức</small></span></button><button class="row" data-a3="bkgs">${ic('dl')}<span class="m"><b>Sao lưu trực tuyến</b><small>Lưu thêm một bản sao toàn bộ dữ liệu</small></span></button></div>`;ED=null;E=null;openSheet()}
+function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['rec','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-nt="open">${ic('bell')}<span class="m"><b>Thông báo &amp; ứng dụng</b><small>Bật thông báo, cài đặt ứng dụng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button></div>`;ED=null;E=null;openSheet()}
 function openIssues(){const L=S.issues;ED=null;E=null;$('#sh').innerHTML=`<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0,80).map(i=>`<div class="iss ${i.lv}"><b>${esc(SN[i.sheet]||i.sheet)} · dòng ${i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length>80?`<p class="mut" style="margin-top:8px">… và ${L.length-80} mục nữa</p>`:''}`;openSheet()}
 function catFields(ty,cat,sub,ip,is){const L=S.cat.map((c,i)=>({...c,i})).filter(c=>c.t===ty),pars=[...new Set(L.map(c=>c.p))],o=c=>`<option value="${c.i}" ${c.p===cat&&c.c===sub?'selected':''}>${esc(c.c)}</option>`;
 return `<label>Hạng mục<select id="${ip}"><option value="">Chọn…</option>${pars.map(p=>`<option ${p===cat?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Chi tiết<select id="${is}"><option value="">${cat?'Chọn…':'Chọn (tự điền hạng mục)…'}</option>${cat?L.filter(c=>c.p===cat).map(o).join(''):pars.map(p=>`<optgroup label="${esc(p)}">${L.filter(c=>c.p===p).map(o).join('')}</optgroup>`).join('')}</select></label>`}
@@ -295,7 +295,7 @@ if(q('[data-save]')){pull();const ty=E.type;let er='';
 
 /* ===== features ===== */
 /* =====================================================================
- * features.js — Nhập kiểu chat · Mẫu giao dịch · Hoàn tác · Sao lưu
+ * features.js — Nhập kiểu chat · Mẫu giao dịch · Hoàn tác
  * Dùng các hàm/biến của app.js (S, E, commit, form, pull, toast, ...).
  * ===================================================================== */
 
@@ -545,35 +545,8 @@ function qbNav() {   // gọi từ nav(): chỉ hiện ô gõ nhanh ở Tổng q
   if (show && _qv !== JSON.stringify(TPL) + tplMg) { _qv = JSON.stringify(TPL) + tplMg; renderTpl() }
 }
 
-/* =====================================================================
- * 4) SAO LƯU — tải JSON (nhắc mỗi 7 ngày) + sao lưu trực tuyến
- * ===================================================================== */
-const BK_DAYS = 7;
-function backupBanner() {
-  if (!S.tx.length) return '';
-  const t = +localStorage.lastBk || 0, days = t ? Math.floor((Date.now() - t) / 864e5) : null;
-  if (t && days < BK_DAYS) return '';
-  return `<div class="warn">💾 ${t ? 'Đã ' + days + ' ngày chưa' : 'Bạn chưa'} sao lưu sổ. <button data-a3="bk">Tải bản sao lưu</button> · <button data-a3="bkgs">Sao lưu trực tuyến</button></div>`;
-}
-function backupJson() {
-  const data = { app: 'so-thu-chi', ver: 1, at: new Date().toISOString(), tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, tpl: TPL };
-  const b = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), a = document.createElement('a');
-  a.href = URL.createObjectURL(b); a.download = 'so-thu-chi-sao-luu-' + todayS() + '.json'; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  localStorage.lastBk = Date.now(); toast('Đã tải bản sao lưu (' + S.tx.length + ' giao dịch)'); render();
-}
-document.addEventListener('click', async e => {
-  const b = e.target.closest('[data-a3]'); if (!b) return;
-  const k = b.dataset.a3;
-  if (k === 'bk') { closeSheet(); return backupJson() }
-  if (k === 'bkgs') {
-    closeSheet();
-    if (!await ask('Sao lưu trực tuyến?', 'Hệ thống sẽ tạo thêm một bản sao toàn bộ dữ liệu (giữ lại 12 bản mới nhất).', { icon: '💾', ok: 'Sao lưu' })) return;
-    const r = await commit([{ op: 'backup' }], { ok: 'Đã sao lưu trực tuyến' });
-    if (r.ok) { localStorage.lastBk = Date.now(); render() } return;
-  }
-  if (k === 'print') { window.print() }
-});
+/* In / PDF (nút ở trang Báo cáo) */
+document.addEventListener('click', e => { if (e.target.closest('[data-a3="print"]')) window.print() });
 
 /* ===== reports ===== */
 /* =====================================================================

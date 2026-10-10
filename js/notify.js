@@ -36,7 +36,7 @@ function toast(t, u, o) {
 /* ---------- thông báo hệ thống (nằm trong trung tâm thông báo của thiết bị) ---------- */
 async function showSys(title, body, tag) {
   if (!pushOn()) return;
-  const o = { body, icon: 'icon-192.png', badge: 'icon-192.png', tag: tag || 'stc', renotify: true, vibrate: [80, 40, 80], data: { url: location.href } };
+  const o = { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag || 'stc', renotify: true, vibrate: [80, 40, 80], data: { url: location.href } };
   try {
     const reg = SWREG || ('serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null);
     if (reg && reg.showNotification) return await reg.showNotification(title, o);
