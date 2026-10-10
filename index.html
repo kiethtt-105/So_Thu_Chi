@@ -1,339 +1,336 @@
 <!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#5B3DF5"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><title>Sổ Thu Chi</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230B4F59'/%3E%3Cpath d='M30 62l14-14 10 10 18-22' stroke='%23fff' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#0E1B2C"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Sổ Thu Chi</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230F6E6E'/%3E%3Cpath d='M30 62l14-14 10 10 18-22' stroke='%23fff' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#EDF2F0;--card:#fff;--ink:#10242B;--mut:#62777D;--line:#DCE6E3;--acc:#0B4F59;--acc2:#0E7C86;--thu:#23814F;--chi:#C4432C;--chuyen:#3F5FB5;--dc:#B07412;--r:16px}
+:root{--bg:#F2F4F7;--card:#fff;--soft:#F7F8FA;--ink:#0F1B2D;--mut:#667085;--line:#E4E7EC;--acc:#0F6E6E;--accl:#E3F2F1;--thu:#15803D;--chi:#DC2626;--chuyen:#2563EB;--dc:#B45309;--sb:#0E1B2C;--r:12px;--sh:0 1px 2px #0f1b2d0d,0 1px 3px #0f1b2d0a}
+body.dark{--bg:#0A111D;--card:#111B2C;--soft:#16233A;--ink:#E7ECF3;--mut:#8C99AD;--line:#22304A;--acc:#2BB5A8;--accl:#12302F;--thu:#4ADE80;--chi:#F87171;--chuyen:#60A5FA;--dc:#FBBF24;--sb:#0A111D;color-scheme:dark}
 *{box-sizing:border-box;margin:0}html{-webkit-text-size-adjust:100%}
-body{font:400 15px/1.45 'Be Vietnam Pro',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums;padding-bottom:calc(84px + env(safe-area-inset-bottom))}
-button,input,select{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none}
-:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
-.hide{display:none!important}
-#login{position:fixed;inset:0;z-index:50;overflow:auto;display:grid;place-items:center;padding:24px;background:var(--acc);color:#fff}
-#login form{width:min(340px,100%);text-align:center}
-#login h1{font-size:30px;font-weight:700;margin:14px 0 6px}#login p{opacity:.75;margin-bottom:26px}
-#login input{width:100%;text-align:center;font-size:28px;letter-spacing:.5em;padding:14px;border-radius:14px;border:2px solid #ffffff44;background:#ffffff14;color:#fff}
-#login input::placeholder{letter-spacing:.2em;opacity:.4}
-#login .go{width:100%;margin-top:14px;padding:14px;border-radius:14px;background:#fff;color:var(--acc);font-weight:700}
-#lerr{height:22px;margin-top:10px;font-size:14px;color:#FFC9BD}.shake{animation:sh .35s}
-@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:#EDF2F0ee;backdrop-filter:blur(10px)}
-header b{font-size:18px;flex:1}header small{color:var(--mut);font-size:12px}
-.ib{width:38px;height:38px;border-radius:12px;background:var(--card);display:grid;place-items:center;border:1px solid var(--line)}
+body{font:400 14px/1.5 'Be Vietnam Pro',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none;-webkit-tap-highlight-color:transparent}
+input,select{font-size:16px}:focus-visible{outline:2px solid var(--acc);outline-offset:2px}.hide{display:none!important}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.thu{color:var(--thu)}.chi{color:var(--chi)}.chuyen{color:var(--chuyen)}.dc{color:var(--dc)}.mut{color:var(--mut)}
+/* login */
+#login{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:var(--sb);color:#fff}
+#login form{width:min(360px,100%);text-align:center;background:#ffffff0d;border:1px solid #ffffff1f;border-radius:20px;padding:34px 26px}
+#login h1{font-size:24px;margin:14px 0 4px}#login p{opacity:.65;margin-bottom:22px}
+#login input{width:100%;text-align:center;font-size:26px;letter-spacing:.45em;padding:12px;border-radius:12px;border:1px solid #ffffff33;background:#ffffff12;color:#fff}
+#login input:focus{outline:0;border-color:#fff}
+#login .go{width:100%;margin-top:12px;padding:13px;border-radius:12px;background:#fff;color:#0E1B2C;font-weight:700}
+#lerr{height:22px;margin-top:8px;font-size:13px;color:#FCA5A5}.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+/* shell */
+aside{display:none}
+.wrap{min-height:100vh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+.top{position:sticky;top:0;z-index:8;display:flex;align-items:center;gap:8px;padding:calc(9px + env(safe-area-inset-top)) 16px 9px;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;flex:1;min-width:0}.top #st{display:none}.top .brand>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top .brand small{display:block;font-weight:400;font-size:11px;color:var(--mut)}
+.logo{width:30px;height:30px;border-radius:9px;background:var(--acc);display:grid;place-items:center;color:#fff;flex:none}
+.ib{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--card);border:1px solid var(--line);color:var(--mut);transition:.15s}.ib:hover{color:var(--ink);border-color:var(--mut)}
 .spin svg{animation:rot .8s linear infinite}@keyframes rot{to{transform:rotate(360deg)}}
-main{max-width:760px;margin:0 auto;padding:4px 16px 24px}
-.hero{background:var(--acc);color:#fff;border-radius:22px;padding:22px 20px;margin-bottom:14px}
-.hero small{opacity:.7}.hero .big{font-size:clamp(30px,9vw,42px);font-weight:700;letter-spacing:-.02em;margin:2px 0 14px}
-.hero .row{display:flex;gap:10px}.hero .pill{flex:1;background:#ffffff1c;border-radius:12px;padding:9px 12px;font-size:13px}.hero .pill b{display:block;font-size:16px}
-.mn{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px}.mn b{font-size:16px}
-.card{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:14px;border:1px solid var(--line)}
-.card h3{font-size:15px;margin-bottom:12px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.two .card{margin:0}.two small{color:var(--mut)}.two b{font-size:19px;display:block}
-.thu{color:var(--thu)}.chi{color:var(--chi)}.chuyen{color:var(--chuyen)}.dc{color:var(--dc)}
-.bar{margin-bottom:11px}.bar div:first-child{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}.bar i{display:block;height:8px;border-radius:5px;background:var(--line);overflow:hidden}.bar i s{display:block;height:100%;background:var(--acc2);border-radius:5px;transition:width .5s}
-.tx{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);width:100%;text-align:left}.tx:last-child{border:0}
-.dot{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:16px;flex:none;background:#0000000a}
-.tx .m{flex:1;min-width:0}.tx .m b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tx .m small{color:var(--mut)}.tx>b{font-weight:700;white-space:nowrap}
-.dh{font-size:13px;color:var(--mut);margin:14px 2px 2px;font-weight:500}
-.chips{display:flex;gap:8px;overflow:auto;margin:10px 0}.chip{padding:7px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line);white-space:nowrap;font-size:14px}.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-.search{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card)}
-.empty{text-align:center;color:var(--mut);padding:34px 10px}.empty b{display:block;color:var(--ink);margin-bottom:4px}
-.acc{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line)}.acc:last-child{border:0}.acc small{color:var(--mut);display:block}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-around;background:#fff;border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:6}
-nav button{flex:1;padding:6px;font-size:12px;color:var(--mut);display:grid;justify-items:center;gap:2px}nav button.on{color:var(--acc);font-weight:700}
-.fab{position:fixed;right:18px;bottom:calc(76px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:18px;background:var(--acc2);color:#fff;font-size:30px;box-shadow:0 8px 20px #0b4f5955;z-index:7}
-.ov{position:fixed;inset:0;background:#10242b66;z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}.ov.open{opacity:1;pointer-events:auto}
-.sheet{position:absolute;left:0;right:0;bottom:0;max-height:94vh;overflow:auto;background:#fff;border-radius:24px 24px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));transform:translateY(40px);transition:transform .25s;max-width:560px;margin:0 auto}.ov.open .sheet{transform:none}
-.seg{display:grid;grid-template-columns:repeat(4,1fr);background:var(--bg);border-radius:12px;padding:3px;margin-bottom:14px}.seg button{padding:8px 2px;border-radius:10px;font-size:13px}.seg .on{background:#fff;font-weight:700;box-shadow:0 1px 3px #0002}
-.amt{width:100%;font-size:34px;font-weight:700;border:0;border-bottom:2px solid var(--line);padding:6px 0;margin-bottom:12px;background:none}
-.f{display:grid;grid-template-columns:1fr 1fr;gap:10px}.f label{display:block;font-size:12px;color:var(--mut)}.f .w{grid-column:1/-1}
-.f input,.f select{width:100%;padding:11px;border-radius:12px;border:1px solid var(--line);background:#fff;margin-top:3px}
-.save{width:100%;margin-top:16px;padding:14px;border-radius:14px;background:var(--acc);color:#fff;font-weight:700}.del{width:100%;margin-top:8px;padding:12px;color:var(--chi);font-weight:500}
-#toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#10242b;color:#fff;padding:10px 16px;border-radius:12px;opacity:0;transition:.25s;z-index:30;pointer-events:none;max-width:90vw}#toast.on{opacity:1;transform:translate(-50%,0)}
-.sk{height:90px;border-radius:16px;background:linear-gradient(90deg,#e3ebe8,#f2f6f5,#e3ebe8);background-size:200%;animation:sk 1.2s infinite;margin-bottom:14px}@keyframes sk{to{background-position:-200%}}
-.rr{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.rr:last-child{border:0}.rr>span:first-child{flex:1;min-width:0}.rr small{display:block;color:var(--mut)}.ba{width:132px;text-align:right;padding:10px;border-radius:12px;border:1px solid var(--line);font-weight:700;background:#fff}.df{width:86px;text-align:right;font-size:13px;font-weight:700}.note{color:var(--mut);font-size:13px;margin-bottom:6px}
-
-.live{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:20px;background:#fff;border:1px solid var(--line);font-size:12px;font-weight:700;white-space:nowrap}.live i{width:9px;height:9px;border-radius:50%;background:#aaa}
-.live.ok{color:#17803D}.live.ok i{background:#22C55E;animation:pl 1.6s infinite}.live.err{color:#C4332C}.live.err i{background:#E5484D}.live.wait{color:#9A6B00}.live.wait i{background:#E5A100}
-@keyframes pl{0%{box-shadow:0 0 0 0 #22C55E99}70%,100%{box-shadow:0 0 0 7px #22C55E00}}
-@media(min-width:900px){body{padding-left:200px;padding-bottom:0}nav{top:0;right:auto;width:200px;flex-direction:column;justify-content:flex-start;gap:4px;padding:80px 12px;border:0;border-right:1px solid var(--line)}nav button{flex:none;display:flex;justify-content:flex-start;gap:10px;font-size:15px;padding:12px;border-radius:12px}main{max-width:880px}header{padding-inline:max(24px,calc((100vw - 200px - 880px)/2 + 16px))}nav button.on{background:var(--bg)}.fab{bottom:28px}}
+.live{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600;white-space:nowrap}.live i{width:8px;height:8px;border-radius:50%;background:#98A2B3}
+.live.ok{color:var(--thu)}.live.ok i{background:#22C55E;animation:pl 1.8s infinite}.live.err{color:var(--chi)}.live.err i{background:#EF4444}.live.wait{color:var(--dc)}.live.wait i{background:#F59E0B}
+@keyframes pl{0%{box-shadow:0 0 0 0 #22C55E88}70%,100%{box-shadow:0 0 0 6px #22C55E00}}
+.pri{display:none;align-items:center;gap:7px;padding:0 14px;height:36px;border-radius:10px;background:var(--acc);color:#fff;font-weight:600}.pri:hover{filter:brightness(1.1)}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 24px}
+.ph{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.ph h1{font-size:21px;font-weight:700;letter-spacing:-.01em}.ph p{color:var(--mut);font-size:13px}.pa{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mn{display:flex;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;height:36px}.mn button{width:34px;height:100%;color:var(--mut);display:grid;place-items:center}.mn button:hover{color:var(--ink)}.mn b{padding:0 6px;font-weight:600;min-width:106px;text-align:center;font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-weight:500;white-space:nowrap}.btn:hover{border-color:var(--mut)}
+.btn.p{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}.btn.b{background:var(--chuyen);border-color:var(--chuyen);color:#fff;font-weight:600}.btn.w{width:100%;height:42px;margin-top:10px}.btn.d{color:var(--chi);border-color:transparent;background:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--sh);min-width:0}
+.card>h3,.ch{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}.ch small{font-weight:400;color:var(--mut);font-size:12px}
+.flush{padding:0 16px}
+.grid{display:grid;gap:14px;margin-bottom:14px;grid-template-columns:1fr}
+.kpis{display:grid;gap:12px;grid-template-columns:1fr 1fr;margin-bottom:14px}
+.kpi{padding:14px 16px}.kpi small{color:var(--mut);font-size:12px;display:flex;align-items:center;gap:6px}.kpi b{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kpi em{font-style:normal;font-size:12px;color:var(--mut)}
+body.dark .kpi.h{background:var(--accl);border-color:var(--acc);color:var(--ink)}body.dark .kpi.h small,body.dark .kpi.h em{color:var(--mut)}.kfull{grid-column:1/-1}@media(min-width:700px){.kfull{grid-column:auto}}.kpi.h{background:var(--sb);color:#fff;border-color:var(--sb)}.kpi.h small,.kpi.h em{color:#ffffffa6}
+.hb .sens{filter:blur(8px);user-select:none}
+.bar{margin-bottom:12px}.bar:last-child{margin-bottom:0}.bar>div{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:5px}.bar>div span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar i{display:block;height:7px;border-radius:4px;background:var(--line);overflow:hidden}.bar s{display:block;height:100%;border-radius:4px;background:var(--bc,var(--acc));transition:width .4s}
+.row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);width:100%;text-align:left;border-radius:0}.row:last-child{border:0}
+button.row:hover{background:var(--soft)}
+.dot{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:16px;flex:none;background:var(--soft);font-weight:700}
+.row .m{flex:1;min-width:0}.row .m b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .m small{color:var(--mut);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row>b{font-weight:600;white-space:nowrap}
+.dh{font-size:12px;font-weight:600;color:var(--mut);padding:12px 0 2px;display:flex;justify-content:space-between;gap:8px}.dh.over{color:var(--chi)}
+.chips{display:flex;gap:6px;overflow:auto;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
+.chip{padding:6px 13px;border-radius:20px;background:var(--card);border:1px solid var(--line);white-space:nowrap;font-size:13px}.chip:hover{border-color:var(--mut)}.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.tb{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.search{width:100%;height:38px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+.sum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.sum span{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:12px}
+.fp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.fp .w{grid-column:1/-1}
+label.l{font-size:12px;color:var(--mut);display:block}
+.fp input,.fp select,.f input,.f select{width:100%;height:40px;padding:0 11px;border-radius:10px;border:1px solid var(--line);background:var(--card);margin-top:3px}
+.empty{text-align:center;color:var(--mut);padding:30px 10px}.empty b{display:block;color:var(--ink);margin-bottom:3px}
+.cd{display:flex;align-items:center;gap:20px}.cd svg{flex:none}.cd ul{list-style:none;padding:0;flex:1;min-width:0;font-size:13px}.cd li{display:flex;gap:8px;align-items:center;margin:6px 0}.cd li i{width:10px;height:10px;border-radius:3px;flex:none}.cd li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:11px}.cal i{font-style:normal;color:var(--mut);padding-bottom:2px}.cal span{border-radius:8px;padding:4px 0;min-height:42px;background:var(--soft)}.cal span b{display:block;font-size:12px;font-weight:500}.cal span small{font-size:10px;color:var(--chi);font-weight:600}.cal span.e{background:none}
+.warn{background:#F59E0B1f;color:var(--dc);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:13px}
+.rr{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.rr:last-child{border:0}.rr>span:first-child{flex:1;min-width:0}.rr small{display:block;color:var(--mut)}
+.ba{width:140px;text-align:right;height:40px;padding:0 11px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-weight:600}.df{width:88px;text-align:right;font-size:13px;font-weight:600}
+.tabs{display:flex;gap:4px;background:var(--soft);padding:3px;border-radius:10px;border:1px solid var(--line)}.tabs button{flex:1;padding:6px 8px;border-radius:8px;font-size:13px;color:var(--mut)}.tabs .on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--sh)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}.row .m small b{font-weight:500}.cg{display:flex;flex-wrap:wrap;gap:6px}
+/* bottom nav */
+#bn{position:fixed;bottom:0;left:0;right:0;z-index:9;display:flex;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:5px 2px calc(5px + env(safe-area-inset-bottom))}
+#bn button{flex:1;display:grid;justify-items:center;gap:1px;padding:5px 0;font-size:10.5px;color:var(--mut);border-radius:10px}#bn button.on{color:var(--acc);font-weight:700}
+.fab{position:fixed;right:16px;bottom:calc(74px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:16px;background:var(--acc);color:#fff;display:grid;place-items:center;box-shadow:0 8px 22px #0f6e6e66;z-index:9}.fab svg{width:24px;height:24px}
+/* sheet */
+.ov{position:fixed;inset:0;background:#0b1220a8;z-index:20;opacity:0;pointer-events:none;transition:opacity .18s;display:flex;align-items:flex-end}.ov.open{opacity:1;pointer-events:auto}
+.sheet{width:100%;max-width:560px;margin:0 auto;max-height:92dvh;overflow:auto;background:var(--card);border-radius:20px 20px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));transform:translateY(30px);transition:transform .2s}.ov.open .sheet{transform:none}
+.sheet:before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:var(--line);margin:0 auto 14px}
+.sheet h3{margin-bottom:12px;font-size:16px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px}.seg button{padding:7px 2px;border-radius:8px;font-size:13px;color:var(--mut)}.seg .on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--sh)}
+.amt{width:100%;font-size:32px;font-weight:700;border:0;border-bottom:2px solid var(--line);padding:4px 0;margin-bottom:12px;background:none}.amt:focus{outline:0;border-color:var(--acc)}
+.f{display:grid;grid-template-columns:1fr 1fr;gap:10px}.f label{font-size:12px;color:var(--mut)}.f .w{grid-column:1/-1}
+.menu .row{padding:13px 4px}.menu .row svg{color:var(--mut)}
+#toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translate(-50%,16px);background:var(--sb);color:#fff;padding:9px 15px;border-radius:10px;opacity:0;transition:.2s;z-index:30;pointer-events:none;max-width:90vw;font-size:13px}#toast.on{opacity:1;transform:translate(-50%,0)}
+.sk{height:90px;border-radius:12px;background:linear-gradient(90deg,var(--line),var(--soft),var(--line));background-size:200%;animation:sk 1.2s infinite;margin-bottom:12px}@keyframes sk{to{background-position:-200%}}
+@media(max-width:480px){.ba{width:126px;font-size:15px;padding:0 8px}.df{width:58px;font-size:12px}.f,.fp{grid-template-columns:1fr}.f .w,.fp .w{grid-column:auto}.cd{flex-wrap:wrap;justify-content:center}.live b{display:none}.kpi b{font-size:17px}}
+@media(min-width:700px){.kpis{grid-template-columns:repeat(4,1fr)}.tb{flex-direction:row;align-items:center}.tb .search{max-width:320px}}
+@media(min-width:960px){
+ aside{display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;width:232px;background:var(--sb);color:#B8C4D6;padding:18px 12px;z-index:10;overflow:auto}
+ aside .brand{display:flex;align-items:center;gap:10px;color:#fff;font-weight:700;font-size:17px;padding:2px 8px 18px}
+ aside .g{font-size:11px;font-weight:600;color:#6F7F96;padding:16px 10px 6px}
+ aside button{display:flex;align-items:center;gap:11px;width:100%;padding:9px 10px;border-radius:9px;color:inherit;text-align:left;font-weight:500;transition:.15s}aside button:hover{background:#ffffff12;color:#fff}aside button.on{background:var(--acc);color:#fff}
+ aside .foot{margin-top:auto;padding:12px 10px 0;font-size:12px;color:#6F7F96}
+ .wrap{margin-left:232px;padding-bottom:0}#bn,.fab{display:none}.top .brand{display:none}.top{padding-inline:28px;justify-content:flex-end}.top #st{display:block;flex:1;color:var(--mut);font-size:12px}.pri{display:inline-flex}
+ main{padding:24px 28px 40px}
+ .grid.a{grid-template-columns:3fr 2fr}.grid.b{grid-template-columns:1fr 1fr}.grid.c{grid-template-columns:2fr 3fr}
+ .ov{align-items:center}.sheet{width:min(520px,92vw);border-radius:18px;padding:22px;transform:scale(.97);box-shadow:0 30px 80px #0b122066}.ov.open .sheet{transform:none}.sheet:before{display:none}
+ #toast{bottom:28px}
+}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
-
-:root{--bg:#F1F0FB;--card:#fff;--ink:#1B1840;--mut:#7A7799;--line:#E6E3F7;--acc:#5B3DF5;--acc2:#8B5CF6;--thu:#10B981;--chi:#F43F5E;--chuyen:#3B82F6;--dc:#F59E0B;--g:linear-gradient(135deg,#5B3DF5,#8B5CF6 55%,#EC4899)}
-body.dark{--bg:#0F0D1F;--card:#1A1733;--ink:#EEEDFF;--mut:#9A97BD;--line:#2B2850}
-body{background:radial-gradient(900px 400px at 0 -10%,#8B5CF633,transparent),radial-gradient(700px 400px at 100% 0,#EC489922,transparent),var(--bg);transition:background .3s}
-header{background:color-mix(in srgb,var(--bg) 80%,transparent)}
-.hero,#login{background:var(--g)!important;box-shadow:0 14px 34px #5b3df544}
-.hero{position:relative;overflow:hidden}.hero:after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:#ffffff1f}
-.card{box-shadow:0 6px 20px #5b3df50d;border:0;transition:transform .2s}.card:hover{transform:translateY(-2px)}
-.two .card:first-child{background:linear-gradient(135deg,#10B98122,var(--card))}.two .card:last-child{background:linear-gradient(135deg,#F43F5E22,var(--card))}
-.ib,.chip,.search,.f input,.f select,.ba,.live,nav,.sheet,.amt{background:var(--card);color:var(--ink);border-color:var(--line)}
-.chip.on,.save,nav button.on{background:var(--g);color:#fff}nav button.on{background:none;color:var(--acc2)}
-.fab{background:var(--g);box-shadow:0 10px 26px #8b5cf688;animation:fl 3s ease-in-out infinite}@keyframes fl{50%{transform:translateY(-4px)}}
-.bar i s{background:var(--bc,var(--acc2))}.dot{font-size:19px}
-.seg .on{background:var(--card)}.cd{display:flex;align-items:center;gap:18px}.cd svg{flex:none}.cd ul{list-style:none;padding:0;flex:1;font-size:13px}.cd li{display:flex;gap:6px;align-items:center;margin:4px 0}.cd li i{width:10px;height:10px;border-radius:3px;flex:none}.cd li span{flex:1}
-.ins{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}.ins div{border-radius:14px;padding:11px;color:#fff;font-size:12px}.ins b{display:block;font-size:15px;margin-top:2px}
-#warn{background:#F59E0B22;color:var(--dc);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px}
-
-.hb .hero .big,.hb .acc>b,.hb .pill b{filter:blur(9px)}
-.dash>.card,.dash>.two,.dash>.ins{margin-bottom:0}.dash{display:grid;gap:14px}
-@media(min-width:900px){main:has(.dash){max-width:1100px}.dash{grid-template-columns:1fr 1fr}.dash>.hero,.dash>.mn,.dash>.ins,.dash>#warn,.dash>.two,.dash>.calc{grid-column:1/-1}}
-.sm{display:grid;gap:8px;font-size:14px}.sm div{display:flex;justify-content:space-between}.sm div:last-child{border-top:1px solid var(--line);padding-top:8px;font-weight:700}
-.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;text-align:center;font-size:11px}.cal i{font-style:normal;color:var(--mut)}.cal span{border-radius:10px;padding:6px 0;min-height:44px;background:var(--bg)}.cal span b{display:block;font-size:13px}.cal span small{font-size:10px;color:var(--chi);font-weight:700}
-
-.fp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.fp label{font-size:11px;color:var(--mut)}.fp select,.fp input{width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);margin-top:2px}.fp .w{grid-column:1/-1}
-.tsum{display:flex;gap:8px;margin:8px 0;font-size:12px;flex-wrap:wrap}.tsum span{background:var(--card);border-radius:10px;padding:6px 10px}.dh.over{color:var(--chi);font-weight:700}
-@media(max-width:899px){nav button{font-size:10.5px;padding:6px 1px}}.addb{width:100%;margin:6px 0 14px;padding:11px;border-radius:14px;border:2px dashed var(--line);color:var(--acc2);font-weight:700}
-
-html{scroll-behavior:smooth}::selection{background:#8b5cf655}
-body.dark{color-scheme:dark}body.dark .dot{background:var(--line)}body.dark .sk{background:linear-gradient(90deg,#1a1733,#2b2850,#1a1733);background-size:200%}
-input,select{font-size:16px}button{-webkit-tap-highlight-color:transparent;transition:transform .12s,background .2s}button:active{transform:scale(.97)}
-.chips{scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
-.tx{min-height:60px;border-radius:12px}.sheet{max-height:92dvh;background:var(--card);color:var(--ink)}
-.sheet:before{content:"";display:block;width:42px;height:4px;border-radius:4px;background:var(--line);margin:-6px auto 14px}
-#login form{background:#ffffff1a;backdrop-filter:blur(18px);border:1px solid #ffffff33;border-radius:28px;padding:32px 24px;box-shadow:0 24px 60px #1b184055}
-#login input:focus{border-color:#fff;outline:0;background:#ffffff26}
-nav button span{font-size:17px;padding:2px 16px;border-radius:12px;transition:background .2s}
-nav button.on span{background:color-mix(in srgb,var(--acc2) 18%,transparent)}
-nav{background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(14px)}
-@media(max-width:480px){.live b{display:none}.live{padding:8px}.ib{width:36px;height:36px}header{gap:6px;padding-inline:12px}main{padding-inline:12px}
-.hero{padding:18px 16px;border-radius:20px}.ins{gap:6px}.ins div{padding:9px;font-size:11px}.ins b{font-size:13px}.cd{flex-wrap:wrap;justify-content:center}.cd ul{min-width:150px}
-.ba{width:112px}.df{width:64px;font-size:12px}.f{grid-template-columns:1fr}.f .w{grid-column:auto}.two b{font-size:16px}}
-@media(max-width:899px){.ov{align-items:flex-end}.sheet{padding-bottom:calc(20px + env(safe-area-inset-bottom))}}
-@media(hover:hover){.tx:hover{background:color-mix(in srgb,var(--acc2) 8%,transparent)}.chip:hover{border-color:var(--acc2)}.card:hover{transform:translateY(-2px)}}
-@media(hover:none){.card:hover{transform:none}}
-@media(min-width:900px){
-main,main:has(.dash){max-width:980px}header{padding-inline:max(24px,calc((100vw - 200px - 980px)/2 + 16px))}
-nav{background:var(--card);gap:6px}nav:before{content:"Sổ Thu Chi";position:absolute;top:26px;left:24px;font-weight:700;font-size:20px;background:var(--g);-webkit-background-clip:text;background-clip:text;color:transparent}
-nav button{transition:background .2s}nav button:hover{background:color-mix(in srgb,var(--acc2) 10%,transparent)}nav button.on{background:color-mix(in srgb,var(--acc2) 16%,transparent)}nav button span{padding:0;background:none!important;width:22px}
-.ov{display:flex;align-items:center;justify-content:center}.sheet{position:relative;width:min(540px,92vw);border-radius:24px;padding:24px;transform:scale(.96);box-shadow:0 30px 80px #1b184066}.ov.open .sheet{transform:none}.sheet:before{display:none}
-.hero .big{font-size:44px}.fab{right:32px}}
 </style></head><body>
-<section id="login"><form id="lf"><svg width="56" height="56" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#fff"/><path d="M30 62l14-14 10 10 18-22" stroke="#0B4F59" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<section id="login"><form id="lf"><div class="logo" style="width:54px;height:54px;border-radius:15px;margin:auto;background:#fff;color:#0F6E6E"><svg class="i" viewBox="0 0 24 24" style="width:28px;height:28px;stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></div>
 <h1>Sổ Thu Chi</h1><p>Nhập mật khẩu để mở sổ</p><input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="Mật khẩu" autofocus><button class="go" id="lb">Mở sổ</button><div id="lerr" role="alert"></div></form></section>
 <div id="app" class="hide">
-<header><div style="flex:1"><b>Sổ Thu Chi</b><br><small id="st">Đang tải…</small></div><span class="live wait" id="live" role="status" aria-live="polite"><i></i><b>Đang kết nối</b></span><button class="ib" id="rf" aria-label="Đồng bộ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></button><button class="ib" id="lo" aria-label="Khóa sổ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></header>
-<main id="v"></main>
-<nav id="nav"></nav><button class="fab" id="fab" aria-label="Thêm giao dịch">+</button>
+<aside id="sb"></aside>
+<div class="wrap">
+<header class="top"><div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></span><span>Sổ Thu Chi<small id="st2"></small></span></div><span id="st"></span>
+<span class="live wait" id="live" role="status" aria-live="polite"><i></i><b>Đang kết nối</b></span>
+<button class="ib" data-a="hide" aria-label="Ẩn/hiện số dư" title="Ẩn/hiện số dư"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+<button class="ib" data-a="dark" aria-label="Đổi giao diện" title="Sáng/tối"><svg class="i" viewBox="0 0 24 24"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></svg></button>
+<button class="ib" id="rf" data-a="sync" aria-label="Đồng bộ" title="Đồng bộ"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></button>
+<button class="ib" data-a="lock" aria-label="Khóa sổ" title="Khóa sổ"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+<button class="pri" data-a="new"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M12 5v14M5 12h14"/></svg>Thêm giao dịch</button></header>
+<main id="v"></main></div>
+<nav id="bn"></nav><button class="fab" data-a="new" aria-label="Thêm giao dịch"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M12 5v14M5 12h14"/></svg></button>
 </div>
 <div class="ov" id="ov"><div class="sheet" id="sh" role="dialog" aria-modal="true"></div></div><div id="toast" role="status"></div>
 <script src="config.js"></script>
 <script>
-
 const TTL=12*3600e3,alive=()=>{const t=+localStorage.sess||0;return t&&Date.now()-t<TTL},touch=()=>{localStorage.sess=Date.now()};
 const{PASS,API}=window.CONFIG||{};
-const $=s=>document.querySelector(s),vnd=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n))+' ₫',num=n=>new Intl.NumberFormat('vi-VN').format(n);
+const $=s=>document.querySelector(s),num=n=>new Intl.NumberFormat('vi-VN').format(n),vnd=n=>num(Math.round(n))+' ₫';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const TYPES=['Chi','Thu','Chuyển khoản','Điều chỉnh'],CLS={Thu:'thu',Chi:'chi','Chuyển khoản':'chuyen','Điều chỉnh':'dc'},SIGN={Thu:'+',Chi:'−','Chuyển khoản':'⇄','Điều chỉnh':'±'};
-const NAV=[['home','Tổng quan','◧'],['tx','Giao dịch','☰'],['acc','Tài khoản','▣'],['rec','Cân đối','⚖'],['cat','Hạng mục','◈']];
+const IC={home:'M3 11l9-8 9 8M5 10v10h14V10',tx:'M4 6h16M4 12h16M4 18h10',rec:'M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',lim:'M4 18a8 8 0 1 1 16 0M12 18l4-6',rc:'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5',acc:'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18',cat:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',tr:'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',more:'M5 12h.01M12 12h.01M19 12h.01',dl:'M12 4v11M7 11l5 5 5-5M5 20h14',pl:'M12 5v14M5 12h14',fl:'M4 5h16l-6 8v6l-4-2v-4z'};
+const ic=k=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[k]}"/></svg>`;
+const TABS=[['home','Tổng quan','Sổ sách'],['tx','Giao dịch'],['rec','Cân đối'],['lim','Hạn mức','Kế hoạch'],['rc','Định kỳ'],['acc','Tài khoản','Danh mục'],['cat','Hạng mục'],['tr','Thùng rác']],MOB=['home','tx','rec','lim'],MONTHLY=['home','tx','lim'];
+const PAL=['#0F766E','#2563EB','#D97706','#DB2777','#7C3AED','#65A30D','#0891B2','#DC2626'],col=i=>PAL[i%PAL.length];
+const EMO=[[/ăn|uống|cơm|cafe|cà phê|nhà hàng/i,'🍜'],[/xe|xăng|đi lại|grab|taxi/i,'🛵'],[/nhà|thuê|điện|nước|internet/i,'🏠'],[/mua|sắm|quần|áo/i,'🛍️'],[/y tế|thuốc|khám|sức khỏe/i,'💊'],[/học|sách|giáo dục/i,'📚'],[/giải trí|phim|game|du lịch/i,'🎮'],[/lương|thưởng|thu/i,'💰'],[/quà|từ thiện|cho/i,'🎁']];
+const emo=k=>(EMO.find(e=>e[0].test(k||''))||[0,'🧾'])[1];
+const ATYPE={'Tiền mặt':['💵','#15803D'],'Ngân hàng':['🏦','#2563EB'],'Thẻ tín dụng':['💳','#7C3AED'],'Ví điện tử':['👛','#DB2777'],'Tiết kiệm':['🐷','#D97706']},ATORD=['Tiền mặt','Ngân hàng','Ví điện tử','Thẻ tín dụng','Tiết kiệm'],EM=['💵','🏦','💳','👛','🐷','📱','💰','🪙','🏧','🛒','📈','🎯'];
+const BR=[[/grab/i,'G','#00B14F'],[/momo/i,'M','#A50064'],[/zalo/i,'Z','#0068FF'],[/shopee/i,'S','#EE4D2D'],[/vcb|vietcombank/i,'VCB','#007A3D'],[/tcb|techcom/i,'TCB','#E3000F'],[/\bmb\b|mbbank/i,'MB','#1C3FAA'],[/bidv/i,'BIDV','#1D6E8C'],[/acb/i,'ACB','#0057A8'],[/vpbank/i,'VP','#00A651'],[/tpbank/i,'TP','#6A1B9A'],[/agribank/i,'AGR','#AE1C3F'],[/sacombank/i,'STB','#0A5EAB'],[/vietinbank|ctg/i,'CTG','#0B4DA2'],[/vnpay/i,'VN','#0F4C99'],[/viettel/i,'VT','#EE0033']];
+let AI={};try{AI=JSON.parse(localStorage.aicon||'{}')}catch(e){}
+function aIco(a){const t=ATYPE[a.type]||['🏦','#667085'],o=AI[a.name];if(o)return `<span class="dot" style="background:color-mix(in srgb,${t[1]} 16%,transparent)">${o}</span>`;const b=BR.find(x=>x[0].test(a.name));
+if(b)return `<span class="dot" style="background:${b[2]};color:#fff;font-size:${b[1].length>2?10:b[1].length>1?12:15}px">${b[1]}</span>`;return `<span class="dot" style="background:color-mix(in srgb,${t[1]} 16%,transparent)">${t[0]}</span>`}
 if(!window.CONFIG)$('#lerr').textContent='Thiếu file config.js';
-let S={act:{},tx:[],acc:[],cat:[],m:ymd(new Date()).slice(0,7),tab:'home',f:'all',q:'',ready:false,busy:0},E=null;
+let S={tx:[],acc:[],cat:[],rec:[],trash:[],bad:0,lim:{d:0,m:0,c:{},cd:{}},m:ymd(new Date()).slice(0,7),tab:(location.hash.slice(1)||'home'),f:'all',q:'',rg:'m',so:'dn',xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',fo:false,mg:'',act:{},ready:false,busy:0,err:''},E=null,ED=null;
+if(!TABS.some(t=>t[0]===S.tab))S.tab='home';
 try{const c=JSON.parse(sessionStorage.cache||'null');if(c){Object.assign(S,c);S.ready=true}}catch(e){}
+try{const l=JSON.parse(localStorage.lim||'null');if(l)S.lim=l}catch(e){}
+if(localStorage.dark==='1'||(localStorage.dark==null&&matchMedia('(prefers-color-scheme:dark)').matches))document.body.classList.add('dark');
+if(localStorage.hb==='1')document.body.classList.add('hb');
+/* ---------- api / sync ---------- */
 async function api(a,d={}){if(!API)throw Error('Thiếu địa chỉ API: file config.js chưa được tải');let r;const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);try{r=await fetch(API,{method:'POST',signal:ac.signal,body:JSON.stringify({a,...d})})}catch(e){throw Error('Không có kết nối mạng')}finally{clearTimeout(tm)}
-let j;try{j=await r.json()}catch(x){throw Error('Apps Script chưa cấp quyền hoặc chưa Deploy bản mới (máy chủ không trả về JSON)')}if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
-function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),2600)}
-function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.sig=sigOf(j);if(j.h)S.h=j.h;S.ready=true;sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat});$('#st').textContent='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}
-const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim,j.trash,j.rec]),POLL_MS=2000;
+let j;try{j=await r.json()}catch(x){throw Error('Apps Script chưa cấp quyền hoặc chưa Deploy bản mới (máy chủ không trả về JSON)')}if(!j.ok){if(/không hợp lệ/i.test(j.err||''))throw Error('Apps Script chưa hỗ trợ hành động "'+a+'" (bản Code.gs đang Deploy quá cũ). Dán Code.gs mới nhất rồi Deploy phiên bản mới.');throw Error(j.err||'Lỗi máy chủ')}return j}
+const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim,j.trash,j.rec]),POLL_MS=5000;
+function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.bad=j.bad||0;S.trash=j.trash||[];S.rec=j.rec||[];if(j.lim&&Object.keys(j.lim).length){S.lim=j.lim;localStorage.lim=JSON.stringify(j.lim)}S.sig=sigOf(j);if(j.h)S.h=j.h;S.ready=true;
+try{sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat,rec:S.rec,trash:S.trash})}catch(e){}
+const t='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});$('#st').textContent=t;$('#st2').textContent=t}
 const setLive=s=>{const e=$('#live');if(!e||e.dataset.s===s)return;e.dataset.s=s;e.className='live '+s;e.lastChild.textContent={ok:'Live',err:'Mất kết nối',wait:'Đang kết nối'}[s]};
-async function sync(quiet){$('#rf').classList.add('spin');try{apply(await api('all'));S.err='';setLive('ok');render()}catch(e){setLive('err');S.err=e.message;if(!quiet)toast(e.message);$('#st').textContent='Chưa đồng bộ được';if(!S.ready)render()}$('#rf').classList.remove('spin')}
-async function push(a,d,undo){S.busy++;$('#rf').classList.add('spin');try{apply(await api(a,d));toast('Đã lưu')}catch(e){undo();toast('Chưa lưu được: '+e.message)}S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
-function lock(){sessionStorage.clear();localStorage.removeItem('sess');$('#app').classList.add('hide');$('#login').classList.remove('hide');$('#pw').value='';$('#ov').classList.remove('open')}
-$('#lf').onsubmit=ev=>{ev.preventDefault();if($('#pw').value===PASS){touch();boot()}
-else{$('#lerr').textContent='Mật khẩu không đúng';$('#lf').classList.remove('shake');void $('#lf').offsetWidth;$('#lf').classList.add('shake');$('#pw').select()}};
+const spin=on=>$('#rf').classList.toggle('spin',on);
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),2800)}
+async function sync(quiet){spin(1);try{apply(await api('all'));S.err='';setLive('ok');render()}catch(e){setLive('err');S.err=e.message;if(!quiet)toast(e.message);$('#st').textContent='Chưa đồng bộ được';if(!S.ready)render()}spin(0)}
+async function push(a,d,undo){S.busy++;spin(1);let ok=false;try{apply(await api(a,d));toast('Đã lưu');ok=true}catch(e){undo();toast('Chưa lưu được: '+e.message)}S.busy--;if(!S.busy)spin(0);render();if(ok)limWarn(d.row)}
+async function act(a,d,msg){S.busy++;try{apply(await api(a,d));toast(msg);closeSheet()}catch(e){toast(e.message)}S.busy--;render()}
+async function pushMany(rows){const old=S.tx.slice();S.tx=S.tx.concat(rows);render();S.busy++;spin(1);try{let j;for(const row of rows)j=await api('add',{row});apply(j);toast('Đã cân đối: ghi '+rows.length+' giao dịch')}catch(e){S.tx=old;toast('Chưa lưu hết được: '+e.message);sync(true)}S.busy--;if(!S.busy)spin(0);render()}
+function lock(){sessionStorage.clear();localStorage.removeItem('sess');$('#app').classList.add('hide');$('#login').classList.remove('hide');$('#pw').value='';closeSheet()}
+$('#lf').onsubmit=ev=>{ev.preventDefault();if($('#pw').value===PASS){touch();boot()}else{$('#lerr').textContent='Mật khẩu không đúng';$('#lf').classList.remove('shake');void $('#lf').offsetWidth;$('#lf').classList.add('shake');$('#pw').select()}};
 function boot(){$('#login').classList.add('hide');$('#app').classList.remove('hide');render();sync(true)}
-$('#rf').onclick=()=>sync();$('#lo').onclick=lock;$('#fab').onclick=()=>openForm();
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(!alive())return lock();sync(true)});
 let inflight=false,fails=0,skip=0;
 const typing=()=>{const a=document.activeElement;return !!(a&&a.closest&&a.closest('#v')&&/INPUT|SELECT|TEXTAREA/.test(a.tagName))};
-async function poll(){if(!alive()){if(!$('#app').classList.contains('hide'))lock();return}
-if(inflight||document.hidden||S.busy)return;if(fails>3&&++skip%5)return;
-inflight=true;try{const j=await api('all',{h:S.h});fails=0;setLive('ok');S.err='';
-if(!j.same&&sigOf(j)!==S.sig){const first=!S.ready;apply(j);if(!first)toast('Có giao dịch mới');S.dirty=true;if(!typing()){S.dirty=false;render()}}}
-catch(e){fails++;setLive('err')}inflight=false}
+async function poll(){if(!alive()){if(!$('#app').classList.contains('hide'))lock();return}if(inflight||document.hidden||S.busy)return;if(fails>3&&++skip%5)return;
+inflight=true;try{const j=await api('all',{h:S.h});fails=0;setLive('ok');S.err='';if(!j.same&&sigOf(j)!==S.sig){const first=!S.ready;apply(j);if(!first)toast('Có dữ liệu mới');S.dirty=true;if(!typing()){S.dirty=false;render()}}}catch(e){fails++;setLive('err')}inflight=false}
 setInterval(poll,POLL_MS);
 document.addEventListener('focusout',()=>setTimeout(()=>{if(S.dirty&&!typing()){S.dirty=false;render()}},60));
 addEventListener('offline',()=>setLive('err'));addEventListener('online',()=>{fails=0;poll()});
 ['click','keydown'].forEach(t=>document.addEventListener(t,()=>{if(alive())touch()},{passive:true}));
-const sums=m=>{let thu=0,chi=0;S.tx.forEach(t=>{if(t.date.slice(0,7)!==m)return;if(t.type==='Thu')thu+=t.amount;if(t.type==='Chi')chi+=t.amount});return{thu,chi}};
+/* ---------- calc ---------- */
+const mOf=t=>t.date.slice(0,7),inM=(t,m)=>mOf(t)===m;
+const sums=m=>{let thu=0,chi=0;S.tx.forEach(t=>{if(!inM(t,m))return;if(t.type==='Thu')thu+=t.amount;if(t.type==='Chi')chi+=t.amount});return{thu,chi}};
 const bal=a=>{let b=a.open;S.tx.forEach(t=>{const x=t.amount;if(t.acc===a.name){if(t.type==='Thu'||t.type==='Điều chỉnh')b+=x;else b-=x}if(t.type==='Chuyển khoản'&&t.accTo===a.name)b+=x});return b};
-const mlabel=m=>'Tháng '+m.slice(5)+'/'+m.slice(0,4),shift=(m,d)=>{const t=new Date(+m.slice(0,4),+m.slice(5)-1+d,1);return ymd(t).slice(0,7)};
-const monthNav=()=>`<div class="mn"><button class="ib" data-m="-1" aria-label="Tháng trước">‹</button><b>${mlabel(S.m)}</b><button class="ib" data-m="1" aria-label="Tháng sau">›</button></div>`;
-function txRow(t){const c=CLS[t.type],ttl=t.type==='Chuyển khoản'?`${esc(t.acc)} → ${esc(t.accTo)}`:esc(t.sub||t.cat||(t.type==='Chi'||t.type==='Thu'?'Chưa phân loại':t.type));
-return `<button class="tx" data-edit="${esc(t.id)}"><span class="dot ${c}">${SIGN[t.type]}</span><span class="m"><b>${ttl}</b><small>${esc(t.note||t.cat||'')}${t.type==='Chuyển khoản'?'':' · '+esc(t.acc)}</small></span><b class="${c}">${t.type==='Chi'?'−':t.type==='Thu'?'+':''}${num(t.amount)}</b></button>`}
-const empty=(a,b)=>`<div class="empty"><b>${a}</b>${b}</div>`;
-function home(){const{thu,chi}=sums(S.m),total=S.acc.reduce((s,a)=>s+bal(a),0),by={};
-S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).forEach(t=>by[t.cat||'Chưa phân loại']=(by[t.cat||'Chưa phân loại']||0)+t.amount);
-const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]),mx=rows[0]?rows[0][1]:1;
-let ch='';const months=[];for(let i=11;i>=0;i--)months.push(shift(S.m,-i));const d=months.map(m=>({m,...sums(m)})),top=Math.max(1,...d.map(x=>Math.max(x.thu,x.chi)));
-d.forEach((x,i)=>{const w=360/12,h1=x.thu/top*100,h2=x.chi/top*100;ch+=`<rect x="${i*w+4}" y="${110-h1}" width="10" height="${h1}" rx="2" fill="#23814F"/><rect x="${i*w+15}" y="${110-h2}" width="10" height="${h2}" rx="2" fill="#C4432C"/><text x="${i*w+15}" y="126" font-size="9" text-anchor="middle" fill="#62777D">${x.m.slice(5)}</text>`});
-const rec=S.tx.filter(t=>t.date.slice(0,7)===S.m).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
-return `<div class="hero"><small>Tổng tài sản</small><div class="big">${vnd(total)}</div><div class="row"><div class="pill">Còn lại ${mlabel(S.m).toLowerCase()}<b>${vnd(thu-chi)}</b></div><div class="pill">Tiết kiệm<b>${thu?Math.round((thu-chi)/thu*100):0}%</b></div></div></div>${monthNav()}
-<div class="two"><div class="card"><small>Thu</small><b class="thu">${vnd(thu)}</b></div><div class="card"><small>Chi</small><b class="chi">${vnd(chi)}</b></div></div>
-<div class="card"><h3>Chi theo hạng mục</h3>${rows.length?rows.map(([k,v])=>`<div class="bar"><div><span>${esc(k)}</span><b>${vnd(v)} <small style="color:var(--mut);font-weight:400">${Math.round(v/chi*100)}%</small></b></div><i><s style="width:${v/mx*100}%"></s></i></div>`).join(''):empty('Chưa có khoản chi','Bấm + để ghi khoản đầu tiên của tháng.')}</div>
-<div class="card"><h3>12 tháng gần nhất <small style="color:var(--mut);font-weight:400">xanh: thu, đỏ: chi</small></h3><svg viewBox="0 0 360 132" width="100%" role="img" aria-label="Biểu đồ thu chi 12 tháng">${ch}</svg></div>
-<div class="card"><h3>Giao dịch gần đây</h3>${rec.length?rec.map(txRow).join(''):empty('Chưa có giao dịch','')}</div>`}
-function txs(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>t.date.slice(0,7)===S.m&&(S.f==='all'||t.type===S.f)&&(!q||[t.note,t.cat,t.sub,t.acc,String(t.amount)].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
-let h='',last='';l.forEach(t=>{if(t.date!==last){last=t.date;const d=new Date(t.date+'T00:00');h+=`<div class="dh">${d.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'})}</div>`}h+=txRow(t)});
-return `${monthNav()}<input class="search" id="q" placeholder="Tìm theo ghi chú, hạng mục, số tiền" value="${esc(S.q)}"><div class="chips">${['all',...TYPES].map(t=>`<button class="chip ${S.f===t?'on':''}" data-f="${t}">${t==='all'?'Tất cả':t}</button>`).join('')}</div>
-<div class="card" style="padding:4px 16px">${l.length?h:empty('Không có giao dịch','Thử đổi tháng hoặc bộ lọc.')}</div><button class="chip" data-csv>Tải CSV toàn bộ</button>`}
-function accs(){const t=S.acc.reduce((s,a)=>s+bal(a),0);return `<div class="hero"><small>Tổng tài sản</small><div class="big">${vnd(t)}</div></div><div class="card" style="padding:4px 16px">${S.acc.map(a=>{const b=bal(a);return `<div class="acc"><span><b style="font-weight:500">${esc(a.name)}</b><small>${esc(a.type)}</small></span><b class="${b<0?'chi':''}">${vnd(b)}</b></div>`}).join('')||empty('Chưa có tài khoản','')}</div>`}
-function cats(){const g={};S.cat.filter(c=>c.t==='Chi').forEach(c=>(g[c.p]=g[c.p]||[]).push(c.c));const sp={};S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).forEach(t=>sp[t.sub]=(sp[t.sub]||0)+t.amount);
-return monthNav()+Object.entries(g).map(([p,k])=>`<div class="card"><h3>${esc(p)}</h3>${k.map(c=>`<div class="acc" style="padding:8px 0"><span>${esc(c)}</span><b class="${sp[c]?'chi':''}" style="font-weight:${sp[c]?700:400}">${sp[c]?vnd(sp[c]):'–'}</b></div>`).join('')}</div>`).join('')||empty('Chưa có hạng mục','')}
-const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p style="color:var(--chi);margin-bottom:10px">${esc(S.err==='Failed to fetch'||S.err==='Không có kết nối mạng'?'Không kết nối được tới Apps Script':S.err)}</p><p style="color:var(--mut);font-size:13px">Kiểm tra: (1) đã dán Code.gs mới và Deploy phiên bản mới; (2) quyền truy cập là Anyone; (3) Google Sheet có đủ 4 sheet TongQuan, GiaoDich, TaiKhoan, DanhMuc.</p><button class="save" data-retry>Thử lại</button></div>`;
+const mlabel=m=>'Tháng '+m.slice(5)+'/'+m.slice(0,4),shift=(m,d)=>ymd(new Date(+m.slice(0,4),+m.slice(5)-1+d,1)).slice(0,7);
+const group=(l,f)=>{const o={};l.forEach(t=>{const k=f(t);o[k]=(o[k]||0)+t.amount});return Object.entries(o).sort((a,b)=>b[1]-a[1])};
+const chiM=m=>S.tx.filter(t=>t.type==='Chi'&&inM(t,m));
+/* ---------- partials ---------- */
+const empty=(a,b='')=>`<div class="empty"><b>${a}</b>${b}</div>`;
+const monthNav=()=>`<div class="mn"><button data-m="-1" aria-label="Tháng trước">‹</button><b>${mlabel(S.m)}</b><button data-m="1" aria-label="Tháng sau">›</button></div>`;
+const head=(t,sub,btns='')=>`<div class="ph"><div><h1>${t}</h1><p>${sub}</p></div><div class="pa">${MONTHLY.includes(S.tab)?monthNav():''}${btns}</div></div>`;
+const kpi=(l,v,c='',s='',h='')=>`<div class="card kpi ${h}"><small>${l}</small><b class="sens ${c}">${v}</b><em>${s}</em></div>`;
+function txRow(t){const c=CLS[t.type],ttl=t.type==='Chuyển khoản'?`${esc(t.acc)} → ${esc(t.accTo)}`:esc(t.sub||t.cat||(t.type==='Chi'||t.type==='Thu'?'Chưa phân loại':t.type)),ico=t.type==='Chuyển khoản'?'⇄':t.type==='Điều chỉnh'?'±':emo(t.sub||t.cat);
+return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(t.note||t.cat||'')}${t.type==='Chuyển khoản'?'':(t.note||t.cat?' · ':'')+esc(t.acc)}</small></span><b class="sens ${c}">${t.type==='Chi'?'−':t.type==='Thu'?'+':''}${num(t.amount)}</b></button>`}
+function donut(rows,tot,off=0,fi=emo){if(!rows.length)return empty('Chưa có dữ liệu');const R=48,C=2*Math.PI*R;let o=0;
+return `<div class="cd"><svg width="132" height="132" viewBox="0 0 120 120" role="img" aria-label="Biểu đồ cơ cấu">${rows.map(([k,v],i)=>{const l=v/tot*C,x=`<circle r="${R}" cx="60" cy="60" fill="none" stroke="${col(i+off)}" stroke-width="18" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-o}" transform="rotate(-90 60 60)"/>`;o+=l;return x}).join('')}<text x="60" y="58" text-anchor="middle" font-size="9" fill="var(--mut)">${rows.length} nhóm</text><text x="60" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${tot>=1e6?(tot/1e6).toFixed(1)+'tr':Math.round(tot/1e3)+'k'}</text></svg>
+<ul>${rows.slice(0,6).map(([k,v],i)=>`<li><i style="background:${col(i+off)}"></i><span>${fi(k)} ${esc(k)}</span><b>${Math.round(v/tot*100)}%</b></li>`).join('')}</ul></div>`}
+const barRow=(lb,v,lim,c)=>{const r=lim?v/lim:0,cc=c||(r>1?'var(--chi)':r>.8?'var(--dc)':'var(--thu)');return `<div class="bar" style="--bc:${cc}"><div><span>${lb}</span><b class="sens">${vnd(v)}${lim?' / '+vnd(lim)+' <small style="color:'+cc+'">'+(v>lim?'vượt '+vnd(v-lim):Math.round(r*100)+'%')+'</small>':''}</b></div><i><s style="width:${Math.min(100,(lim?r:v/c2)*100)}%"></s></i></div>`};
+let c2=1;
+function limBlocks(){const L=S.lim||{},now=ymd(new Date()),M=chiM(S.m),tot=M.reduce((a,t)=>a+t.amount,0),td=S.tx.filter(t=>t.type==='Chi'&&t.date===now).reduce((a,t)=>a+t.amount,0),by={},dd={};
+M.forEach(t=>{by[t.cat]=(by[t.cat]||0)+t.amount;const k=t.cat+'|'+t.date;dd[k]=(dd[k]||0)+t.amount});
+const main=(L.d?barRow('Hôm nay',td,L.d):'')+(L.m?barRow(mlabel(S.m),tot,L.m):'')+Object.entries(L.c||{}).map(([k,v])=>barRow(emo(k)+' '+esc(k)+' · tháng',by[k]||0,v)).join('')+Object.entries(L.cd||{}).map(([k,v])=>barRow(emo(k)+' '+esc(k)+' · hôm nay',dd[k+'|'+now]||0,v)).join('');
+const ov=[];Object.entries(L.cd||{}).forEach(([k,v])=>{const ex=Object.entries(dd).filter(([x,a])=>x.startsWith(k+'|')&&a>v);if(ex.length)ov.push({k,n:ex.length,x:ex.reduce((q,[,a])=>q+a-v,0)})});
+Object.entries(L.c||{}).forEach(([k,v])=>{if((by[k]||0)>v)ov.push({k,n:0,x:by[k]-v})});ov.sort((a,b)=>b.x-a.x);return{main,ov}}
+/* ---------- pages ---------- */
+function home(){const{thu,chi}=sums(S.m),total=S.acc.reduce((s,a)=>s+bal(a),0),M=S.tx.filter(t=>inM(t,S.m)),rows=group(chiM(S.m),t=>t.cat||'Chưa phân loại'),mx=rows[0]?rows[0][1]:1;c2=mx;
+const months=[];for(let i=11;i>=0;i--)months.push(shift(S.m,-i));const d=months.map(m=>({m,...sums(m)})),top=Math.max(1,...d.map(x=>Math.max(x.thu,x.chi)));
+const ch=[0,.5,1].map(f=>`<line x1="0" x2="480" y1="${130-f*120}" y2="${130-f*120}" stroke="var(--line)"/>`).join('')+d.map((x,i)=>{const w=40,h1=x.thu/top*120,h2=x.chi/top*120;return `<rect x="${i*w+6}" y="${130-h1}" width="13" height="${h1}" rx="2" fill="var(--thu)"/><rect x="${i*w+20}" y="${130-h2}" width="13" height="${h2}" rx="2" fill="var(--chi)"/><text x="${i*w+20}" y="148" font-size="10" text-anchor="middle" fill="var(--mut)">${x.m.slice(5)}</text>`}).join('');
+const y=+S.m.slice(0,4),mo=+S.m.slice(5),dim=new Date(y,mo,0).getDate(),off=(new Date(y,mo-1,1).getDay()+6)%7,dc={};chiM(S.m).forEach(t=>dc[+t.date.slice(8)]=(dc[+t.date.slice(8)]||0)+t.amount);
+const cmx=Math.max(1,...Object.values(dc)),sh=n=>n>=1e6?(n/1e6).toFixed(1)+'tr':Math.round(n/1e3)+'k';
+const day=S.m===ymd(new Date()).slice(0,7)?new Date().getDate():dim,big=chiM(S.m).sort((a,b)=>b.amount-a.amount)[0],lb=limBlocks();
+const rec=M.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+return head('Tổng quan',mlabel(S.m)+' · '+M.length+' giao dịch')+(S.bad?`<div class="warn">⚠️ Sheet có ${S.bad} dòng dữ liệu sai — hệ thống đã tự sửa/khôi phục khi có thể.</div>`:'')+
+`<div class="kpis">${kpi('Tổng tài sản',vnd(total),'',S.acc.length+' tài khoản','h')}${kpi('Thu',vnd(thu),'thu','Tháng này')}${kpi('Chi',vnd(chi),'chi','TB '+vnd(chi/day)+'/ngày')}${kpi('Còn lại',vnd(thu-chi),thu-chi<0?'chi':'','Tiết kiệm '+(thu?Math.round((thu-chi)/thu*100):0)+'%')}</div>
+<div class="grid a"><div class="card"><div class="ch">Thu chi 12 tháng <small><span class="thu">■</span> thu &nbsp;<span class="chi">■</span> chi</small></div><svg viewBox="0 0 480 154" width="100%" role="img" aria-label="Biểu đồ thu chi 12 tháng">${ch}</svg></div>
+<div class="card"><div class="ch">Cơ cấu chi tiêu <small>${big?'Lớn nhất '+num(big.amount):''}</small></div>${donut(rows,chi)}</div></div>
+<div class="grid b"><div class="card"><div class="ch">Chi theo hạng mục</div>${rows.length?rows.map(([k,v],i)=>barRow(emo(k)+' '+esc(k),v,0,col(i)).replace('</b>',' <small class="mut">'+Math.round(v/chi*100)+'%</small></b>')).join(''):empty('Chưa có khoản chi','Bấm + để ghi khoản đầu tiên của tháng.')}${rows.length?`<div class="ch" style="margin:16px 0 0;padding-top:12px;border-top:1px solid var(--line)">Khoản chi lớn nhất</div>${chiM(S.m).sort((a,b)=>b.amount-a.amount).slice(0,3).map(txRow).join('')}`:''}</div>
+<div class="card"><div class="ch">Lịch chi tiêu</div><div class="cal">${['T2','T3','T4','T5','T6','T7','CN'].map(x=>`<i>${x}</i>`).join('')}${'<span class="e"></span>'.repeat(off)}${Array.from({length:dim},(_,i)=>{const v=dc[i+1];return `<span style="${v?`background:color-mix(in srgb,var(--chi) ${Math.round(12+38*v/cmx)}%,transparent)`:''}"><b>${i+1}</b>${v?`<small class="sens">${sh(v)}</small>`:''}</span>`}).join('')}</div></div></div>
+<div class="grid b"><div class="card"><div class="ch">Giao dịch gần đây <button class="chip" data-tab="tx">Xem tất cả</button></div>${rec.length?rec.map(txRow).join(''):empty('Chưa có giao dịch')}</div>
+<div class="card"><div class="ch">Hạn mức chi <button class="chip" data-tab="lim">Chi tiết</button></div>${lb.main||empty('Chưa đặt hạn mức','Vào tab Hạn mức để thiết lập.')}${lb.ov.length?`<p class="chi" style="font-size:13px;margin-top:10px">⚠️ ${lb.ov.length} hạng mục đang bội chi</p>`:''}</div></div>`}
+function txs(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>{if(S.rg==='m'&&!inM(t,S.m))return false;if(S.rg==='c'&&((S.d1&&t.date<S.d1)||(S.d2&&t.date>S.d2)))return false;if(S.f!=='all'&&t.type!==S.f)return false;if(S.xa&&t.acc!==S.xa&&t.accTo!==S.xa)return false;if(S.xc&&t.cat!==S.xc)return false;if(S.mn!==''&&t.amount<+S.mn)return false;if(S.mx!==''&&t.amount>+S.mx)return false;
+return !q||[t.note,t.cat,t.sub,t.acc,t.accTo,String(t.amount)].join(' ').toLowerCase().includes(q)});
+const ds=S.so==='dn'||S.so==='do';l.sort({dn:(a,b)=>b.date.localeCompare(a.date),do:(a,b)=>a.date.localeCompare(b.date),ah:(a,b)=>b.amount-a.amount,al:(a,b)=>a.amount-b.amount}[S.so]);
+const thu=l.filter(t=>t.type==='Thu').reduce((a,t)=>a+t.amount,0),chi=l.filter(t=>t.type==='Chi').reduce((a,t)=>a+t.amount,0),dt={};l.forEach(t=>{if(t.type==='Chi')dt[t.date]=(dt[t.date]||0)+t.amount});
+let h='',last='';l.forEach(t=>{if(ds&&t.date!==last){last=t.date;const dd=new Date(t.date+'T00:00'),ov=S.lim.d&&dt[t.date]>S.lim.d;h+=`<div class="dh ${ov?'over':''}"><span>${dd.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'})}</span><span class="sens">${dt[t.date]?'chi '+num(dt[t.date])+(ov?' ⚠️ vượt hạn mức':''):''}</span></div>`}h+=txRow(t)});
+const op=(a,v,ph)=>`<option value="">${ph}</option>`+a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join(''),pars=[...new Set(S.cat.map(c=>c.p))],n=[S.xa,S.xc,S.mn,S.mx,S.d1,S.d2].filter(x=>x!=='').length+(S.rg!=='m'?1:0);
+return head('Giao dịch',S.rg==='m'?mlabel(S.m):S.rg==='a'?'Toàn bộ thời gian':'Khoảng ngày tùy chọn',`<button class="btn" data-a="csv">${ic('dl')}CSV</button>`)+
+`<div class="tb"><input class="search" id="q" placeholder="Tìm theo ghi chú, hạng mục, số tiền" value="${esc(S.q)}" aria-label="Tìm giao dịch"><div class="chips">${['all',...TYPES].map(t=>`<button class="chip ${S.f===t?'on':''}" data-f="${t}">${t==='all'?'Tất cả':t}</button>`).join('')}<button class="chip ${n?'on':''}" data-a="fo">${ic('fl').replace('class="i"','class="i" style="width:14px;height:14px;vertical-align:-2px"')} Bộ lọc${n?' ('+n+')':''}</button></div></div>
+${S.fo?`<div class="card" style="margin-bottom:12px"><div class="fp"><label class="l w">Thời gian<select id="x_rg"><option value="m" ${S.rg==='m'?'selected':''}>Theo tháng đang xem</option><option value="a" ${S.rg==='a'?'selected':''}>Toàn bộ thời gian</option><option value="c" ${S.rg==='c'?'selected':''}>Khoảng ngày tùy chọn</option></select></label>
+${S.rg==='c'?`<label class="l">Từ ngày<input type="date" id="x_d1" value="${S.d1}"></label><label class="l">Đến ngày<input type="date" id="x_d2" value="${S.d2}"></label>`:''}
+<label class="l">Tài khoản<select id="x_acc">${op(S.acc.map(a=>a.name),S.xa,'Tất cả')}</select></label><label class="l">Hạng mục<select id="x_cat">${op(pars,S.xc,'Tất cả')}</select></label>
+<label class="l">Số tiền từ<input type="number" id="x_mn" inputmode="numeric" value="${S.mn}"></label><label class="l">Đến<input type="number" id="x_mx" inputmode="numeric" value="${S.mx}"></label>
+<label class="l w">Sắp xếp<select id="x_so">${[['dn','Mới nhất trước'],['do','Cũ nhất trước'],['ah','Số tiền: cao → thấp'],['al','Số tiền: thấp → cao']].map(([k,v])=>`<option value="${k}" ${S.so===k?'selected':''}>${v}</option>`).join('')}</select></label></div><button class="btn" data-a="rs">Xóa bộ lọc</button></div>`:''}
+<div class="sum"><span>${l.length} giao dịch</span><span class="thu sens">Thu ${vnd(thu)}</span><span class="chi sens">Chi ${vnd(chi)}</span><span class="sens">Ròng ${vnd(thu-chi)}</span></div>
+<div class="card flush">${l.length?h:empty('Không có giao dịch','Thử đổi bộ lọc hoặc khoảng thời gian.')}</div>`}
+function limPage(){const lb=limBlocks(),tot=lb.ov.reduce((q,o)=>q+o.x,0);
+return head('Hạn mức chi','Theo dõi mức chi so với hạn mức đã đặt',`<button class="btn p" data-a="lim">Thiết lập hạn mức</button>`)+
+`<div class="grid b"><div class="card"><div class="ch">Mức sử dụng</div>${lb.main||empty('Chưa đặt hạn mức','Bấm “Thiết lập hạn mức” để bắt đầu.')}</div>
+<div class="card"><div class="ch">Danh mục bội chi ${tot?`<small class="chi sens">+${vnd(tot)}</small>`:''}</div>${lb.ov.map(o=>`<div class="row"><span class="dot">${emo(o.k)}</span><span class="m"><b>${esc(o.k)}</b><small>${o.n?o.n+' ngày vượt hạn mức ngày':'Vượt hạn mức tháng'}</small></span><b class="chi sens">+${vnd(o.x)}</b></div>`).join('')||empty('Không có hạng mục nào bội chi','Tháng này đang trong hạn mức.')}</div></div>`}
 const diffs=()=>S.acc.map(a=>{const sys=bal(a),v=S.act[a.name],has=v!==undefined;return{a,sys,has,act:v,diff:has?v-sys:0}});
-function recon(){const D=diffs();return `<div class="hero"><small>Chênh lệch (thực tế − hệ thống)</small><div class="big" id="rt">–</div><div class="row"><div class="pill">Hệ thống<b id="rs">–</b></div><div class="pill">Thực tế<b id="ra">–</b></div></div></div>
-<div class="card"><h3>Nhập số dư thực tế</h3>${D.map((x,i)=>`<div class="rr"><span><b style="font-weight:500">${esc(x.a.name)}</b><small>Hệ thống: ${vnd(x.sys)}</small></span><input class="ba" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has?num(x.act):''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('')||empty('Chưa có tài khoản','')}</div><div id="rbtn"></div>`}
+function recon(){const D=diffs();return head('Cân đối','So số dư thực tế với hệ thống, tạo điều chỉnh khi lệch')+
+`<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${`<div class="card kpi h kfull"><small>Chênh lệch</small><b class="sens" id="rt">–</b></div><div class="card kpi"><small>Hệ thống</small><b class="sens" id="rs">–</b></div><div class="card kpi"><small>Thực tế</small><b class="sens" id="ra">–</b></div>`}</div>
+<div class="grid c"><div class="card"><div class="ch">Nhập số dư thực tế</div>${D.map((x,i)=>`<div class="rr"><span style="display:flex;align-items:center;gap:10px">${aIco(x.a)}<span style="min-width:0"><b style="font-weight:500">${esc(x.a.name)}</b><small class="sens">Hệ thống: ${vnd(x.sys)}</small></span></span><input class="ba" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has?num(x.act):''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('')||empty('Chưa có tài khoản')}</div>
+<div class="card"><div class="ch">Xử lý</div><div id="rbtn"></div></div></div>`}
 function reconUpdate(){const D=diffs(),has=D.filter(x=>x.has),tot=has.reduce((s,x)=>s+x.diff,0),sg=n=>(n>0?'+':'−')+vnd(Math.abs(n));
 D.forEach((x,i)=>{const e=$('#df'+i);if(e){e.textContent=!x.has?'':x.diff===0?'Khớp':sg(x.diff).replace(' ₫','');e.className='df '+(!x.has?'':x.diff===0?'thu':'chi')}});
-$('#rt').textContent=has.length?(tot===0?'Khớp':sg(tot)):'–';
-$('#rs').textContent=vnd((has.length?has:D).reduce((s,x)=>s+x.sys,0));$('#ra').textContent=has.length?vnd(has.reduce((s,x)=>s+x.act,0)):'–';
+$('#rt').textContent=has.length?(tot===0?'Khớp':sg(tot)):'–';$('#rs').textContent=vnd((has.length?has:D).reduce((s,x)=>s+x.sys,0));$('#ra').textContent=has.length?vnd(has.reduce((s,x)=>s+x.act,0)):'–';
 const bad=has.filter(x=>x.diff!==0),pos=bad.some(x=>x.diff>0),neg=bad.some(x=>x.diff<0);
-$('#rbtn').innerHTML=(bad.length?`<button class="save" data-bdo="adj">Tạo điều chỉnh số dư (${bad.length} tài khoản)</button>`+(pos&&neg?`<button class="save" style="background:var(--chuyen)" data-bdo="xfer">${tot===0?'Ghi nhận là chuyển khoản giữa các tài khoản':'Chuyển khoản phần bù trừ, điều chỉnh phần còn lại'}</button>`:''):has.length?empty('Đã khớp','Số dư thực tế trùng với hệ thống.'):'')+`<button class="chip" style="margin-top:12px" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`}
-function doBal(k){if(k==='form')return openForm(null,'Chuyển khoản');
-const rem=diffs().filter(x=>x.has&&x.diff!==0).map(x=>({n:x.a.name,d:x.diff})),rows=[],today=ymd(new Date());let i=0;
+$('#rbtn').innerHTML=(bad.length?`<button class="btn p w" data-bdo="adj" style="margin-top:0">Tạo điều chỉnh số dư (${bad.length} tài khoản)</button>`+(pos&&neg?`<button class="btn b w" data-bdo="xfer">${tot===0?'Ghi nhận là chuyển khoản giữa các tài khoản':'Chuyển khoản phần bù trừ, điều chỉnh phần còn lại'}</button>`:''):has.length?empty('Đã khớp','Số dư thực tế trùng với hệ thống.'):'<p class="mut" style="margin-bottom:6px">Nhập số dư thực tế để xem chênh lệch.</p>')+`<button class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`}
+function doBal(k){if(k==='form')return openForm(null,'Chuyển khoản');const rem=diffs().filter(x=>x.has&&x.diff!==0).map(x=>({n:x.a.name,d:x.diff})),rows=[],today=ymd(new Date());let i=0;
 const mk=o=>({id:'C'+Date.now().toString(36)+(i++),date:today,cat:'',sub:'',accTo:'',...o});
 if(k==='xfer')for(const g of rem.filter(x=>x.d<0))for(const r of rem.filter(x=>x.d>0)){if(!g.d||!r.d)continue;const m=Math.min(-g.d,r.d);if(m<=0)continue;rows.push(mk({type:'Chuyển khoản',amount:m,acc:g.n,accTo:r.n,note:'Cân đối: chuyển giữa tài khoản'}));g.d+=m;r.d-=m}
-rem.filter(x=>x.d!==0).forEach(x=>rows.push(mk({type:'Điều chỉnh',amount:x.d,acc:x.n,note:'Cân đối số dư'})));
-if(!rows.length)return;S.act={};pushMany(rows)}
-async function pushMany(rows){const old=S.tx.slice();S.tx=S.tx.concat(rows);render();S.busy++;$('#rf').classList.add('spin');
-try{let j;for(const row of rows)j=await api('add',{row});apply(j);toast('Đã cân đối: ghi '+rows.length+' giao dịch')}catch(e){S.tx=old;toast('Chưa lưu hết được: '+e.message);sync(true)}
-S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
-document.addEventListener('input',e=>{const t=e.target;if(!t.classList||!t.classList.contains('ba'))return;const neg=t.value.trim().startsWith('-'),v=t.value.replace(/[^\d]/g,''),a=S.acc[+t.dataset.i];
-t.value=(neg?'-':'')+(v?num(+v):'');if(!a)return;if(v)S.act[a.name]=(neg?-1:1)*Number(v);else delete S.act[a.name];reconUpdate()});
-function render(){$('#nav').innerHTML=NAV.map(([k,l,i])=>`<button class="${S.tab===k?'on':''}" data-tab="${k}"><span aria-hidden="true">${i}</span>${l}</button>`).join('');
-$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,acc:accs,cat:cats,rec:recon,mg:mgPage,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
-document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-csv],[data-retry],[data-bdo]');if(!t)return;const d=t.dataset;
-if(d.tab){S.tab=d.tab;scrollTo(0,0)}else if(d.m)S.m=shift(S.m,+d.m);else if(d.f)S.f=d.f;else if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));else if(d.bdo)return doBal(d.bdo);else if('csv' in d)return csv();else if('retry' in d){S.err='';render();return sync()}render()});
-document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const p=e.target.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p)}});
+rem.filter(x=>x.d!==0).forEach(x=>rows.push(mk({type:'Điều chỉnh',amount:x.d,acc:x.n,note:'Cân đối số dư'})));if(!rows.length)return;S.act={};pushMany(rows)}
+function accs(){const bs=S.acc.map(a=>({a,b:bal(a)})),tot=bs.reduce((s,x)=>s+x.b,0),pos=bs.filter(x=>x.b>0).reduce((s,x)=>s+x.b,0),neg=bs.filter(x=>x.b<0).reduce((s,x)=>s+x.b,0),mo={};
+S.tx.forEach(t=>{if(!inM(t,S.m))return;const o=mo[t.acc]=mo[t.acc]||{thu:0,chi:0};if(t.type==='Thu')o.thu+=t.amount;if(t.type==='Chi')o.chi+=t.amount});
+const types=[...new Set([...ATORD,...S.acc.map(a=>a.type)])].filter(t=>bs.some(x=>x.a.type===t)),pie=bs.filter(x=>x.b>0).sort((a,b)=>b.b-a.b).map(x=>[x.a.name,x.b]);
+const grp=types.map(t=>{const l=bs.filter(x=>x.a.type===t),sub=l.reduce((s,x)=>s+x.b,0);return `<div class="card flush"><div class="ch" style="padding-top:14px;margin:0"><span>${(ATYPE[t]||['🏦'])[0]} ${esc(t)} <small>· ${l.length} tài khoản</small></span><b class="sens ${sub<0?'chi':''}">${vnd(sub)}</b></div>${l.map(({a,b})=>{const i=S.acc.indexOf(a),m=mo[a.name]||{thu:0,chi:0};return `<button class="row" data-ed="tk:${i}">${aIco(a)}<span class="m"><b>${esc(a.name)}</b><small class="sens">${mlabel(S.m)}: <span class="thu">+${num(m.thu)}</span> · <span class="chi">−${num(m.chi)}</span></small></span><b class="sens ${b<0?'chi':''}">${vnd(b)}</b></button>`}).join('')}</div>`}).join('');
+return head('Tài khoản',S.acc.length+' tài khoản · bấm vào để sửa hoặc xem giao dịch',`<button class="btn p" data-ed="tk:new">${ic('pl')}Thêm tài khoản</button>`).replace('<div class="pa">','<div class="pa">'+monthNav())+
+`<div class="kpis">${kpi('Tổng tài sản ròng',vnd(tot),tot<0?'chi':'','Sau khi trừ nợ','h')}${kpi('Tiền đang có',vnd(pos),'thu',bs.filter(x=>x.b>0).length+' tài khoản')}${kpi('Đang nợ',vnd(neg),neg<0?'chi':'',bs.filter(x=>x.b<0).length+' tài khoản')}${(()=>{const th=Object.values(mo).reduce((s,x)=>s+x.thu,0),ch=Object.values(mo).reduce((s,x)=>s+x.chi,0);return kpi('Thu − chi '+mlabel(S.m).toLowerCase(),vnd(th-ch),th-ch<0?'chi':'thu','+'+num(th)+' / −'+num(ch))})()}</div>
+<div class="grid a" style="align-items:start"><div class="col">${grp||`<div class="card">${empty('Chưa có tài khoản','Bấm “Thêm tài khoản” để bắt đầu.')}</div>`}</div><div class="card"><div class="ch">Phân bổ tài sản</div>${donut(pie,pos,0,k=>'')}</div></div>`}
+function cats(){const g={};S.cat.forEach((c,i)=>{(g[c.t+'|'+c.p]=g[c.t+'|'+c.p]||[]).push([c,i])});const sp={};chiM(S.m).forEach(t=>sp[t.sub]=(sp[t.sub]||0)+t.amount);
+return head('Hạng mục','Chi tiêu theo hạng mục con trong '+mlabel(S.m).toLowerCase(),`<button class="btn p" data-ed="dm:new">${ic('pl')}Thêm hạng mục</button>`).replace(/<div class="pa">/,'<div class="pa">'+monthNav())+
+`<div class="grid b" style="align-items:start">${Object.entries(g).map(([k,v])=>{const[t,p]=k.split('|');return `<div class="card"><div class="ch"><span>${emo(p)} ${esc(p)}</span><small class="${t==='Thu'?'thu':'chi'}">${t}</small></div><div class="cg">${v.map(([c,i])=>`<button class="chip" data-ed="dm:${i}">${esc(c.c)}${sp[c.c]&&t==='Chi'?` <b class="chi sens">${num(sp[c.c])}</b>`:''}</button>`).join('')}</div></div>`}).join('')||empty('Chưa có hạng mục')}</div>`}
+function recs(){return head('Giao dịch định kỳ','Tự động ghi hằng tháng',`<button class="btn p" data-ed="rec:new">${ic('pl')}Thêm định kỳ</button>`)+
+`<div class="card flush">${S.rec.map((r,i)=>`<button class="row" data-ed="rec:${i}"><span class="dot">🔁</span><span class="m"><b>${esc(r.sub||r.cat||r.type)}</b><small>Ngày ${r.day} hằng tháng · ${esc(r.acc)}</small></span><b class="sens ${CLS[r.type]}">${num(r.amount)}</b></button>`).join('')||empty('Chưa có giao dịch định kỳ','Thêm khoản lặp lại như tiền nhà, lương.')}</div>`}
+const KT={gd:'Giao dịch',tk:'Tài khoản',dm:'Hạng mục'};
+function trashPage(){return head('Thùng rác','Mục đã xóa vẫn lưu ở tab DaXoa, có thể khôi phục')+`<div class="card flush">${S.trash.map((t,i)=>`<div class="row"><span class="m"><b>${KT[t.k]||''}: ${esc(t.k==='gd'?(t.sub||t.cat||t.type)+' · '+num(t.amount):t.k==='tk'?t.id:t.cat+' › '+t.sub)}</b><small>${t.k==='gd'?esc(t.date+' · '+t.acc)+' · ':''}Xóa lúc ${esc(t.at)}</small></span><button class="chip" data-rs="${i}">Khôi phục</button></div>`).join('')||empty('Thùng rác trống')}</div>`}
+const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p class="chi" style="margin-bottom:10px">${esc(S.err==='Failed to fetch'||S.err==='Không có kết nối mạng'?'Không kết nối được tới Apps Script':S.err)}</p><p class="mut" style="font-size:13px">Kiểm tra: (1) đã dán Code.gs mới và Deploy phiên bản mới; (2) quyền truy cập là Anyone; (3) Google Sheet có đủ 3 sheet GiaoDich, TaiKhoan, DanhMuc; (4) đã chạy menu Sổ Thu Chi → Cài đặt tự động.</p><button class="btn p w" data-a="retry">Thử lại</button></div>`;
+/* ---------- shell render ---------- */
+function nav(){let g='';$('#sb').innerHTML=`<div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></span>Sổ Thu Chi</div>`+TABS.map(([k,l,gr])=>(gr?`<div class="g">${gr}</div>`:'')+`<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${l}</button>`).join('')+`<div class="foot">Phím tắt: <b>N</b> thêm · <b>/</b> tìm</div>`;
+$('#bn').innerHTML=MOB.map(k=>{const t=TABS.find(x=>x[0]===k);return `<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${t[1]}</button>`}).join('')+`<button class="${MOB.includes(S.tab)?'':'on'}" data-a="more">${ic('more')}${MOB.includes(S.tab)?'Thêm':TABS.find(x=>x[0]===S.tab)[1]}</button>`}
+function render(){nav();$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,rec:recon,lim:limPage,rc:recs,acc:accs,cat:cats,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
+/* ---------- events ---------- */
+const go=t=>{S.tab=t;location.hash=t;scrollTo(0,0);closeSheet();render()};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-a],[data-bdo],[data-ed],[data-rs]');if(!t||t.closest('#ov'))return;const d=t.dataset;
+if(d.tab)return go(d.tab);if(d.m){S.m=shift(S.m,+d.m);return render()}if(d.f){S.f=d.f;return render()}
+if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));if(d.bdo)return doBal(d.bdo);
+if(d.rs!=null){const x=S.trash[+d.rs];return x&&act('restore',{at:x.at,kind:x.k},'Đã khôi phục')}
+if(d.ed){const[k,i]=d.ed.split(':'),src={tk:S.acc,dm:S.cat,rec:S.rec}[k];return ed(k,i==='new'?{}:{...src[+i]},i==='new'?null:+i)}
+switch(d.a){case'new':return openForm();case'sync':return sync();case'lock':return lock();case'retry':S.err='';render();return sync();
+case'dark':localStorage.dark=document.body.classList.toggle('dark')?1:0;return;case'hide':localStorage.hb=document.body.classList.toggle('hb')?1:0;return;
+case'fo':S.fo=!S.fo;return render();case'rs':Object.assign(S,{xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',so:'dn',rg:'m',f:'all',q:''});return render();
+case'csv':return csv();case'lim':return openLim();case'more':return openMore()}});
+document.addEventListener('input',e=>{const t=e.target;if(t.id==='q'){S.q=t.value;const p=t.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p);return}
+if(t.classList&&t.classList.contains('ba')){const neg=t.value.trim().startsWith('-'),v=t.value.replace(/[^\d]/g,''),a=S.acc[+t.dataset.i];t.value=(neg?'-':'')+(v?num(+v):'');if(!a)return;if(v)S.act[a.name]=(neg?-1:1)*Number(v);else delete S.act[a.name];reconUpdate()}});
+document.addEventListener('change',e=>{const k={x_rg:'rg',x_acc:'xa',x_cat:'xc',x_mn:'mn',x_mx:'mx',x_so:'so',x_d1:'d1',x_d2:'d2'}[e.target.id];if(k){S[k]=e.target.value;render()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')return closeSheet();if(e.metaKey||e.ctrlKey||e.altKey||/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||'')||!$('#login').classList.contains('hide'))return;
+if(e.key==='n'||e.key==='N'){e.preventDefault();openForm()}if(e.key==='/'){e.preventDefault();go('tx');setTimeout(()=>{const q=$('#q');q&&q.focus()},0)}});
 function csv(){const r=[['ID','Ngày','Loại','Số tiền','Tài khoản','Tài khoản đến','Hạng mục cha','Hạng mục con','Ghi chú'],...S.tx.map(t=>[t.id,t.date,t.type,t.amount,t.acc,t.accTo,t.cat,t.sub,t.note])];
 const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='so-thu-chi.csv';a.click()}
-function openForm(t,ty){E=t?{...t}:{id:'G'+Date.now().toString(36),date:ymd(new Date()),type:ty||'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',isNew:true};form();$('#ov').classList.add('open')}
-const closeForm=()=>$('#ov').classList.remove('open');
+/* ---------- sheets ---------- */
+const openSheet=()=>$('#ov').classList.add('open'),closeSheet=()=>$('#ov').classList.remove('open');
+function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['rc','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button></div>`;openSheet()}
+function catFields(ty,cat,sub,ip,is){const L=S.cat.map((c,i)=>({...c,i})).filter(c=>c.t===ty),pars=[...new Set(L.map(c=>c.p))],o=c=>`<option value="${c.i}" ${c.p===cat&&c.c===sub?'selected':''}>${esc(c.c)}</option>`;
+return `<label>Hạng mục<select id="${ip}"><option value="">Chọn…</option>${pars.map(p=>`<option ${p===cat?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Chi tiết<select id="${is}"><option value="">${cat?'Chọn…':'Chọn (tự điền hạng mục)…'}</option>${cat?L.filter(c=>c.p===cat).map(o).join(''):pars.map(p=>`<optgroup label="${esc(p)}">${L.filter(c=>c.p===p).map(o).join('')}</optgroup>`).join('')}</select></label>`}
+function openForm(t,ty){E=t?{...t}:{id:'G'+Date.now().toString(36),date:ymd(new Date()),type:ty||'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',isNew:true};ED=null;form();openSheet()}
 function form(){const ty=E.type,pars=[...new Set(S.cat.filter(c=>c.t===ty).map(c=>c.p))],subs=S.cat.filter(c=>c.t===ty&&c.p===E.cat).map(c=>c.c),op=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
 $('#sh').innerHTML=`<div class="seg">${TYPES.map(x=>`<button data-ty="${x}" class="${x===ty?'on':''}">${x==='Chuyển khoản'?'Chuyển':x}</button>`).join('')}</div>
 <input class="amt ${CLS[ty]}" id="fa" inputmode="${ty==='Điều chỉnh'?'text':'numeric'}" placeholder="0" value="${E.amount?num(E.amount):''}" aria-label="Số tiền"><div class="f">
 <label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>${ty==='Chuyển khoản'?'Từ tài khoản':'Tài khoản'}<select id="fc">${op(S.acc.map(a=>a.name),E.acc)}</select></label>
-${ty==='Chuyển khoản'?`<label class="w">Đến tài khoản<select id="ft"><option value="">Chọn…</option>${op(S.acc.map(a=>a.name).filter(n=>n!==E.acc),E.accTo)}</select></label>`:ty==='Điều chỉnh'?'':`<label>Hạng mục<select id="fp"><option value="">Chọn…</option>${op(pars,E.cat)}</select></label><label>Chi tiết<select id="fs"><option value="">Chọn…</option>${op(subs,E.sub)}</select></label>`}
-<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label></div><button class="save" data-save>${E.isNew?'Lưu giao dịch':'Lưu thay đổi'}</button>${E.isNew?'':'<button class="del" data-del>Xóa giao dịch</button>'}`}
-function pull(){const g=i=>($(i)||{}).value;E.date=g('#fd')||E.date;E.acc=g('#fc')||E.acc;E.note=g('#fn')||'';if($('#ft'))E.accTo=g('#ft');if($('#fp')){E.cat=g('#fp');E.sub=g('#fs')||''}const raw=($('#fa').value||'').replace(/[^\d-]/g,'');E.amount=Number(raw)||0}
-$('#ov').addEventListener('click',e=>{if(e.target.id==='ov')return closeForm();const d=e.target.closest('[data-ty],[data-save],[data-del]');if(!d)return;
-if(d.dataset.ty){pull();E.type=d.dataset.ty;E.cat=E.sub='';form();return}
-if('del' in d.dataset){if(!confirm('Chuyển giao dịch vào Thùng rác? Dữ liệu vẫn được lưu ở tab DaXoa và có thể khôi phục.'))return;const old=S.tx.slice();S.tx=S.tx.filter(x=>x.id!==E.id);closeForm();render();push('del',{id:E.id},()=>S.tx=old);return}
-pull();const ty=E.type;let er='';if(!E.amount||(E.amount<0&&ty!=='Điều chỉnh'))er='Nhập số tiền lớn hơn 0';else if(!E.acc)er='Chọn tài khoản';else if(ty==='Chuyển khoản'&&!E.accTo)er='Chọn tài khoản nhận';else if(ty!=='Chuyển khoản'&&ty!=='Điều chỉnh'&&(!E.cat||!E.sub))er='Chọn hạng mục và chi tiết';
-if(er)return toast(er);const row={id:E.id,date:E.date,type:ty,amount:E.amount,acc:E.acc,accTo:ty==='Chuyển khoản'?E.accTo:'',cat:ty==='Chuyển khoản'||ty==='Điều chỉnh'?'':E.cat,sub:ty==='Chuyển khoản'||ty==='Điều chỉnh'?'':E.sub,note:E.note},old=S.tx.slice();
-S.tx=S.tx.filter(x=>x.id!==row.id).concat(row);S.m=row.date.slice(0,7);closeForm();render();push(E.isNew?'add':'upd',{row},()=>S.tx=old)});
-$('#ov').addEventListener('input',e=>{if(e.target.id==='fa'){const neg=e.target.value.trim().startsWith('-'),v=e.target.value.replace(/[^\d]/g,'');e.target.value=(neg?'-':'')+(v?num(+v):'')}if(e.target.id==='fc'||e.target.id==='fp'){pull();form();$('#'+e.target.id).focus()}});
-
-const PAL=['#8B5CF6','#EC4899','#F59E0B','#10B981','#3B82F6','#F43F5E','#14B8A6','#F97316','#6366F1','#84CC16'];
-const EMO=[[/ăn|uống|cơm|cafe|cà phê|nhà hàng/i,'🍜'],[/xe|xăng|đi lại|grab|taxi/i,'🛵'],[/nhà|thuê|điện|nước|internet/i,'🏠'],[/mua|sắm|quần|áo/i,'🛍️'],[/y tế|thuốc|khám|sức khỏe/i,'💊'],[/học|sách|giáo dục/i,'📚'],[/giải trí|phim|game|du lịch/i,'🎮'],[/lương|thưởng|thu/i,'💰'],[/quà|từ thiện|cho/i,'🎁']];
-const emo=k=>(EMO.find(e=>e[0].test(k||''))||[0,'🧾'])[1],colOf=(k,i)=>PAL[i%PAL.length];
-if(localStorage.dark==='1'||(localStorage.dark==null&&matchMedia('(prefers-color-scheme:dark)').matches))document.body.classList.add('dark');
-const tg=document.createElement('button');tg.className='ib';tg.id='tg';tg.setAttribute('aria-label','Đổi giao diện');tg.textContent='🌓';tg.onclick=()=>{localStorage.dark=document.body.classList.toggle('dark')?1:0};
-$('#rf').before(tg);
-const _home=home,_txRow=txRow;
-txRow=function(t){return _txRow(t).replace(/<span class="dot (\w+)">[^<]*<\/span>/,(m,c)=>`<span class="dot ${c}">${t.type==='Chuyển khoản'?'⇄':t.type==='Điều chỉnh'?'±':emo(t.sub||t.cat)}</span>`)};
-home=function(){let h=_home();const{chi}=sums(S.m),by={};S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).forEach(t=>{const k=t.cat||'Chưa phân loại';by[k]=(by[k]||0)+t.amount});
-const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);let a=0;const R=48,C=2*Math.PI*R;
-const arcs=rows.map(([k,v],i)=>{const l=v/chi*C,x=`<circle r="${R}" cx="60" cy="60" fill="none" stroke="${colOf(k,i)}" stroke-width="20" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-a}" transform="rotate(-90 60 60)"/>`;a+=l;return x}).join('');
-const day=Math.max(1,S.m===ymd(new Date()).slice(0,7)?new Date().getDate():new Date(+S.m.slice(0,4),+S.m.slice(5),0).getDate()),big=S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).sort((x,y)=>y.amount-x.amount)[0];
-const ins=`<div class="ins"><div style="background:linear-gradient(135deg,#F59E0B,#F97316)">TB chi/ngày<b>${vnd(chi/day)}</b></div><div style="background:linear-gradient(135deg,#3B82F6,#6366F1)">Số giao dịch<b>${S.tx.filter(t=>t.date.slice(0,7)===S.m).length}</b></div><div style="background:linear-gradient(135deg,#EC4899,#F43F5E)">Khoản chi lớn nhất<b>${big?num(big.amount):'–'}</b></div></div>`;
-const donut=rows.length?`<div class="card"><h3>Cơ cấu chi tiêu</h3><div class="cd"><svg width="130" height="130" viewBox="0 0 120 120">${arcs}<text x="60" y="64" text-anchor="middle" font-size="11" fill="currentColor">${rows.length} nhóm</text></svg><ul>${rows.slice(0,6).map(([k,v],i)=>`<li><i style="background:${colOf(k,i)}"></i><span>${emo(k)} ${esc(k)}</span><b>${Math.round(v/chi*100)}%</b></li>`).join('')}</ul></div></div>`:'';
-const bad=S.bad?`<div id="warn">⚠️ Sheet có ${S.bad} dòng dữ liệu sai — hệ thống đã tự sửa/khôi phục khi có thể.</div>`:'';
-h=h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',bad+ins+donut+'<div class="card"><h3>Chi theo hạng mục</h3>');
-return h.replace(/<div class="bar"><div><span>([^<]*)<\/span>/g,(m,k)=>`<div class="bar" style="--bc:${colOf(k,rows.findIndex(r=>esc(r[0])===k))}"><div><span>${emo(k)} ${k}</span>`)};
-const _apply=apply;apply=function(j){S.bad=j.bad||0;S.trash=j.trash||[];S.rec=j.rec||[];if(j.lim&&Object.keys(j.lim).length){S.lim=j.lim;localStorage.lim=JSON.stringify(j.lim)}_apply(j)};
-
-const eye=document.createElement('button');eye.className='ib';eye.setAttribute('aria-label','Ẩn/hiện số dư');eye.textContent='👁';
-if(localStorage.hb==='1')document.body.classList.add('hb');eye.onclick=()=>{localStorage.hb=document.body.classList.toggle('hb')?1:0};$('#tg').before(eye);
-const _home2=home;
-home=function(){let h=_home2();const{thu,chi}=sums(S.m),M=S.tx.filter(t=>t.date.slice(0,7)===S.m);
-const dn=(ty,tt)=>{const by={};M.filter(t=>t.type===ty).forEach(t=>{const k=t.cat||t.sub||'Khác';by[k]=(by[k]||0)+t.amount});const r=Object.entries(by).sort((a,b)=>b[1]-a[1]),tot=r.reduce((a,x)=>a+x[1],0),R=48,C=2*Math.PI*R;let o=0;
-return `<div class="card"><h3>${tt}</h3>${r.length?`<div class="cd"><svg width="130" height="130" viewBox="0 0 120 120">${r.map(([k,v],i)=>{const l=v/tot*C,x=`<circle r="${R}" cx="60" cy="60" fill="none" stroke="${colOf(k,i+3)}" stroke-width="20" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-o}" transform="rotate(-90 60 60)"/>`;o+=l;return x}).join('')}</svg><ul>${r.slice(0,5).map(([k,v],i)=>`<li><i style="background:${colOf(k,i+3)}"></i><span>${emo(k)} ${esc(k)}</span><b>${Math.round(v/tot*100)}%</b></li>`).join('')}</ul></div>`:empty('Chưa có dữ liệu','')}</div>`};
-const y=+S.m.slice(0,4),mo=+S.m.slice(5),dim=new Date(y,mo,0).getDate(),off=(new Date(y,mo-1,1).getDay()+6)%7,dc={};
-M.filter(t=>t.type==='Chi').forEach(t=>dc[+t.date.slice(8)]=(dc[+t.date.slice(8)]||0)+t.amount);const mx=Math.max(1,...Object.values(dc)),sh=n=>n>=1e6?(n/1e6).toFixed(1)+'tr':Math.round(n/1e3)+'k';
-const cal=`<div class="card cal-w cal" style="display:block"><h3>Lịch chi tiêu tháng</h3><div class="cal">${['T2','T3','T4','T5','T6','T7','CN'].map(d=>`<i>${d}</i>`).join('')}${'<span style="background:none"></span>'.repeat(off)}${Array.from({length:dim},(_,i)=>{const v=dc[i+1];return `<span style="${v?`background:rgba(244,63,94,${.12+.4*v/mx})`:''}"><b>${i+1}</b>${v?`<small>${sh(v)}</small>`:''}</span>`}).join('')}</div></div>`.replace('class="card cal-w cal" style="display:block"','class="card cal-wrap"');
-const sm=`<div class="card"><h3>Tổng quan tháng</h3><div class="sm"><div><span>Tổng thu</span><b class="thu">${vnd(thu)}</b></div><div><span>Tổng chi</span><b class="chi">${vnd(chi)}</b></div><div><span>Chênh lệch</span><b>${vnd(thu-chi)}</b></div></div></div>`;
-h=h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',dn('Thu','Thu tiền')+sm+'<div class="card"><h3>Chi theo hạng mục</h3>');
-return '<div class="dash">'+h+cal.replace('class="card cal-wrap"','class="card calc"')+'</div>'};
-
-try{S.lim=JSON.parse(localStorage.lim||'null')||{d:0,m:0,c:{}}}catch(e){S.lim={d:0,m:0,c:{}}}
-Object.assign(S,{rg:'m',so:'dn',xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',fo:false});
-txs=function(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>{
-if(S.rg==='m'&&t.date.slice(0,7)!==S.m)return false;if(S.rg==='c'&&((S.d1&&t.date<S.d1)||(S.d2&&t.date>S.d2)))return false;
-if(S.f!=='all'&&t.type!==S.f)return false;if(S.xa&&t.acc!==S.xa&&t.accTo!==S.xa)return false;if(S.xc&&t.cat!==S.xc)return false;
-if(S.mn!==''&&t.amount<+S.mn)return false;if(S.mx!==''&&t.amount>+S.mx)return false;
-return !q||[t.note,t.cat,t.sub,t.acc,t.accTo,String(t.amount)].join(' ').toLowerCase().includes(q)});
-const dsort=S.so==='dn'||S.so==='do';l.sort({dn:(a,b)=>b.date.localeCompare(a.date),do:(a,b)=>a.date.localeCompare(b.date),ah:(a,b)=>b.amount-a.amount,al:(a,b)=>a.amount-b.amount}[S.so]);
-const thu=l.filter(t=>t.type==='Thu').reduce((a,t)=>a+t.amount,0),chi=l.filter(t=>t.type==='Chi').reduce((a,t)=>a+t.amount,0),dt={};l.forEach(t=>{if(t.type==='Chi')dt[t.date]=(dt[t.date]||0)+t.amount});
-let h='',last='';l.forEach(t=>{if(dsort&&t.date!==last){last=t.date;const d=new Date(t.date+'T00:00'),ov=S.lim.d&&dt[t.date]>S.lim.d;h+=`<div class="dh ${ov?'over':''}">${d.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'})}${dt[t.date]?' · chi '+num(dt[t.date])+(ov?' ⚠️ vượt hạn mức':''):''}</div>`}h+=txRow(t)});
-const op=(a,v,ph)=>`<option value="">${ph}</option>`+a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join(''),pars=[...new Set(S.cat.map(c=>c.p))],n=[S.xa,S.xc,S.mn,S.mx,S.d1,S.d2].filter(x=>x!=='').length+(S.rg!=='m'?1:0);
-return `${S.rg==='m'?monthNav():''}<input class="search" id="q" placeholder="Tìm theo ghi chú, hạng mục, số tiền" value="${esc(S.q)}"><div class="chips">${['all',...TYPES].map(t=>`<button class="chip ${S.f===t?'on':''}" data-f="${t}">${t==='all'?'Tất cả':t}</button>`).join('')}<button class="chip ${n?'on':''}" data-x="fo">⚙ Bộ lọc${n?' ('+n+')':''}</button></div>
-${S.fo?`<div class="card"><div class="fp"><label class="w">Thời gian<select id="x_rg"><option value="m" ${S.rg==='m'?'selected':''}>Theo tháng đang xem</option><option value="a" ${S.rg==='a'?'selected':''}>Toàn bộ thời gian</option><option value="c" ${S.rg==='c'?'selected':''}>Khoảng ngày tùy chọn</option></select></label>
-${S.rg==='c'?`<label>Từ ngày<input type="date" id="x_d1" value="${S.d1}"></label><label>Đến ngày<input type="date" id="x_d2" value="${S.d2}"></label>`:''}
-<label>Tài khoản<select id="x_acc">${op(S.acc.map(a=>a.name),S.xa,'Tất cả')}</select></label><label>Hạng mục<select id="x_cat">${op(pars,S.xc,'Tất cả')}</select></label>
-<label>Số tiền từ<input type="number" id="x_mn" inputmode="numeric" value="${S.mn}"></label><label>Đến<input type="number" id="x_mx" inputmode="numeric" value="${S.mx}"></label>
-<label class="w">Sắp xếp<select id="x_so">${[['dn','Mới nhất trước'],['do','Cũ nhất trước'],['ah','Số tiền: cao → thấp'],['al','Số tiền: thấp → cao']].map(([k,v])=>`<option value="${k}" ${S.so===k?'selected':''}>${v}</option>`).join('')}</select></label></div><button class="chip" data-x="rs">Xóa bộ lọc</button></div>`:''}
-<div class="tsum"><span>${l.length} giao dịch</span><span class="thu">Thu ${vnd(thu)}</span><span class="chi">Chi ${vnd(chi)}</span><span>Ròng ${vnd(thu-chi)}</span></div>
-<div class="card" style="padding:4px 16px">${l.length?h:empty('Không có giao dịch','Thử đổi bộ lọc hoặc khoảng thời gian.')}</div><button class="chip" data-csv>Tải CSV toàn bộ</button>`};
-document.addEventListener('click',e=>{const t=e.target.closest('[data-x]');if(!t)return;const x=t.dataset.x;
-if(x==='fo')S.fo=!S.fo;else if(x==='rs'){Object.assign(S,{xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',so:'dn',rg:'m',f:'all',q:''})}else if(x==='lim')return openLim();render()});
-document.addEventListener('change',e=>{const k={x_rg:'rg',x_acc:'xa',x_cat:'xc',x_mn:'mn',x_mx:'mx',x_so:'so',x_d1:'d1',x_d2:'d2'}[e.target.id];if(k){S[k]=e.target.value;render()}});
-function openLim(){const L=S.lim,pars=[...new Set(S.cat.filter(c=>c.t==='Chi').map(c=>c.p))];
-$('#sh').innerHTML=`<h3 style="margin-bottom:6px">Hạn mức chi</h3><div class="f"><label>Mỗi ngày (₫)<input id="l_d" type="number" inputmode="numeric" value="${L.d||''}"></label><label>Mỗi tháng (₫)<input id="l_m" type="number" inputmode="numeric" value="${L.m||''}"></label><div class="w seg" style="grid-template-columns:1fr 1fr;margin:10px 0 2px"><button type="button" class="on" data-lt="gd">Theo ngày</button><button type="button" data-lt="gc">Theo tháng</button></div><div class="w f" id="gd">${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_cd" data-p="${esc(p)}" type="number" inputmode="numeric" placeholder="₫ / ngày" value="${(L.cd||{})[p]||''}"></label>`).join('')}</div><div class="w f hide" id="gc">${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_c" data-p="${esc(p)}" type="number" inputmode="numeric" placeholder="₫ / tháng" value="${(L.c||{})[p]||''}"></label>`).join('')}</div></div><button class="save" data-lsave>Lưu hạn mức</button>`;$('#ov').classList.add('open')}
-$('#sh').addEventListener('click',e=>{const b=e.target.closest('[data-lt]');if(!b)return;document.querySelectorAll('[data-lt]').forEach(x=>x.classList.toggle('on',x===b));$('#gd').classList.toggle('hide',b.dataset.lt!=='gd');$('#gc').classList.toggle('hide',b.dataset.lt!=='gc')});
-$('#sh').addEventListener('click',async e=>{if(!e.target.closest('[data-lsave]'))return;const c={};document.querySelectorAll('.l_c').forEach(i=>{if(+i.value>0)c[i.dataset.p]=+i.value});
-const cd={};document.querySelectorAll('.l_cd').forEach(i=>{if(+i.value>0)cd[i.dataset.p]=+i.value});S.lim={d:+$('#l_d').value||0,m:+$('#l_m').value||0,c,cd};localStorage.lim=JSON.stringify(S.lim);closeForm();render();try{apply(await api('lim',{lim:S.lim}));toast('Đã lưu hạn mức');render()}catch(er){toast('Đã lưu trên máy này, chưa đồng bộ: '+er.message)}});
-const _home3=home;
-home=function(){let h=_home3();const L=S.lim||{},now=ymd(new Date()),M=S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m),tot=M.reduce((a,t)=>a+t.amount,0),td=S.tx.filter(t=>t.type==='Chi'&&t.date===now).reduce((a,t)=>a+t.amount,0);
-const bar=(lb,v,lim)=>{const r=v/lim,c=r>1?'var(--chi)':r>.8?'var(--dc)':'var(--thu)';return `<div class="bar" style="--bc:${c}"><div><span>${lb}</span><b>${vnd(v)} / ${vnd(lim)} <small style="color:${c}">${Math.round(r*100)}%</small></b></div><i><s style="width:${Math.min(100,r*100)}%"></s></i></div>`};
-let b='';if(L.d)b+=bar('Hôm nay',td,L.d);if(L.m)b+=bar(mlabel(S.m),tot,L.m);const by={};M.forEach(t=>by[t.cat]=(by[t.cat]||0)+t.amount);Object.entries(L.c||{}).forEach(([k,v])=>b+=bar(emo(k)+' '+esc(k),by[k]||0,v));
-const days=new Set(M.map(t=>t.date));let ov=0;if(L.d){const d={};M.forEach(t=>d[t.date]=(d[t.date]||0)+t.amount);ov=Object.values(d).filter(v=>v>L.d).length}
-const card=`<div class="card"><h3>Hạn mức chi <button class="chip" style="float:right;padding:3px 10px" data-x="lim">⚙ Thiết lập</button></h3>${b||''}${L.d&&ov?`<p class="note" style="color:var(--chi)">⚠️ ${ov} ngày trong tháng vượt hạn mức ngày.</p>`:''}</div>`;
-return h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',card+'<div class="card"><h3>Chi theo hạng mục</h3>')};
-const _push=push;push=async function(a,d,u){await _push(a,d,u);const r=d.row;if(a==='del'||!r||r.type!=='Chi')return;const L=S.lim||{},W=[],sm=f=>S.tx.filter(t=>t.type==='Chi'&&f(t)).reduce((x,t)=>x+t.amount,0),dc=(L.cd||{})[r.cat],mc=(L.c||{})[r.cat];
-if(dc){const v=sm(t=>t.date===r.date&&t.cat===r.cat);if(v>dc)W.push(r.cat+' vượt '+vnd(v-dc)+' trong ngày')}
-if(mc){const v=sm(t=>t.date.slice(0,7)===r.date.slice(0,7)&&t.cat===r.cat);if(v>mc)W.push(r.cat+' vượt '+vnd(v-mc)+' trong tháng')}
-if(L.d){const v=sm(t=>t.date===r.date);if(v>L.d)W.push('tổng chi ngày vượt '+vnd(v-L.d))}
-if(W.length)toast('⚠️ '+W.join(' · '))};
-const _home4=home;
-home=function(){let h=_home4();const L=S.lim||{},now=ymd(new Date()),M=S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m),by={},dd={};
-M.forEach(t=>{by[t.cat]=(by[t.cat]||0)+t.amount;const k=t.cat+'|'+t.date;dd[k]=(dd[k]||0)+t.amount});
-const bar=(lb,v,lim)=>{const r=v/lim,c=r>1?'var(--chi)':r>.8?'var(--dc)':'var(--thu)';return `<div class="bar" style="--bc:${c}"><div><span>${lb}</span><b>${vnd(v)} / ${vnd(lim)} <small style="color:${c}">${v>lim?'vượt '+vnd(v-lim):Math.round(r*100)+'%'}</small></b></div><i><s style="width:${Math.min(100,r*100)}%"></s></i></div>`};
-const cdE=Object.entries(L.cd||{}),cE=Object.entries(L.c||{});if(!cdE.length&&!cE.length)return h;
-const ov=[];cdE.forEach(([k,v])=>{const ex=Object.entries(dd).filter(([x,a])=>x.startsWith(k+'|')&&a>v);if(ex.length)ov.push({k,n:ex.length,x:ex.reduce((q,[,a])=>q+a-v,0)})});
-cE.forEach(([k,v])=>{if((by[k]||0)>v)ov.push({k,n:0,x:by[k]-v})});ov.sort((a,b)=>b.x-a.x);const tot=ov.reduce((q,o)=>q+o.x,0);
-const card=`${cdE.length?`<div class="card"><h3>Hạn mức ngày theo hạng mục (hôm nay)</h3>${cdE.map(([k,v])=>bar(emo(k)+' '+esc(k),dd[k+'|'+now]||0,v)).join('')}</div>`:''}<div class="card"><h3>Danh mục bội chi${tot?` <small class="chi" style="float:right">+${vnd(tot)}</small>`:''}</h3>${ov.map(o=>`<div class="acc"><span><b style="font-weight:500">${emo(o.k)} ${esc(o.k)}</b><small>${o.n?o.n+' ngày vượt hạn mức ngày':'Vượt hạn mức tháng'}</small></span><b class="chi">+${vnd(o.x)}</b></div>`).join('')||empty('Không có hạng mục nào bội chi','Tháng này đang trong hạn mức.')}</div>`;
-return h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',card+'<div class="card"><h3>Chi theo hạng mục</h3>')};
-
-S.trash=S.trash||[];S.rec=S.rec||[];NAV.push(['mg','Quản lý','⚙'],['tr','Thùng rác','🗑']);NAV.splice(NAV.findIndex(x=>x[0]==='acc'),1);
-const KT={gd:'Giao dịch',tk:'Tài khoản',dm:'Hạng mục'};
-function mgPage(){const g={};S.cat.forEach((c,i)=>{(g[c.t+'|'+c.p]=g[c.t+'|'+c.p]||[]).push([c,i])});
-return `<h3 style="margin:8px 2px">Tài khoản</h3><div class="card" style="padding:4px 16px">${S.acc.map((a,i)=>`<button class="tx" data-ed="tk:${i}"><span class="dot">🏦</span><span class="m"><b>${esc(a.name)}</b><small>${esc(a.type)}</small></span><b class="${bal(a)<0?'chi':''}">${vnd(bal(a))}</b></button>`).join('')||empty('Chưa có tài khoản','')}</div><button class="addb" data-ed="tk:new">+ Thêm tài khoản</button>
-<h3 style="margin:8px 2px">Hạng mục</h3>${Object.entries(g).map(([k,v])=>{const[t,p]=k.split('|');return `<div class="card"><h3>${emo(p)} ${esc(p)} <small class="${t==='Thu'?'thu':'chi'}">${t}</small></h3><div class="chips" style="flex-wrap:wrap;margin:0">${v.map(([c,i])=>`<button class="chip" data-ed="dm:${i}">${esc(c.c)}</button>`).join('')}</div></div>`}).join('')}<button class="addb" data-ed="dm:new">+ Thêm hạng mục</button>
-<h3 style="margin:8px 2px">Giao dịch định kỳ</h3><div class="card" style="padding:4px 16px">${S.rec.map((r,i)=>`<button class="tx" data-ed="rec:${i}"><span class="dot">🔁</span><span class="m"><b>${esc(r.sub||r.cat||r.type)}</b><small>Ngày ${r.day} hằng tháng · ${esc(r.acc)}</small></span><b class="${CLS[r.type]}">${num(r.amount)}</b></button>`).join('')||empty('Chưa có giao dịch định kỳ','')}</div><button class="addb" data-ed="rec:new">+ Thêm giao dịch định kỳ</button>`}
-function trashPage(){return `<div class="card"><h3>Thùng rác</h3>${S.trash.map((t,i)=>`<div class="acc"><span><b style="font-weight:500">${KT[t.k]||''}: ${esc(t.k==='gd'?(t.sub||t.cat||t.type)+' · '+num(t.amount):t.k==='tk'?t.id:t.cat+' › '+t.sub)}</b><small>${t.k==='gd'?esc(t.date+' · '+t.acc):''} Xóa lúc ${esc(t.at)}</small></span><button class="chip" data-rs="${i}">Khôi phục</button></div>`).join('')||empty('Thùng rác trống','')}</div>`}
-async function act(a,d,msg){S.busy++;try{apply(await api(a,d));toast(msg);closeForm()}catch(e){toast(e.message)}S.busy--;render()}
-let ED=null;
-function ed(kind,o,idx){const L=[...new Set(S.cat.map(c=>c.p))],nm=S.acc.map(a=>a.name),isN=idx==null;ED={kind,o,idx};
+${ty==='Chuyển khoản'?`<label class="w">Đến tài khoản<select id="ft"><option value="">Chọn…</option>${op(S.acc.map(a=>a.name).filter(n=>n!==E.acc),E.accTo)}</select></label>`:ty==='Điều chỉnh'?'':`${catFields(ty,E.cat,E.sub,'fp','fs')}`}
+<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label></div>
+<button class="btn p w" data-save>${E.isNew?'Lưu giao dịch':'Lưu thay đổi'}</button>${E.isNew?'':'<button class="btn w" data-dup>⧉ Nhân đôi giao dịch</button><button class="btn d w" data-del style="margin-top:2px">Xóa giao dịch</button>'}`}
+function pull(){const g=i=>($(i)||{}).value;E.date=g('#fd')||E.date;E.acc=g('#fc')||E.acc;E.note=g('#fn')||'';if($('#ft'))E.accTo=g('#ft');E.amount=Number(($('#fa').value||'').replace(/[^\d-]/g,''))||0}
+function limWarn(r){if(!r||r.type!=='Chi')return;const L=S.lim||{},W=[],sm=f=>S.tx.filter(t=>t.type==='Chi'&&f(t)).reduce((x,t)=>x+t.amount,0),dc=(L.cd||{})[r.cat],mc=(L.c||{})[r.cat];
+if(dc){const v=sm(t=>t.date===r.date&&t.cat===r.cat);if(v>dc)W.push(r.cat+' vượt '+vnd(v-dc)+' trong ngày')}if(mc){const v=sm(t=>mOf(t)===mOf(r)&&t.cat===r.cat);if(v>mc)W.push(r.cat+' vượt '+vnd(v-mc)+' trong tháng')}
+if(L.d){const v=sm(t=>t.date===r.date);if(v>L.d)W.push('tổng chi ngày vượt '+vnd(v-L.d))}if(W.length)setTimeout(()=>toast('⚠️ '+W.join(' · ')),1200)}
+function openLim(){const L=S.lim,pars=[...new Set(S.cat.filter(c=>c.t==='Chi').map(c=>c.p))];ED=null;
+$('#sh').innerHTML=`<h3>Hạn mức chi</h3><div class="f"><label>Mỗi ngày (₫)<input id="l_d" type="number" inputmode="numeric" value="${L.d||''}"></label><label>Mỗi tháng (₫)<input id="l_m" type="number" inputmode="numeric" value="${L.m||''}"></label>
+<div class="w tabs" style="margin:6px 0"><button type="button" class="on" data-lt="gd">Theo ngày</button><button type="button" data-lt="gc">Theo tháng</button></div>
+<div class="w f" id="gd">${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_cd" data-p="${esc(p)}" type="number" inputmode="numeric" placeholder="₫ / ngày" value="${(L.cd||{})[p]||''}"></label>`).join('')}</div>
+<div class="w f hide" id="gc">${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_c" data-p="${esc(p)}" type="number" inputmode="numeric" placeholder="₫ / tháng" value="${(L.c||{})[p]||''}"></label>`).join('')}</div></div><button class="btn p w" data-lsave>Lưu hạn mức</button>`;openSheet()}
+function ed(kind,o,idx){const L=[...new Set(S.cat.map(c=>c.p))],nm=S.acc.map(a=>a.name),isN=idx==null;ED={kind,o,idx};E=null;
 const F={tk:[['name','Tên tài khoản','text',o.name],['type','Loại','text',o.type,['Tiền mặt','Ngân hàng','Thẻ tín dụng','Ví điện tử','Tiết kiệm']],['open','Số dư ban đầu','number',o.open]],
 dm:[['t','Loại','select',o.t||'Chi',['Chi','Thu']],['p','Hạng mục cha','text',o.p,L],['c','Chi tiết','text',o.c]],
 rec:[['type','Loại','select',o.type||'Chi',['Chi','Thu']],['amount','Số tiền','number',o.amount],['acc','Tài khoản','select',o.acc||nm[0],nm],['cat','Hạng mục','text',o.cat,L],['sub','Chi tiết','text',o.sub,S.cat.map(c=>c.c)],['note','Ghi chú','text',o.note],['day','Ngày trong tháng (1–31)','number',o.day||1]]}[kind];
-$('#sh').innerHTML=`<h3 style="margin-bottom:10px">${isN?'Thêm':'Sửa'} ${{tk:'tài khoản',dm:'hạng mục',rec:'giao dịch định kỳ'}[kind]}</h3><div class="f">${F.map(([id,lb,ty,v,ls])=>`<label class="${id==='note'||id==='name'||id==='c'?'w':''}">${lb}${ty==='select'?`<select id="e_${id}">${ls.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}</select>`:`<input id="e_${id}" type="${ty}" ${ty==='number'?'inputmode="numeric"':''} value="${esc(v??'')}" ${ls?`list="dl_${id}"`:''}>${ls?`<datalist id="dl_${id}">${[...new Set(ls)].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`:''}`}</label>`).join('')}</div><button class="save" data-esave>Lưu</button>${isN?'':'<button class="del" data-edel>Chuyển vào Thùng rác</button>'}`;$('#ov').classList.add('open')}
-document.addEventListener('click',e=>{const t=e.target.closest('[data-ed],[data-rs]');if(!t)return;
-if(t.dataset.rs!=null){const x=S.trash[+t.dataset.rs];return x&&act('restore',{at:x.at,kind:x.k},'Đã khôi phục')}
-const[k,i]=t.dataset.ed.split(':'),src={tk:S.acc,dm:S.cat,rec:S.rec}[k];ed(k,i==='new'?{}:{...src[+i]},i==='new'?null:+i)});
-$('#sh').addEventListener('click',e=>{if(e.target.closest('[data-dup]')){E={...E,id:'G'+Date.now().toString(36),date:ymd(new Date()),isNew:true};form();return}if(!ED)return;const v=id=>($('#e_'+id)||{}).value,{kind,o,idx}=ED;
-if(e.target.closest('[data-esave]')){if(kind==='tk')return act('accSave',{acc:{name:v('name').trim(),type:v('type'),open:+v('open')||0},old:o.name},'Đã lưu');
+$('#sh').innerHTML=`<h3>${isN?'Thêm':'Sửa'} ${{tk:'tài khoản',dm:'hạng mục',rec:'giao dịch định kỳ'}[kind]}</h3><div class="f">${F.map(([id,lb,ty,v,ls])=>kind==='rec'&&id==='cat'?catFields(o.type||'Chi',o.cat,o.sub,'e_cat','e_sub'):kind==='rec'&&id==='sub'?'':`<label class="${id==='note'||id==='name'||id==='c'?'w':''}">${lb}${ty==='select'?`<select id="e_${id}">${ls.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}</select>`:`<input id="e_${id}" type="${ty}" ${ty==='number'?'inputmode="numeric"':''} value="${esc(v??'')}" ${ls?`list="dl_${id}"`:''}>${ls?`<datalist id="dl_${id}">${[...new Set(ls)].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`:''}`}</label>`).join('')}${kind==='tk'?`<div class="w"><span class="l" style="font-size:12px;color:var(--mut)">Biểu tượng</span><div class="cg" style="margin-top:6px"><button type="button" class="chip ${AI[o.name]?'':'on'}" data-ico="">Tự động</button>${EM.map(e=>`<button type="button" class="chip ${AI[o.name]===e?'on':''}" data-ico="${e}">${e}</button>`).join('')}</div></div>`:''}</div><button class="btn p w" data-esave>Lưu</button>${kind==='tk'&&!isN?'<button class="btn w" data-viewacc>Xem giao dịch của tài khoản này</button>':''}${isN?'':'<button class="btn d w" data-edel style="margin-top:2px">Chuyển vào Thùng rác</button>'}`;openSheet()}
+$('#ov').addEventListener('input',e=>{if(e.target.id==='fa'){const neg=e.target.value.trim().startsWith('-'),v=e.target.value.replace(/[^\d]/g,'');e.target.value=(neg?'-':'')+(v?num(+v):'')}if(E&&['fc','fp','fs'].includes(e.target.id)){const id=e.target.id,val=e.target.value;pull();
+if(id==='fp'){E.cat=val;if(E.sub&&!S.cat.some(c=>c.t===E.type&&c.p===E.cat&&c.c===E.sub))E.sub=''}
+if(id==='fs'){if(val!==''){const c=S.cat[+val];E.cat=c.p;E.sub=c.c}else E.sub=''}form();$('#'+id).focus()}
+if(ED&&ED.kind==='rec'&&['e_type','e_cat','e_sub'].includes(e.target.id)){const id=e.target.id,val=e.target.value,o=ED.o,g=k=>($('#e_'+k)||{}).value;o.type=g('type');o.amount=+g('amount')||0;o.acc=g('acc');o.note=g('note')||'';o.day=+g('day')||1;
+if(id==='e_type'){o.cat=o.sub=''}else if(id==='e_cat'){o.cat=val;if(o.sub&&!S.cat.some(c=>c.t===o.type&&c.p===o.cat&&c.c===o.sub))o.sub=''}else if(val!==''){const c=S.cat[+val];o.cat=c.p;o.sub=c.c}else o.sub='';
+ed(ED.kind,o,ED.idx);$('#'+id).focus()}});
+$('#ov').addEventListener('click',e=>{const T=e.target;if(T.id==='ov')return closeSheet();const q=s=>T.closest(s);
+if(q('[data-ico]')){const b=q('[data-ico]');document.querySelectorAll('[data-ico]').forEach(x=>x.classList.toggle('on',x===b));if(ED)ED.ico=b.dataset.ico;return}
+if(q('[data-viewacc]')&&ED){Object.assign(S,{xa:ED.o.name,rg:'a',fo:true,f:'all',q:''});return go('tx')}
+if(q('[data-sheettab]'))return go(q('[data-sheettab]').dataset.sheettab);if(q('[data-a2]')){closeSheet();return csv()}
+if(q('[data-lt]')){const b=q('[data-lt]');document.querySelectorAll('[data-lt]').forEach(x=>x.classList.toggle('on',x===b));$('#gd').classList.toggle('hide',b.dataset.lt!=='gd');$('#gc').classList.toggle('hide',b.dataset.lt!=='gc');return}
+if(q('[data-lsave]')){const c={},cd={};document.querySelectorAll('.l_c').forEach(i=>{if(+i.value>0)c[i.dataset.p]=+i.value});document.querySelectorAll('.l_cd').forEach(i=>{if(+i.value>0)cd[i.dataset.p]=+i.value});
+S.lim={d:+$('#l_d').value||0,m:+$('#l_m').value||0,c,cd};localStorage.lim=JSON.stringify(S.lim);closeSheet();render();api('lim',{lim:S.lim}).then(j=>{apply(j);toast('Đã lưu hạn mức');render()}).catch(er=>toast('Đã lưu trên máy này, chưa đồng bộ: '+er.message));return}
+if(ED){const v=id=>($('#e_'+id)||{}).value,{kind,o,idx}=ED;
+if(q('[data-esave]')){if(kind==='tk'){const nm=v('name').trim(),old=o.name;if(ED.ico!==undefined){if(ED.ico)AI[nm]=ED.ico;else delete AI[nm];if(old&&old!==nm)delete AI[old]}else if(old&&old!==nm&&AI[old]){AI[nm]=AI[old];delete AI[old]}try{localStorage.aicon=JSON.stringify(AI)}catch(e){}}
+if(kind==='tk')return act('accSave',{acc:{name:v('name').trim(),type:v('type'),open:+v('open')||0},old:o.name},'Đã lưu');
 if(kind==='dm')return act('catSave',{cat:{t:v('t'),p:v('p').trim(),c:v('c').trim()},old:idx==null?null:{t:o.t,p:o.p,c:o.c}},'Đã lưu');
-if(kind==='rec'){const r={id:o.id||Date.now().toString(36),type:v('type'),amount:+v('amount')||0,acc:v('acc'),cat:v('cat').trim(),sub:v('sub').trim(),note:v('note'),day:Math.min(31,Math.max(1,+v('day')||1))};if(!r.amount)return toast('Nhập số tiền');const L=S.rec.slice();idx==null?L.push(r):L[idx]=r;return act('recSet',{rec:L},'Đã lưu định kỳ')}}
-if(e.target.closest('[data-edel]')){if(!confirm('Chuyển vào Thùng rác? Dữ liệu vẫn được lưu ở tab DaXoa.'))return;
-if(kind==='tk')return act('accDel',{name:o.name},'Đã chuyển vào Thùng rác');if(kind==='dm')return act('catDel',{cat:{t:o.t,p:o.p,c:o.c}},'Đã chuyển vào Thùng rác');
-if(kind==='rec')return act('recSet',{rec:S.rec.filter((_,i)=>i!==idx)},'Đã xóa định kỳ')}
-});
-const _form=form;form=function(){ED=null;_form();if(!E.isNew)$('#sh').insertAdjacentHTML('beforeend','<button class="chip" data-dup style="margin-top:8px;width:100%">⧉ Nhân đôi giao dịch</button>')};
+if(kind==='rec'){const r={id:o.id||Date.now().toString(36),type:v('type'),amount:+v('amount')||0,acc:v('acc'),cat:o.cat||'',sub:o.sub||'',note:v('note'),day:Math.min(31,Math.max(1,+v('day')||1))};if(!r.amount)return toast('Nhập số tiền');if(!r.cat||!r.sub)return toast('Chọn hạng mục và chi tiết');const L=S.rec.slice();idx==null?L.push(r):L[idx]=r;return act('recSet',{rec:L},'Đã lưu định kỳ')}}
+if(q('[data-edel]')){if(!confirm('Chuyển vào Thùng rác? Dữ liệu vẫn được lưu ở tab DaXoa.'))return;
+if(kind==='tk')return act('accDel',{name:o.name},'Đã chuyển vào Thùng rác');if(kind==='dm')return act('catDel',{cat:{t:o.t,p:o.p,c:o.c}},'Đã chuyển vào Thùng rác');if(kind==='rec')return act('recSet',{rec:S.rec.filter((_,i)=>i!==idx)},'Đã xóa định kỳ')}return}
+if(!E)return;
+if(q('[data-ty]')){pull();E.type=q('[data-ty]').dataset.ty;E.cat=E.sub='';form();return}
+if(q('[data-dup]')){pull();E={...E,id:'G'+Date.now().toString(36),date:ymd(new Date()),isNew:true};form();return}
+if(q('[data-del]')){if(!confirm('Chuyển giao dịch vào Thùng rác? Dữ liệu vẫn được lưu ở tab DaXoa và có thể khôi phục.'))return;const old=S.tx.slice(),id=E.id;S.tx=S.tx.filter(x=>x.id!==id);closeSheet();render();push('del',{id},()=>S.tx=old);return}
+if(q('[data-save]')){pull();const ty=E.type;let er='';if(!E.amount||(E.amount<0&&ty!=='Điều chỉnh'))er='Nhập số tiền lớn hơn 0';else if(!E.acc)er='Chọn tài khoản';else if(ty==='Chuyển khoản'&&!E.accTo)er='Chọn tài khoản nhận';else if(ty!=='Chuyển khoản'&&ty!=='Điều chỉnh'&&(!E.cat||!E.sub))er='Chọn hạng mục và chi tiết';if(er)return toast(er);
+const x=ty==='Chuyển khoản'||ty==='Điều chỉnh',row={id:E.id,date:E.date,type:ty,amount:E.amount,acc:E.acc,accTo:ty==='Chuyển khoản'?E.accTo:'',cat:x?'':E.cat,sub:x?'':E.sub,note:E.note},old=S.tx.slice(),isNew=E.isNew;
+S.tx=S.tx.filter(t=>t.id!==row.id).concat(row);S.m=row.date.slice(0,7);closeSheet();render();push(isNew?'add':'upd',{row},()=>S.tx=old)}});
 if(alive())boot();
 </script></body></html>
