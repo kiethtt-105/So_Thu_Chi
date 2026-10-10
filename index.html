@@ -67,7 +67,7 @@ nav button{flex:1;padding:6px;font-size:12px;color:var(--mut);display:grid;justi
 <script>
 const PASS='0000'; // mật khẩu đăng nhập (đổi tại đây)
 const TTL=12*3600e3,alive=()=>{const t=+localStorage.sess||0;return t&&Date.now()-t<TTL},touch=()=>{localStorage.sess=Date.now()};
-const API='https://script.google.com/macros/s/AKfycbxYb3wpByClOV4omgi7xDjtix9pL_l6OOYit139McWLPkFOR8c9kDjJufRTFi2BAB1Q/exec';
+const API='https://script.google.com/macros/s/AKfycbznLXXBUWBGhPbmfPal7FDN6WD7gQPqcdGLsRFEcvImPtbMKwhVEaBljv_7Jt2j_3g7/exec';
 const $=s=>document.querySelector(s),vnd=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n))+' ₫',num=n=>new Intl.NumberFormat('vi-VN').format(n);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
