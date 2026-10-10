@@ -53,6 +53,7 @@ nav button{flex:1;padding:6px;font-size:12px;color:var(--mut);display:grid;justi
 .save{width:100%;margin-top:16px;padding:14px;border-radius:14px;background:var(--acc);color:#fff;font-weight:700}.del{width:100%;margin-top:8px;padding:12px;color:var(--chi);font-weight:500}
 #toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#10242b;color:#fff;padding:10px 16px;border-radius:12px;opacity:0;transition:.25s;z-index:30;pointer-events:none;max-width:90vw}#toast.on{opacity:1;transform:translate(-50%,0)}
 .sk{height:90px;border-radius:16px;background:linear-gradient(90deg,#e3ebe8,#f2f6f5,#e3ebe8);background-size:200%;animation:sk 1.2s infinite;margin-bottom:14px}@keyframes sk{to{background-position:-200%}}
+.rr{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.rr:last-child{border:0}.rr>span:first-child{flex:1;min-width:0}.rr small{display:block;color:var(--mut)}.ba{width:132px;text-align:right;padding:10px;border-radius:12px;border:1px solid var(--line);font-weight:700;background:#fff}.df{width:86px;text-align:right;font-size:13px;font-weight:700}.note{color:var(--mut);font-size:13px;margin-bottom:6px}
 @media(min-width:900px){body{padding-left:200px;padding-bottom:0}nav{top:0;right:auto;width:200px;flex-direction:column;justify-content:flex-start;gap:4px;padding:80px 12px;border:0;border-right:1px solid var(--line)}nav button{display:flex;justify-content:flex-start;gap:10px;font-size:15px;padding:12px;border-radius:12px}nav button.on{background:var(--bg)}.fab{bottom:28px}header{padding-left:24px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body>
@@ -72,8 +73,8 @@ const $=s=>document.querySelector(s),vnd=n=>new Intl.NumberFormat('vi-VN').forma
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const TYPES=['Chi','Thu','Chuyển khoản','Điều chỉnh'],CLS={Thu:'thu',Chi:'chi','Chuyển khoản':'chuyen','Điều chỉnh':'dc'},SIGN={Thu:'+',Chi:'−','Chuyển khoản':'⇄','Điều chỉnh':'±'};
-const NAV=[['home','Tổng quan','◧'],['tx','Giao dịch','☰'],['acc','Tài khoản','▣'],['cat','Hạng mục','◈']];
-let S={tx:[],acc:[],cat:[],m:ymd(new Date()).slice(0,7),tab:'home',f:'all',q:'',ready:false,busy:0},E=null;
+const NAV=[['home','Tổng quan','◧'],['tx','Giao dịch','☰'],['acc','Tài khoản','▣'],['rec','Cân đối','⚖'],['cat','Hạng mục','◈']];
+let S={act:{},tx:[],acc:[],cat:[],m:ymd(new Date()).slice(0,7),tab:'home',f:'all',q:'',ready:false,busy:0},E=null;
 try{const c=JSON.parse(sessionStorage.cache||'null');if(c){Object.assign(S,c);S.ready=true}}catch(e){}
 async function api(a,d={}){let r;try{r=await fetch(API,{method:'POST',body:JSON.stringify({a,...d})})}catch(e){throw Error('Không có kết nối mạng')}
 const j=await r.json();if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
@@ -117,15 +118,36 @@ function accs(){const t=S.acc.reduce((s,a)=>s+bal(a),0);return `<div class="hero
 function cats(){const g={};S.cat.filter(c=>c.t==='Chi').forEach(c=>(g[c.p]=g[c.p]||[]).push(c.c));const sp={};S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).forEach(t=>sp[t.sub]=(sp[t.sub]||0)+t.amount);
 return monthNav()+Object.entries(g).map(([p,k])=>`<div class="card"><h3>${esc(p)}</h3>${k.map(c=>`<div class="acc" style="padding:8px 0"><span>${esc(c)}</span><b class="${sp[c]?'chi':''}" style="font-weight:${sp[c]?700:400}">${sp[c]?vnd(sp[c]):'–'}</b></div>`).join('')}</div>`).join('')||empty('Chưa có hạng mục','Thêm trong sheet DanhMuc.')}
 const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p style="color:var(--chi);margin-bottom:10px">${esc(S.err==='Failed to fetch'||S.err==='Không có kết nối mạng'?'Không kết nối được tới Apps Script':S.err)}</p><p style="color:var(--mut);font-size:13px">Kiểm tra: (1) đã dán Code.gs mới và Deploy phiên bản mới; (2) quyền truy cập là Anyone; (3) Google Sheet có đủ 4 sheet TongQuan, GiaoDich, TaiKhoan, DanhMuc.</p><button class="save" data-retry>Thử lại</button></div>`;
+// ---- cân đối tài khoản
+const diffs=()=>S.acc.map(a=>{const sys=bal(a),v=S.act[a.name],has=v!==undefined;return{a,sys,has,act:v,diff:has?v-sys:0}});
+function recon(){const D=diffs();return `<div class="hero"><small>Chênh lệch (thực tế − hệ thống)</small><div class="big" id="rt">–</div><div class="row"><div class="pill">Hệ thống<b id="rs">–</b></div><div class="pill">Thực tế<b id="ra">–</b></div></div></div>
+<div class="card"><h3>Nhập số dư thực tế</h3><p class="note">Nhập số tiền đang có thật ở từng tài khoản. Tài khoản để trống sẽ không được kiểm tra.</p>${D.map((x,i)=>`<div class="rr"><span><b style="font-weight:500">${esc(x.a.name)}</b><small>Hệ thống: ${vnd(x.sys)}</small></span><input class="ba" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has?num(x.act):''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('')||empty('Chưa có tài khoản','Thêm trong sheet TaiKhoan.')}</div><div id="rbtn"></div>`}
+function reconUpdate(){const D=diffs(),has=D.filter(x=>x.has),tot=has.reduce((s,x)=>s+x.diff,0),sg=n=>(n>0?'+':'−')+vnd(Math.abs(n));
+D.forEach((x,i)=>{const e=$('#df'+i);if(e){e.textContent=!x.has?'':x.diff===0?'Khớp':sg(x.diff).replace(' ₫','');e.className='df '+(!x.has?'':x.diff===0?'thu':'chi')}});
+$('#rt').textContent=has.length?(tot===0?'Khớp':sg(tot)):'–';
+$('#rs').textContent=vnd((has.length?has:D).reduce((s,x)=>s+x.sys,0));$('#ra').textContent=has.length?vnd(has.reduce((s,x)=>s+x.act,0)):'–';
+const bad=has.filter(x=>x.diff!==0),pos=bad.some(x=>x.diff>0),neg=bad.some(x=>x.diff<0);
+$('#rbtn').innerHTML=(bad.length?`<button class="save" data-bdo="adj">Tạo điều chỉnh số dư (${bad.length} tài khoản)</button>`+(pos&&neg?`<button class="save" style="background:var(--chuyen)" data-bdo="xfer">${tot===0?'Ghi nhận là chuyển khoản giữa các tài khoản':'Chuyển khoản phần bù trừ, điều chỉnh phần còn lại'}</button>`:''):has.length?empty('Đã khớp','Số dư thực tế trùng với hệ thống.'):'')+`<button class="chip" style="margin-top:12px" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`}
+function doBal(k){if(k==='form')return openForm(null,'Chuyển khoản');
+const rem=diffs().filter(x=>x.has&&x.diff!==0).map(x=>({n:x.a.name,d:x.diff})),rows=[],today=ymd(new Date());let i=0;
+const mk=o=>({id:'C'+Date.now().toString(36)+(i++),date:today,cat:'',sub:'',accTo:'',...o});
+if(k==='xfer')for(const g of rem.filter(x=>x.d<0))for(const r of rem.filter(x=>x.d>0)){if(!g.d||!r.d)continue;const m=Math.min(-g.d,r.d);if(m<=0)continue;rows.push(mk({type:'Chuyển khoản',amount:m,acc:g.n,accTo:r.n,note:'Cân đối: chuyển giữa tài khoản'}));g.d+=m;r.d-=m}
+rem.filter(x=>x.d!==0).forEach(x=>rows.push(mk({type:'Điều chỉnh',amount:x.d,acc:x.n,note:'Cân đối số dư'})));
+if(!rows.length)return;S.act={};pushMany(rows)}
+async function pushMany(rows){const old=S.tx.slice();S.tx=S.tx.concat(rows);render();S.busy++;$('#rf').classList.add('spin');
+try{let j;for(const row of rows)j=await api('add',{row});apply(j);toast('Đã cân đối: ghi '+rows.length+' giao dịch')}catch(e){S.tx=old;toast('Chưa lưu hết được: '+e.message);sync(true)}
+S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
+document.addEventListener('input',e=>{const t=e.target;if(!t.classList||!t.classList.contains('ba'))return;const neg=t.value.trim().startsWith('-'),v=t.value.replace(/[^\d]/g,''),a=S.acc[+t.dataset.i];
+t.value=(neg?'-':'')+(v?num(+v):'');if(!a)return;if(v)S.act[a.name]=(neg?-1:1)*Number(v);else delete S.act[a.name];reconUpdate()});
 function render(){$('#nav').innerHTML=NAV.map(([k,l,i])=>`<button class="${S.tab===k?'on':''}" data-tab="${k}"><span aria-hidden="true">${i}</span>${l}</button>`).join('');
-$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,acc:accs,cat:cats}[S.tab]()}
-document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-csv],[data-retry]');if(!t)return;const d=t.dataset;
-if(d.tab){S.tab=d.tab;scrollTo(0,0)}else if(d.m)S.m=shift(S.m,+d.m);else if(d.f)S.f=d.f;else if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));else if('csv' in d)return csv();else if('retry' in d){S.err='';render();return sync()}render()});
+$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,acc:accs,cat:cats,rec:recon}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-csv],[data-retry],[data-bdo]');if(!t)return;const d=t.dataset;
+if(d.tab){S.tab=d.tab;scrollTo(0,0)}else if(d.m)S.m=shift(S.m,+d.m);else if(d.f)S.f=d.f;else if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));else if(d.bdo)return doBal(d.bdo);else if('csv' in d)return csv();else if('retry' in d){S.err='';render();return sync()}render()});
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const p=e.target.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p)}});
 function csv(){const r=[['ID','Ngày','Loại','Số tiền','Tài khoản','Tài khoản đến','Hạng mục cha','Hạng mục con','Ghi chú'],...S.tx.map(t=>[t.id,t.date,t.type,t.amount,t.acc,t.accTo,t.cat,t.sub,t.note])];
 const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='so-thu-chi.csv';a.click()}
 // ---- form
-function openForm(t){E=t?{...t}:{id:'G'+Date.now().toString(36),date:ymd(new Date()),type:'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',isNew:true};form();$('#ov').classList.add('open')}
+function openForm(t,ty){E=t?{...t}:{id:'G'+Date.now().toString(36),date:ymd(new Date()),type:ty||'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',isNew:true};form();$('#ov').classList.add('open')}
 const closeForm=()=>$('#ov').classList.remove('open');
 function form(){const ty=E.type,pars=[...new Set(S.cat.filter(c=>c.t===ty).map(c=>c.p))],subs=S.cat.filter(c=>c.t===ty&&c.p===E.cat).map(c=>c.c),op=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
 $('#sh').innerHTML=`<div class="seg">${TYPES.map(x=>`<button data-ty="${x}" class="${x===ty?'on':''}">${x==='Chuyển khoản'?'Chuyển':x}</button>`).join('')}</div>
