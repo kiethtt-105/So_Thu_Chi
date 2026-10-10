@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0B4F59"><title>Sổ Thu Chi</title>
+<meta name="theme-color" content="#5B3DF5"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><title>Sổ Thu Chi</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230B4F59'/%3E%3Cpath d='M30 62l14-14 10 10 18-22' stroke='%23fff' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -61,7 +61,7 @@ nav button{flex:1;padding:6px;font-size:12px;color:var(--mut);display:grid;justi
 @media(min-width:900px){body{padding-left:200px;padding-bottom:0}nav{top:0;right:auto;width:200px;flex-direction:column;justify-content:flex-start;gap:4px;padding:80px 12px;border:0;border-right:1px solid var(--line)}nav button{flex:none;display:flex;justify-content:flex-start;gap:10px;font-size:15px;padding:12px;border-radius:12px}main{max-width:880px}header{padding-inline:max(24px,calc((100vw - 200px - 880px)/2 + 16px))}nav button.on{background:var(--bg)}.fab{bottom:28px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ===== PRO THEME ===== */
+
 :root{--bg:#F1F0FB;--card:#fff;--ink:#1B1840;--mut:#7A7799;--line:#E6E3F7;--acc:#5B3DF5;--acc2:#8B5CF6;--thu:#10B981;--chi:#F43F5E;--chuyen:#3B82F6;--dc:#F59E0B;--g:linear-gradient(135deg,#5B3DF5,#8B5CF6 55%,#EC4899)}
 body.dark{--bg:#0F0D1F;--card:#1A1733;--ink:#EEEDFF;--mut:#9A97BD;--line:#2B2850}
 body{background:radial-gradient(900px 400px at 0 -10%,#8B5CF633,transparent),radial-gradient(700px 400px at 100% 0,#EC489922,transparent),var(--bg);transition:background .3s}
@@ -87,6 +87,30 @@ header{background:color-mix(in srgb,var(--bg) 80%,transparent)}
 .fp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.fp label{font-size:11px;color:var(--mut)}.fp select,.fp input{width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);margin-top:2px}.fp .w{grid-column:1/-1}
 .tsum{display:flex;gap:8px;margin:8px 0;font-size:12px;flex-wrap:wrap}.tsum span{background:var(--card);border-radius:10px;padding:6px 10px}.dh.over{color:var(--chi);font-weight:700}
 @media(max-width:899px){nav button{font-size:10.5px;padding:6px 1px}}.addb{width:100%;margin:6px 0 14px;padding:11px;border-radius:14px;border:2px dashed var(--line);color:var(--acc2);font-weight:700}
+
+html{scroll-behavior:smooth}::selection{background:#8b5cf655}
+body.dark{color-scheme:dark}body.dark .dot{background:var(--line)}body.dark .sk{background:linear-gradient(90deg,#1a1733,#2b2850,#1a1733);background-size:200%}
+input,select{font-size:16px}button{-webkit-tap-highlight-color:transparent;transition:transform .12s,background .2s}button:active{transform:scale(.97)}
+.chips{scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
+.tx{min-height:60px;border-radius:12px}.sheet{max-height:92dvh;background:var(--card);color:var(--ink)}
+.sheet:before{content:"";display:block;width:42px;height:4px;border-radius:4px;background:var(--line);margin:-6px auto 14px}
+#login form{background:#ffffff1a;backdrop-filter:blur(18px);border:1px solid #ffffff33;border-radius:28px;padding:32px 24px;box-shadow:0 24px 60px #1b184055}
+#login input:focus{border-color:#fff;outline:0;background:#ffffff26}
+nav button span{font-size:17px;padding:2px 16px;border-radius:12px;transition:background .2s}
+nav button.on span{background:color-mix(in srgb,var(--acc2) 18%,transparent)}
+nav{background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(14px)}
+@media(max-width:480px){.live b{display:none}.live{padding:8px}.ib{width:36px;height:36px}header{gap:6px;padding-inline:12px}main{padding-inline:12px}
+.hero{padding:18px 16px;border-radius:20px}.ins{gap:6px}.ins div{padding:9px;font-size:11px}.ins b{font-size:13px}.cd{flex-wrap:wrap;justify-content:center}.cd ul{min-width:150px}
+.ba{width:112px}.df{width:64px;font-size:12px}.f{grid-template-columns:1fr}.f .w{grid-column:auto}.two b{font-size:16px}}
+@media(max-width:899px){.ov{align-items:flex-end}.sheet{padding-bottom:calc(20px + env(safe-area-inset-bottom))}}
+@media(hover:hover){.tx:hover{background:color-mix(in srgb,var(--acc2) 8%,transparent)}.chip:hover{border-color:var(--acc2)}.card:hover{transform:translateY(-2px)}}
+@media(hover:none){.card:hover{transform:none}}
+@media(min-width:900px){
+main,main:has(.dash){max-width:980px}header{padding-inline:max(24px,calc((100vw - 200px - 980px)/2 + 16px))}
+nav{background:var(--card);gap:6px}nav:before{content:"Sổ Thu Chi";position:absolute;top:26px;left:24px;font-weight:700;font-size:20px;background:var(--g);-webkit-background-clip:text;background-clip:text;color:transparent}
+nav button{transition:background .2s}nav button:hover{background:color-mix(in srgb,var(--acc2) 10%,transparent)}nav button.on{background:color-mix(in srgb,var(--acc2) 16%,transparent)}nav button span{padding:0;background:none!important;width:22px}
+.ov{display:flex;align-items:center;justify-content:center}.sheet{position:relative;width:min(540px,92vw);border-radius:24px;padding:24px;transform:scale(.96);box-shadow:0 30px 80px #1b184066}.ov.open .sheet{transform:none}.sheet:before{display:none}
+.hero .big{font-size:44px}.fab{right:32px}}
 </style></head><body>
 <section id="login"><form id="lf"><svg width="56" height="56" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#fff"/><path d="M30 62l14-14 10 10 18-22" stroke="#0B4F59" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
 <h1>Sổ Thu Chi</h1><p>Nhập mật khẩu để mở sổ</p><input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="Mật khẩu" autofocus><button class="go" id="lb">Mở sổ</button><div id="lerr" role="alert"></div></form></section>
@@ -96,19 +120,21 @@ header{background:color-mix(in srgb,var(--bg) 80%,transparent)}
 <nav id="nav"></nav><button class="fab" id="fab" aria-label="Thêm giao dịch">+</button>
 </div>
 <div class="ov" id="ov"><div class="sheet" id="sh" role="dialog" aria-modal="true"></div></div><div id="toast" role="status"></div>
+<script src="config.js"></script>
 <script>
-const PASS='0000'; // mật khẩu đăng nhập (đổi tại đây)
+
 const TTL=12*3600e3,alive=()=>{const t=+localStorage.sess||0;return t&&Date.now()-t<TTL},touch=()=>{localStorage.sess=Date.now()};
-const API='https://script.google.com/macros/s/AKfycbznLXXBUWBGhPbmfPal7FDN6WD7gQPqcdGLsRFEcvImPtbMKwhVEaBljv_7Jt2j_3g7/exec';
+const{PASS,API}=window.CONFIG||{};
 const $=s=>document.querySelector(s),vnd=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n))+' ₫',num=n=>new Intl.NumberFormat('vi-VN').format(n);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const TYPES=['Chi','Thu','Chuyển khoản','Điều chỉnh'],CLS={Thu:'thu',Chi:'chi','Chuyển khoản':'chuyen','Điều chỉnh':'dc'},SIGN={Thu:'+',Chi:'−','Chuyển khoản':'⇄','Điều chỉnh':'±'};
 const NAV=[['home','Tổng quan','◧'],['tx','Giao dịch','☰'],['acc','Tài khoản','▣'],['rec','Cân đối','⚖'],['cat','Hạng mục','◈']];
+if(!window.CONFIG)$('#lerr').textContent='Thiếu file config.js';
 let S={act:{},tx:[],acc:[],cat:[],m:ymd(new Date()).slice(0,7),tab:'home',f:'all',q:'',ready:false,busy:0},E=null;
 try{const c=JSON.parse(sessionStorage.cache||'null');if(c){Object.assign(S,c);S.ready=true}}catch(e){}
-async function api(a,d={}){let r;const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);try{r=await fetch(API,{method:'POST',signal:ac.signal,body:JSON.stringify({a,...d})})}catch(e){throw Error('Không có kết nối mạng')}finally{clearTimeout(tm)}
-const j=await r.json();if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
+async function api(a,d={}){if(!API)throw Error('Thiếu địa chỉ API: file config.js chưa được tải');let r;const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);try{r=await fetch(API,{method:'POST',signal:ac.signal,body:JSON.stringify({a,...d})})}catch(e){throw Error('Không có kết nối mạng')}finally{clearTimeout(tm)}
+let j;try{j=await r.json()}catch(x){throw Error('Apps Script chưa cấp quyền hoặc chưa Deploy bản mới (máy chủ không trả về JSON)')}if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),2600)}
 function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.sig=sigOf(j);if(j.h)S.h=j.h;S.ready=true;sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat});$('#st').textContent='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}
 const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim,j.trash,j.rec]),POLL_MS=2000;
@@ -132,7 +158,6 @@ setInterval(poll,POLL_MS);
 document.addEventListener('focusout',()=>setTimeout(()=>{if(S.dirty&&!typing()){S.dirty=false;render()}},60));
 addEventListener('offline',()=>setLive('err'));addEventListener('online',()=>{fails=0;poll()});
 ['click','keydown'].forEach(t=>document.addEventListener(t,()=>{if(alive())touch()},{passive:true}));
-// ---- tính toán
 const sums=m=>{let thu=0,chi=0;S.tx.forEach(t=>{if(t.date.slice(0,7)!==m)return;if(t.type==='Thu')thu+=t.amount;if(t.type==='Chi')chi+=t.amount});return{thu,chi}};
 const bal=a=>{let b=a.open;S.tx.forEach(t=>{const x=t.amount;if(t.acc===a.name){if(t.type==='Thu'||t.type==='Điều chỉnh')b+=x;else b-=x}if(t.type==='Chuyển khoản'&&t.accTo===a.name)b+=x});return b};
 const mlabel=m=>'Tháng '+m.slice(5)+'/'+m.slice(0,4),shift=(m,d)=>{const t=new Date(+m.slice(0,4),+m.slice(5)-1+d,1);return ymd(t).slice(0,7)};
@@ -140,7 +165,6 @@ const monthNav=()=>`<div class="mn"><button class="ib" data-m="-1" aria-label="T
 function txRow(t){const c=CLS[t.type],ttl=t.type==='Chuyển khoản'?`${esc(t.acc)} → ${esc(t.accTo)}`:esc(t.sub||t.cat||(t.type==='Chi'||t.type==='Thu'?'Chưa phân loại':t.type));
 return `<button class="tx" data-edit="${esc(t.id)}"><span class="dot ${c}">${SIGN[t.type]}</span><span class="m"><b>${ttl}</b><small>${esc(t.note||t.cat||'')}${t.type==='Chuyển khoản'?'':' · '+esc(t.acc)}</small></span><b class="${c}">${t.type==='Chi'?'−':t.type==='Thu'?'+':''}${num(t.amount)}</b></button>`}
 const empty=(a,b)=>`<div class="empty"><b>${a}</b>${b}</div>`;
-// ---- màn hình
 function home(){const{thu,chi}=sums(S.m),total=S.acc.reduce((s,a)=>s+bal(a),0),by={};
 S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).forEach(t=>by[t.cat||'Chưa phân loại']=(by[t.cat||'Chưa phân loại']||0)+t.amount);
 const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]),mx=rows[0]?rows[0][1]:1;
@@ -156,14 +180,13 @@ function txs(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>t.date.slice(0,7)=
 let h='',last='';l.forEach(t=>{if(t.date!==last){last=t.date;const d=new Date(t.date+'T00:00');h+=`<div class="dh">${d.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'})}</div>`}h+=txRow(t)});
 return `${monthNav()}<input class="search" id="q" placeholder="Tìm theo ghi chú, hạng mục, số tiền" value="${esc(S.q)}"><div class="chips">${['all',...TYPES].map(t=>`<button class="chip ${S.f===t?'on':''}" data-f="${t}">${t==='all'?'Tất cả':t}</button>`).join('')}</div>
 <div class="card" style="padding:4px 16px">${l.length?h:empty('Không có giao dịch','Thử đổi tháng hoặc bộ lọc.')}</div><button class="chip" data-csv>Tải CSV toàn bộ</button>`}
-function accs(){const t=S.acc.reduce((s,a)=>s+bal(a),0);return `<div class="hero"><small>Tổng tài sản</small><div class="big">${vnd(t)}</div></div><div class="card" style="padding:4px 16px">${S.acc.map(a=>{const b=bal(a);return `<div class="acc"><span><b style="font-weight:500">${esc(a.name)}</b><small>${esc(a.type)}</small></span><b class="${b<0?'chi':''}">${vnd(b)}</b></div>`}).join('')||empty('Chưa có tài khoản','Thêm trong sheet TaiKhoan.')}</div><p class="empty" style="padding:0">Thêm hoặc đổi tên tài khoản ở sheet TaiKhoan trong Google Sheets.</p>`}
+function accs(){const t=S.acc.reduce((s,a)=>s+bal(a),0);return `<div class="hero"><small>Tổng tài sản</small><div class="big">${vnd(t)}</div></div><div class="card" style="padding:4px 16px">${S.acc.map(a=>{const b=bal(a);return `<div class="acc"><span><b style="font-weight:500">${esc(a.name)}</b><small>${esc(a.type)}</small></span><b class="${b<0?'chi':''}">${vnd(b)}</b></div>`}).join('')||empty('Chưa có tài khoản','')}</div>`}
 function cats(){const g={};S.cat.filter(c=>c.t==='Chi').forEach(c=>(g[c.p]=g[c.p]||[]).push(c.c));const sp={};S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m).forEach(t=>sp[t.sub]=(sp[t.sub]||0)+t.amount);
-return monthNav()+Object.entries(g).map(([p,k])=>`<div class="card"><h3>${esc(p)}</h3>${k.map(c=>`<div class="acc" style="padding:8px 0"><span>${esc(c)}</span><b class="${sp[c]?'chi':''}" style="font-weight:${sp[c]?700:400}">${sp[c]?vnd(sp[c]):'–'}</b></div>`).join('')}</div>`).join('')||empty('Chưa có hạng mục','Thêm trong sheet DanhMuc.')}
+return monthNav()+Object.entries(g).map(([p,k])=>`<div class="card"><h3>${esc(p)}</h3>${k.map(c=>`<div class="acc" style="padding:8px 0"><span>${esc(c)}</span><b class="${sp[c]?'chi':''}" style="font-weight:${sp[c]?700:400}">${sp[c]?vnd(sp[c]):'–'}</b></div>`).join('')}</div>`).join('')||empty('Chưa có hạng mục','')}
 const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p style="color:var(--chi);margin-bottom:10px">${esc(S.err==='Failed to fetch'||S.err==='Không có kết nối mạng'?'Không kết nối được tới Apps Script':S.err)}</p><p style="color:var(--mut);font-size:13px">Kiểm tra: (1) đã dán Code.gs mới và Deploy phiên bản mới; (2) quyền truy cập là Anyone; (3) Google Sheet có đủ 4 sheet TongQuan, GiaoDich, TaiKhoan, DanhMuc.</p><button class="save" data-retry>Thử lại</button></div>`;
-// ---- cân đối tài khoản
 const diffs=()=>S.acc.map(a=>{const sys=bal(a),v=S.act[a.name],has=v!==undefined;return{a,sys,has,act:v,diff:has?v-sys:0}});
 function recon(){const D=diffs();return `<div class="hero"><small>Chênh lệch (thực tế − hệ thống)</small><div class="big" id="rt">–</div><div class="row"><div class="pill">Hệ thống<b id="rs">–</b></div><div class="pill">Thực tế<b id="ra">–</b></div></div></div>
-<div class="card"><h3>Nhập số dư thực tế</h3><p class="note">Nhập số tiền đang có thật ở từng tài khoản. Tài khoản để trống sẽ không được kiểm tra.</p>${D.map((x,i)=>`<div class="rr"><span><b style="font-weight:500">${esc(x.a.name)}</b><small>Hệ thống: ${vnd(x.sys)}</small></span><input class="ba" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has?num(x.act):''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('')||empty('Chưa có tài khoản','Thêm trong sheet TaiKhoan.')}</div><div id="rbtn"></div>`}
+<div class="card"><h3>Nhập số dư thực tế</h3>${D.map((x,i)=>`<div class="rr"><span><b style="font-weight:500">${esc(x.a.name)}</b><small>Hệ thống: ${vnd(x.sys)}</small></span><input class="ba" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has?num(x.act):''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('')||empty('Chưa có tài khoản','')}</div><div id="rbtn"></div>`}
 function reconUpdate(){const D=diffs(),has=D.filter(x=>x.has),tot=has.reduce((s,x)=>s+x.diff,0),sg=n=>(n>0?'+':'−')+vnd(Math.abs(n));
 D.forEach((x,i)=>{const e=$('#df'+i);if(e){e.textContent=!x.has?'':x.diff===0?'Khớp':sg(x.diff).replace(' ₫','');e.className='df '+(!x.has?'':x.diff===0?'thu':'chi')}});
 $('#rt').textContent=has.length?(tot===0?'Khớp':sg(tot)):'–';
@@ -188,7 +211,6 @@ if(d.tab){S.tab=d.tab;scrollTo(0,0)}else if(d.m)S.m=shift(S.m,+d.m);else if(d.f)
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const p=e.target.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(p,p)}});
 function csv(){const r=[['ID','Ngày','Loại','Số tiền','Tài khoản','Tài khoản đến','Hạng mục cha','Hạng mục con','Ghi chú'],...S.tx.map(t=>[t.id,t.date,t.type,t.amount,t.acc,t.accTo,t.cat,t.sub,t.note])];
 const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='so-thu-chi.csv';a.click()}
-// ---- form
 function openForm(t,ty){E=t?{...t}:{id:'G'+Date.now().toString(36),date:ymd(new Date()),type:ty||'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',isNew:true};form();$('#ov').classList.add('open')}
 const closeForm=()=>$('#ov').classList.remove('open');
 function form(){const ty=E.type,pars=[...new Set(S.cat.filter(c=>c.t===ty).map(c=>c.p))],subs=S.cat.filter(c=>c.t===ty&&c.p===E.cat).map(c=>c.c),op=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
@@ -206,7 +228,6 @@ if(er)return toast(er);const row={id:E.id,date:E.date,type:ty,amount:E.amount,ac
 S.tx=S.tx.filter(x=>x.id!==row.id).concat(row);S.m=row.date.slice(0,7);closeForm();render();push(E.isNew?'add':'upd',{row},()=>S.tx=old)});
 $('#ov').addEventListener('input',e=>{if(e.target.id==='fa'){const neg=e.target.value.trim().startsWith('-'),v=e.target.value.replace(/[^\d]/g,'');e.target.value=(neg?'-':'')+(v?num(+v):'')}if(e.target.id==='fc'||e.target.id==='fp'){pull();form();$('#'+e.target.id).focus()}});
 
-// ===== PRO ADDONS =====
 const PAL=['#8B5CF6','#EC4899','#F59E0B','#10B981','#3B82F6','#F43F5E','#14B8A6','#F97316','#6366F1','#84CC16'];
 const EMO=[[/ăn|uống|cơm|cafe|cà phê|nhà hàng/i,'🍜'],[/xe|xăng|đi lại|grab|taxi/i,'🛵'],[/nhà|thuê|điện|nước|internet/i,'🏠'],[/mua|sắm|quần|áo/i,'🛍️'],[/y tế|thuốc|khám|sức khỏe/i,'💊'],[/học|sách|giáo dục/i,'📚'],[/giải trí|phim|game|du lịch/i,'🎮'],[/lương|thưởng|thu/i,'💰'],[/quà|từ thiện|cho/i,'🎁']];
 const emo=k=>(EMO.find(e=>e[0].test(k||''))||[0,'🧾'])[1],colOf=(k,i)=>PAL[i%PAL.length];
@@ -239,7 +260,6 @@ const sm=`<div class="card"><h3>Tổng quan tháng</h3><div class="sm"><div><spa
 h=h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',dn('Thu','Thu tiền')+sm+'<div class="card"><h3>Chi theo hạng mục</h3>');
 return '<div class="dash">'+h+cal.replace('class="card cal-wrap"','class="card calc"')+'</div>'};
 
-// ===== LỌC / SẮP XẾP / HẠN MỨC =====
 try{S.lim=JSON.parse(localStorage.lim||'null')||{d:0,m:0,c:{}}}catch(e){S.lim={d:0,m:0,c:{}}}
 Object.assign(S,{rg:'m',so:'dn',xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',fo:false});
 txs=function(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>{
@@ -263,26 +283,39 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-x]');if(!t
 if(x==='fo')S.fo=!S.fo;else if(x==='rs'){Object.assign(S,{xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',so:'dn',rg:'m',f:'all',q:''})}else if(x==='lim')return openLim();render()});
 document.addEventListener('change',e=>{const k={x_rg:'rg',x_acc:'xa',x_cat:'xc',x_mn:'mn',x_mx:'mx',x_so:'so',x_d1:'d1',x_d2:'d2'}[e.target.id];if(k){S[k]=e.target.value;render()}});
 function openLim(){const L=S.lim,pars=[...new Set(S.cat.filter(c=>c.t==='Chi').map(c=>c.p))];
-$('#sh').innerHTML=`<h3 style="margin-bottom:6px">Hạn mức chi</h3><p class="note">Để trống hoặc 0 = không giới hạn. Đồng bộ qua Google Sheet.</p><div class="f"><label>Mỗi ngày (₫)<input id="l_d" type="number" inputmode="numeric" value="${L.d||''}"></label><label>Mỗi tháng (₫)<input id="l_m" type="number" inputmode="numeric" value="${L.m||''}"></label><label class="w" style="font-weight:700;margin-top:8px">Theo hạng mục (mỗi tháng)</label>${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_c" data-p="${esc(p)}" type="number" inputmode="numeric" value="${(L.c||{})[p]||''}"></label>`).join('')}</div><button class="save" data-lsave>Lưu hạn mức</button>`;$('#ov').classList.add('open')}
+$('#sh').innerHTML=`<h3 style="margin-bottom:6px">Hạn mức chi</h3><div class="f"><label>Mỗi ngày (₫)<input id="l_d" type="number" inputmode="numeric" value="${L.d||''}"></label><label>Mỗi tháng (₫)<input id="l_m" type="number" inputmode="numeric" value="${L.m||''}"></label><div class="w seg" style="grid-template-columns:1fr 1fr;margin:10px 0 2px"><button type="button" class="on" data-lt="gd">Theo ngày</button><button type="button" data-lt="gc">Theo tháng</button></div><div class="w f" id="gd">${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_cd" data-p="${esc(p)}" type="number" inputmode="numeric" placeholder="₫ / ngày" value="${(L.cd||{})[p]||''}"></label>`).join('')}</div><div class="w f hide" id="gc">${pars.map(p=>`<label>${emo(p)} ${esc(p)}<input class="l_c" data-p="${esc(p)}" type="number" inputmode="numeric" placeholder="₫ / tháng" value="${(L.c||{})[p]||''}"></label>`).join('')}</div></div><button class="save" data-lsave>Lưu hạn mức</button>`;$('#ov').classList.add('open')}
+$('#sh').addEventListener('click',e=>{const b=e.target.closest('[data-lt]');if(!b)return;document.querySelectorAll('[data-lt]').forEach(x=>x.classList.toggle('on',x===b));$('#gd').classList.toggle('hide',b.dataset.lt!=='gd');$('#gc').classList.toggle('hide',b.dataset.lt!=='gc')});
 $('#sh').addEventListener('click',async e=>{if(!e.target.closest('[data-lsave]'))return;const c={};document.querySelectorAll('.l_c').forEach(i=>{if(+i.value>0)c[i.dataset.p]=+i.value});
-S.lim={d:+$('#l_d').value||0,m:+$('#l_m').value||0,c};localStorage.lim=JSON.stringify(S.lim);closeForm();render();try{apply(await api('lim',{lim:S.lim}));toast('Đã lưu hạn mức');render()}catch(er){toast('Đã lưu trên máy này, chưa đồng bộ: '+er.message)}});
+const cd={};document.querySelectorAll('.l_cd').forEach(i=>{if(+i.value>0)cd[i.dataset.p]=+i.value});S.lim={d:+$('#l_d').value||0,m:+$('#l_m').value||0,c,cd};localStorage.lim=JSON.stringify(S.lim);closeForm();render();try{apply(await api('lim',{lim:S.lim}));toast('Đã lưu hạn mức');render()}catch(er){toast('Đã lưu trên máy này, chưa đồng bộ: '+er.message)}});
 const _home3=home;
 home=function(){let h=_home3();const L=S.lim||{},now=ymd(new Date()),M=S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m),tot=M.reduce((a,t)=>a+t.amount,0),td=S.tx.filter(t=>t.type==='Chi'&&t.date===now).reduce((a,t)=>a+t.amount,0);
 const bar=(lb,v,lim)=>{const r=v/lim,c=r>1?'var(--chi)':r>.8?'var(--dc)':'var(--thu)';return `<div class="bar" style="--bc:${c}"><div><span>${lb}</span><b>${vnd(v)} / ${vnd(lim)} <small style="color:${c}">${Math.round(r*100)}%</small></b></div><i><s style="width:${Math.min(100,r*100)}%"></s></i></div>`};
 let b='';if(L.d)b+=bar('Hôm nay',td,L.d);if(L.m)b+=bar(mlabel(S.m),tot,L.m);const by={};M.forEach(t=>by[t.cat]=(by[t.cat]||0)+t.amount);Object.entries(L.c||{}).forEach(([k,v])=>b+=bar(emo(k)+' '+esc(k),by[k]||0,v));
 const days=new Set(M.map(t=>t.date));let ov=0;if(L.d){const d={};M.forEach(t=>d[t.date]=(d[t.date]||0)+t.amount);ov=Object.values(d).filter(v=>v>L.d).length}
-const card=`<div class="card"><h3>Hạn mức chi <button class="chip" style="float:right;padding:3px 10px" data-x="lim">⚙ Thiết lập</button></h3>${b||'<p class="note">Chưa đặt hạn mức. Bấm Thiết lập để đặt hạn mức theo ngày, tháng và hạng mục.</p>'}${L.d&&ov?`<p class="note" style="color:var(--chi)">⚠️ ${ov} ngày trong tháng vượt hạn mức ngày.</p>`:''}</div>`;
+const card=`<div class="card"><h3>Hạn mức chi <button class="chip" style="float:right;padding:3px 10px" data-x="lim">⚙ Thiết lập</button></h3>${b||''}${L.d&&ov?`<p class="note" style="color:var(--chi)">⚠️ ${ov} ngày trong tháng vượt hạn mức ngày.</p>`:''}</div>`;
 return h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',card+'<div class="card"><h3>Chi theo hạng mục</h3>')};
-const _push=push;push=async function(a,d,u){await _push(a,d,u);if(a!=='del'&&d.row&&d.row.type==='Chi'&&S.lim.d){const v=S.tx.filter(t=>t.type==='Chi'&&t.date===d.row.date).reduce((x,t)=>x+t.amount,0);if(v>S.lim.d)toast('⚠️ Vượt hạn mức chi ngày: '+vnd(v)+' / '+vnd(S.lim.d))}};
+const _push=push;push=async function(a,d,u){await _push(a,d,u);const r=d.row;if(a==='del'||!r||r.type!=='Chi')return;const L=S.lim||{},W=[],sm=f=>S.tx.filter(t=>t.type==='Chi'&&f(t)).reduce((x,t)=>x+t.amount,0),dc=(L.cd||{})[r.cat],mc=(L.c||{})[r.cat];
+if(dc){const v=sm(t=>t.date===r.date&&t.cat===r.cat);if(v>dc)W.push(r.cat+' vượt '+vnd(v-dc)+' trong ngày')}
+if(mc){const v=sm(t=>t.date.slice(0,7)===r.date.slice(0,7)&&t.cat===r.cat);if(v>mc)W.push(r.cat+' vượt '+vnd(v-mc)+' trong tháng')}
+if(L.d){const v=sm(t=>t.date===r.date);if(v>L.d)W.push('tổng chi ngày vượt '+vnd(v-L.d))}
+if(W.length)toast('⚠️ '+W.join(' · '))};
+const _home4=home;
+home=function(){let h=_home4();const L=S.lim||{},now=ymd(new Date()),M=S.tx.filter(t=>t.type==='Chi'&&t.date.slice(0,7)===S.m),by={},dd={};
+M.forEach(t=>{by[t.cat]=(by[t.cat]||0)+t.amount;const k=t.cat+'|'+t.date;dd[k]=(dd[k]||0)+t.amount});
+const bar=(lb,v,lim)=>{const r=v/lim,c=r>1?'var(--chi)':r>.8?'var(--dc)':'var(--thu)';return `<div class="bar" style="--bc:${c}"><div><span>${lb}</span><b>${vnd(v)} / ${vnd(lim)} <small style="color:${c}">${v>lim?'vượt '+vnd(v-lim):Math.round(r*100)+'%'}</small></b></div><i><s style="width:${Math.min(100,r*100)}%"></s></i></div>`};
+const cdE=Object.entries(L.cd||{}),cE=Object.entries(L.c||{});if(!cdE.length&&!cE.length)return h;
+const ov=[];cdE.forEach(([k,v])=>{const ex=Object.entries(dd).filter(([x,a])=>x.startsWith(k+'|')&&a>v);if(ex.length)ov.push({k,n:ex.length,x:ex.reduce((q,[,a])=>q+a-v,0)})});
+cE.forEach(([k,v])=>{if((by[k]||0)>v)ov.push({k,n:0,x:by[k]-v})});ov.sort((a,b)=>b.x-a.x);const tot=ov.reduce((q,o)=>q+o.x,0);
+const card=`${cdE.length?`<div class="card"><h3>Hạn mức ngày theo hạng mục (hôm nay)</h3>${cdE.map(([k,v])=>bar(emo(k)+' '+esc(k),dd[k+'|'+now]||0,v)).join('')}</div>`:''}<div class="card"><h3>Danh mục bội chi${tot?` <small class="chi" style="float:right">+${vnd(tot)}</small>`:''}</h3>${ov.map(o=>`<div class="acc"><span><b style="font-weight:500">${emo(o.k)} ${esc(o.k)}</b><small>${o.n?o.n+' ngày vượt hạn mức ngày':'Vượt hạn mức tháng'}</small></span><b class="chi">+${vnd(o.x)}</b></div>`).join('')||empty('Không có hạng mục nào bội chi','Tháng này đang trong hạn mức.')}</div>`;
+return h.replace('<div class="card"><h3>Chi theo hạng mục</h3>',card+'<div class="card"><h3>Chi theo hạng mục</h3>')};
 
-// ===== QUẢN LÝ + ĐỊNH KỲ + THÙNG RÁC =====
-S.trash=S.trash||[];S.rec=S.rec||[];NAV.push(['mg','Quản lý','⚙'],['tr','Thùng rác','🗑']);
+S.trash=S.trash||[];S.rec=S.rec||[];NAV.push(['mg','Quản lý','⚙'],['tr','Thùng rác','🗑']);NAV.splice(NAV.findIndex(x=>x[0]==='acc'),1);
 const KT={gd:'Giao dịch',tk:'Tài khoản',dm:'Hạng mục'};
 function mgPage(){const g={};S.cat.forEach((c,i)=>{(g[c.t+'|'+c.p]=g[c.t+'|'+c.p]||[]).push([c,i])});
-return `<h3 style="margin:8px 2px">Tài khoản</h3><div class="card" style="padding:4px 16px">${S.acc.map((a,i)=>`<button class="tx" data-ed="tk:${i}"><span class="dot">🏦</span><span class="m"><b>${esc(a.name)}</b><small>${esc(a.type)} · đầu kỳ ${num(a.open)}</small></span><b>›</b></button>`).join('')||empty('Chưa có tài khoản','')}</div><button class="addb" data-ed="tk:new">+ Thêm tài khoản</button>
+return `<h3 style="margin:8px 2px">Tài khoản</h3><div class="card" style="padding:4px 16px">${S.acc.map((a,i)=>`<button class="tx" data-ed="tk:${i}"><span class="dot">🏦</span><span class="m"><b>${esc(a.name)}</b><small>${esc(a.type)}</small></span><b class="${bal(a)<0?'chi':''}">${vnd(bal(a))}</b></button>`).join('')||empty('Chưa có tài khoản','')}</div><button class="addb" data-ed="tk:new">+ Thêm tài khoản</button>
 <h3 style="margin:8px 2px">Hạng mục</h3>${Object.entries(g).map(([k,v])=>{const[t,p]=k.split('|');return `<div class="card"><h3>${emo(p)} ${esc(p)} <small class="${t==='Thu'?'thu':'chi'}">${t}</small></h3><div class="chips" style="flex-wrap:wrap;margin:0">${v.map(([c,i])=>`<button class="chip" data-ed="dm:${i}">${esc(c.c)}</button>`).join('')}</div></div>`}).join('')}<button class="addb" data-ed="dm:new">+ Thêm hạng mục</button>
-<h3 style="margin:8px 2px">Giao dịch định kỳ</h3><div class="card" style="padding:4px 16px">${S.rec.map((r,i)=>`<button class="tx" data-ed="rec:${i}"><span class="dot">🔁</span><span class="m"><b>${esc(r.sub||r.cat||r.type)}</b><small>Ngày ${r.day} hằng tháng · ${esc(r.acc)}</small></span><b class="${CLS[r.type]}">${num(r.amount)}</b></button>`).join('')||empty('Chưa có giao dịch định kỳ','Tiền nhà, internet, lương… sẽ tự tạo đúng ngày.')}</div><button class="addb" data-ed="rec:new">+ Thêm giao dịch định kỳ</button>`}
-function trashPage(){return `<div class="card"><h3>Thùng rác</h3><p class="note">Mọi mục đã xóa được lưu vĩnh viễn ở tab DaXoa trên Google Sheet, không bao giờ bị xóa thật.</p>${S.trash.map((t,i)=>`<div class="acc"><span><b style="font-weight:500">${KT[t.k]||''}: ${esc(t.k==='gd'?(t.sub||t.cat||t.type)+' · '+num(t.amount):t.k==='tk'?t.id:t.cat+' › '+t.sub)}</b><small>${t.k==='gd'?esc(t.date+' · '+t.acc):''} Xóa lúc ${esc(t.at)}</small></span><button class="chip" data-rs="${i}">Khôi phục</button></div>`).join('')||empty('Thùng rác trống','')}</div>`}
+<h3 style="margin:8px 2px">Giao dịch định kỳ</h3><div class="card" style="padding:4px 16px">${S.rec.map((r,i)=>`<button class="tx" data-ed="rec:${i}"><span class="dot">🔁</span><span class="m"><b>${esc(r.sub||r.cat||r.type)}</b><small>Ngày ${r.day} hằng tháng · ${esc(r.acc)}</small></span><b class="${CLS[r.type]}">${num(r.amount)}</b></button>`).join('')||empty('Chưa có giao dịch định kỳ','')}</div><button class="addb" data-ed="rec:new">+ Thêm giao dịch định kỳ</button>`}
+function trashPage(){return `<div class="card"><h3>Thùng rác</h3>${S.trash.map((t,i)=>`<div class="acc"><span><b style="font-weight:500">${KT[t.k]||''}: ${esc(t.k==='gd'?(t.sub||t.cat||t.type)+' · '+num(t.amount):t.k==='tk'?t.id:t.cat+' › '+t.sub)}</b><small>${t.k==='gd'?esc(t.date+' · '+t.acc):''} Xóa lúc ${esc(t.at)}</small></span><button class="chip" data-rs="${i}">Khôi phục</button></div>`).join('')||empty('Thùng rác trống','')}</div>`}
 async function act(a,d,msg){S.busy++;try{apply(await api(a,d));toast(msg);closeForm()}catch(e){toast(e.message)}S.busy--;render()}
 let ED=null;
 function ed(kind,o,idx){const L=[...new Set(S.cat.map(c=>c.p))],nm=S.acc.map(a=>a.name),isN=idx==null;ED={kind,o,idx};
