@@ -1,7 +1,8 @@
 /* ===== app ===== */
 /* =============== CẤU HÌNH & TIỆN ÍCH =============== */
 const {PASS,API}=window.CONFIG||{},WANT='v5',POLL_MS=5000,TTL=12*3600e3;
-const alive=()=>{const t=+localStorage.sess||0;return t&&Date.now()-t<TTL},touch=()=>{localStorage.sess=Date.now()};
+try{localStorage.removeItem('sess')}catch(e){}   // bỏ phiên cũ lưu lâu dài
+const alive=()=>{const t=+sessionStorage.sess||0;return t&&Date.now()-t<TTL},touch=()=>{sessionStorage.sess=Date.now()};   // phiên chỉ sống trong tab: đóng tab là hết
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const num=n=>new Intl.NumberFormat('vi-VN').format(n),vnd=n=>num(Math.round(n))+' ₫';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -10,15 +11,17 @@ const newId=i=>'G'+Date.now().toString(36)+(i||0)+Math.floor(Math.random()*1296)
 const pm=v=>{const s=String(v||'').trim(),n=Number(s.replace(/[^\d]/g,''));return n?(s.startsWith('-')?-n:n):0};
 const fm=el=>{const s=el.value.trim(),ng=el.dataset.neg&&s.startsWith('-'),d=s.replace(/[^\d]/g,'');el.value=(ng?'-':'')+(d?num(+d):'')};
 const TYPES=['Chi','Thu','Chuyển khoản','Điều chỉnh'],CLS={Thu:'thu',Chi:'chi','Chuyển khoản':'chuyen','Điều chỉnh':'dc'};
-const ACC_TYPES=['Tiền mặt','Ngân hàng','Thẻ tín dụng','Ví điện tử','Tiết kiệm'];
+const HELD='Giữ Hộ';   // tài khoản giữ hộ tiền người khác: vẫn ghi giao dịch nhưng KHÔNG tính vào thu/chi, hạn mức, báo cáo, tổng tài sản
+const ACC_TYPES=['Tiền mặt','Ngân hàng','Thẻ tín dụng','Ví điện tử','Tiết kiệm',HELD];
 const IC={home:'M3 11l9-8 9 8M5 10v10h14V10',tx:'M4 6h16M4 12h16M4 18h10',rec:'M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',lim:'M4 18a8 8 0 1 1 16 0M12 18l4-6',acc:'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18',cat:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',tr:'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',more:'M5 12h.01M12 12h.01M19 12h.01',dl:'M12 4v11M7 11l5 5 5-5M5 20h14',pl:'M12 5v14M5 12h14',fl:'M4 5h16l-6 8v6l-4-2v-4z',rp:'M5 20V11M12 20V4M19 20v-6'};
 const ic=k=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[k]}"/></svg>`;
-const TABS=[['home','Tổng quan','Sổ sách'],['tx','Giao dịch'],['rp','Báo cáo'],['rec','Cân đối'],['lim','Hạn mức','Kế hoạch'],['acc','Tài khoản','Danh mục'],['cat','Hạng mục'],['tr','Thùng rác']],MOB=['home','tx','rp','lim'],MONTHLY=['home','tx','lim','acc','cat'];
+IC.ba='M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M7 15h3';IC.bc='M20 12l-8 8-9-9V3h8zM7.5 7.5h.01';IC.bl='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01';
+const TABS=[['home','Tổng quan','Sổ sách'],['rp','Báo cáo'],['tx','Tất cả','Giao dịch'],['ba','Theo tài khoản'],['bc','Theo danh mục'],['bl','Theo hạn mức'],['rec','Cân đối','Quản lý'],['lim','Hạn mức'],['acc','Tài khoản'],['cat','Hạng mục'],['tr','Thùng rác']],MOB=['home','tx','rp','lim'],MONTHLY=['home','tx','ba','bc','bl','lim','acc','cat'],GRP_TX=['tx','ba','bc','bl'],SHORT={tx:'Giao dịch'};
 const SN={GiaoDich:'Giao dịch',TaiKhoan:'Tài khoản',DanhMuc:'Hạng mục',HanMuc:'Hạn mức',DaXoa:'Thùng rác'};
 const PAL=['#0F766E','#2563EB','#D97706','#DB2777','#7C3AED','#65A30D','#0891B2','#DC2626'],col=i=>PAL[i%PAL.length];
 const EMO=[[/đầu tư|lãi|lời|cổ phiếu|chứng khoán/i,'📈'],[/làm thêm|freelance|việc phụ/i,'💼'],[/cân đối|điều chỉnh/i,'⚖️'],[/^\s*khác\s*$/i,'📦'],[/ăn|uống|cơm|cafe|cà phê|nhà hàng/i,'🍜'],[/xe|xăng|đi lại|grab|taxi/i,'🛵'],[/nhà|thuê|điện|nước|internet/i,'🏠'],[/mua|sắm|quần|áo/i,'🛍️'],[/y tế|thuốc|khám|sức khỏe/i,'💊'],[/học|sách|giáo dục/i,'📚'],[/giải trí|phim|game|du lịch/i,'🎮'],[/lương|thưởng|thu/i,'💰'],[/quà|từ thiện|cho/i,'🎁'],[/tiết kiệm/i,'🐷']];
 const emo=k=>(EMO.find(e=>e[0].test(k||''))||[0,'🧾'])[1];
-const ATYPE={'Tiền mặt':['💵','#15803D'],'Ngân hàng':['🏦','#2563EB'],'Thẻ tín dụng':['💳','#7C3AED'],'Ví điện tử':['👛','#DB2777'],'Tiết kiệm':['🐷','#D97706']},ATORD=['Tiền mặt','Ngân hàng','Ví điện tử','Thẻ tín dụng','Tiết kiệm'],EM=['💵','🏦','💳','👛','🐷','📱','💰','🪙','🏧','🛒','📈','🎯'];
+const ATYPE={'Tiền mặt':['💵','#15803D'],'Ngân hàng':['🏦','#2563EB'],'Thẻ tín dụng':['💳','#7C3AED'],'Ví điện tử':['👛','#DB2777'],'Tiết kiệm':['🐷','#D97706'],[HELD]:['🤝','#667085']},ATORD=['Tiền mặt','Ngân hàng','Ví điện tử','Thẻ tín dụng','Tiết kiệm',HELD],EM=['💵','🏦','💳','👛','🐷','📱','💰','🪙','🏧','🛒','📈','🎯'];
 const BR=[[/grab/i,'G','#00B14F'],[/momo/i,'M','#A50064'],[/zalo/i,'Z','#0068FF'],[/shopee/i,'S','#EE4D2D'],[/vcb|vietcombank/i,'VCB','#007A3D'],[/tcb|techcom/i,'TCB','#E3000F'],[/\bmb\b|mbbank/i,'MB','#1C3FAA'],[/bidv/i,'BIDV','#1D6E8C'],[/acb/i,'ACB','#0057A8'],[/vpbank/i,'VP','#00A651'],[/tpbank/i,'TP','#6A1B9A'],[/agribank/i,'AGR','#AE1C3F'],[/sacombank/i,'STB','#0A5EAB'],[/vietinbank|ctg/i,'CTG','#0B4DA2'],[/vnpay/i,'VN','#0F4C99'],[/viettel/i,'VT','#EE0033']];
 let AI={};try{AI=JSON.parse(localStorage.aicon||'{}')}catch(e){}   // biểu tượng tài khoản: chỉ là trang trí, lưu trên máy này
 function aIco(a){const t=ATYPE[a.type]||['🏦','#667085'],o=AI[a.name];if(o)return `<span class="dot" style="background:color-mix(in srgb,${t[1]} 16%,transparent)">${o}</span>`;const b=BR.find(x=>x[0].test(a.name));
@@ -83,23 +86,28 @@ addEventListener('offline',()=>setLive('err'));addEventListener('online',()=>{fa
 
 /* =============== TÍNH TOÁN =============== */
 const mOf=t=>t.date.slice(0,7),inM=(t,m)=>mOf(t)===m;
-const sums=m=>{let thu=0,chi=0;S.tx.forEach(t=>{if(!inM(t,m))return;if(t.type==='Thu')thu+=t.amount;if(t.type==='Chi')chi+=t.amount});return{thu,chi}};
+/* Giao dịch tính vào thống kê = bỏ giao dịch của tài khoản "Giữ hộ" */
+let _own=null;
+const heldSet=()=>new Set(S.acc.filter(a=>a.type===HELD).map(a=>a.name));
+const stx=()=>{if(_own&&_own.t===S.tx&&_own.a===S.acc&&_own.n===S.tx.length)return _own.l;const h=heldSet(),l=h.size?S.tx.filter(t=>!h.has(t.acc)&&!(t.accTo&&h.has(t.accTo))):S.tx;_own={t:S.tx,a:S.acc,n:S.tx.length,l};return l};
+const ownAcc=()=>S.acc.filter(a=>a.type!==HELD);
+const sums=m=>{let thu=0,chi=0;stx().forEach(t=>{if(!inM(t,m))return;if(t.type==='Thu')thu+=t.amount;if(t.type==='Chi')chi+=t.amount});return{thu,chi}};
 const bal=a=>{let b=a.open;S.tx.forEach(t=>{const x=t.amount;if(t.acc===a.name){if(t.type==='Thu'||t.type==='Điều chỉnh')b+=x;else b-=x}if(t.type==='Chuyển khoản'&&t.accTo===a.name)b+=x});return b};
 const mlabel=m=>'Tháng '+m.slice(5)+'/'+m.slice(0,4),shift=(m,d)=>ymd(new Date(+m.slice(0,4),+m.slice(5)-1+d,1)).slice(0,7);
 const group=(l,f)=>{const o={};l.forEach(t=>{const k=f(t);o[k]=(o[k]||0)+t.amount});return Object.entries(o).sort((a,b)=>b[1]-a[1])};
-const chiM=m=>S.tx.filter(t=>t.type==='Chi'&&inM(t,m));
+const chiM=m=>stx().filter(t=>t.type==='Chi'&&inM(t,m));
 /* ---- HẠN MỨC ----
  Quy tắc tính hạn mức:
   • Kỳ = Ngày | Tháng.  Hạng mục trống = tổng chi; có tên = hạng mục CHA.
   • Chỉ tính giao dịch loại Chi.  Ngày: theo từng ngày lịch.  Tháng: theo từng tháng lịch.      */
 const limOf=(per,cat)=>(S.lim.find(l=>l.per===per&&l.cat===cat)||{}).v||0;
-function limCalc(){const today=ymd(new Date()),chi=S.tx.filter(t=>t.type==='Chi'),M=chi.filter(t=>inM(t,S.m)),sum=(a,c)=>a.reduce((s,t)=>(!c||t.cat===c)?s+t.amount:s,0);
+function limCalc(){const today=ymd(new Date()),chi=stx().filter(t=>t.type==='Chi'),M=chi.filter(t=>inM(t,S.m)),sum=(a,c)=>a.reduce((s,t)=>(!c||t.cat===c)?s+t.amount:s,0);
   return S.lim.map(L=>{const name=L.cat||'Tổng chi';
     if(L.per==='Ngày'){const pd={};M.forEach(t=>{if(!L.cat||t.cat===L.cat)pd[t.date]=(pd[t.date]||0)+t.amount});const days=Object.entries(pd).filter(([,a])=>a>L.v).map(([d,a])=>[d,a-L.v]);
       return{...L,name,used:sum(chi.filter(t=>t.date===today),L.cat),over:days.length,excess:days.reduce((s,x)=>s+x[1],0),days}}
     const used=sum(M,L.cat);return{...L,name,used,over:used>L.v?1:0,excess:Math.max(0,used-L.v),days:[]}})
   .sort((a,b)=>(a.cat?1:0)-(b.cat?1:0)||a.name.localeCompare(b.name,'vi'))}
-function limWarn(r){if(!r||r.type!=='Chi')return;const W=[],sm=f=>S.tx.filter(t=>t.type==='Chi'&&f(t)).reduce((x,t)=>x+t.amount,0);
+function limWarn(r){if(!r||r.type!=='Chi'||heldSet().has(r.acc))return;const W=[],sm=f=>stx().filter(t=>t.type==='Chi'&&f(t)).reduce((x,t)=>x+t.amount,0);
   S.lim.forEach(L=>{if(L.cat&&L.cat!==r.cat)return;const v=L.per==='Ngày'?sm(t=>t.date===r.date&&(!L.cat||t.cat===L.cat)):sm(t=>mOf(t)===mOf(r)&&(!L.cat||t.cat===L.cat));if(v>L.v)W.push((L.cat||'Tổng chi')+' vượt '+vnd(v-L.v)+(L.per==='Ngày'?' trong ngày':' trong tháng'))});
   if(W.length)setTimeout(()=>notify(W.join(' · '),{title:'Vượt hạn mức',ico:'⚠️',err:1,undo:UNDO&&Date.now()-UNDO.t<9000?UNDO.fn:null}),1500)}
 
@@ -114,8 +122,8 @@ const B={};S.acc.forEach(a=>B[a.name]=+a.open||0);const tm=t=>(t.at||'').slice(1
 S.tx.map((t,i)=>[t,i]).sort((x,y)=>x[0].date.localeCompare(y[0].date)||tm(x[0]).localeCompare(tm(y[0]))||x[1]-y[1]).forEach(([t])=>{
 const x=t.amount;B[t.acc]=(B[t.acc]||0)+(t.type==='Thu'||t.type==='Điều chỉnh'?x:-x);if(t.type==='Chuyển khoản'&&t.accTo)B[t.accTo]=(B[t.accTo]||0)+x;m[t.id]=B[t.acc]});
 _bk={t:S.tx,a:S.acc,n:S.tx.length,m};return m}
-function txRow(t){const c=CLS[t.type],ttl=t.type==='Chuyển khoản'?`${esc(t.acc)} → ${esc(t.accTo)}`:esc(t.sub||t.cat||(t.type==='Chi'||t.type==='Thu'?'Chưa phân loại':t.type)),ico=t.type==='Chuyển khoản'?'⇄':t.type==='Điều chỉnh'?'±':emo(t.sub||t.cat);
-return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(noteTxt(t.note)||t.cat||'')+(hasImg(t.note)?' 📎':'')}${t.type==='Chuyển khoản'?'':(noteTxt(t.note)||t.cat||hasImg(t.note)?' · ':'')+esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${t.type==='Chi'?'−':t.type==='Thu'?'+':''}${num(t.amount)}</b>${balMap()[t.id]!==undefined?`<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(balMap()[t.id])}</small>`:''}</span></button>`}
+function txRow(t,v){const xs=typeof v==='string'&&t.type==='Chuyển khoản',sg=xs?(t.acc===v?'−':'+'):(t.type==='Chi'?'−':t.type==='Thu'?'+':''),hb=xs&&t.acc!==v;const c=CLS[t.type],ttl=t.type==='Chuyển khoản'?`${esc(t.acc)} → ${esc(t.accTo)}`:esc(t.sub||t.cat||(t.type==='Chi'||t.type==='Thu'?'Chưa phân loại':t.type)),ico=t.type==='Chuyển khoản'?'⇄':t.type==='Điều chỉnh'?'±':emo(t.sub||t.cat);
+return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(noteTxt(t.note)||t.cat||'')+(hasImg(t.note)?' 📎':'')}${t.type==='Chuyển khoản'?'':(noteTxt(t.note)||t.cat||hasImg(t.note)?' · ':'')+esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${sg}${num(t.amount)}</b>${balMap()[t.id]!==undefined&&!hb?`<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(balMap()[t.id])}</small>`:''}</span></button>`}
 function donut(rows,tot,off=0,fi=emo){if(!rows.length||!tot)return empty('Chưa có dữ liệu');const R=48,C=2*Math.PI*R;let o=0;
 return `<div class="cd"><svg width="132" height="132" viewBox="0 0 120 120" role="img" aria-label="Biểu đồ cơ cấu">${rows.map(([k,v],i)=>{const l=v/tot*C,x=`<circle r="${R}" cx="60" cy="60" fill="none" stroke="${col(i+off)}" stroke-width="18" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-o}" transform="rotate(-90 60 60)"/>`;o+=l;return x}).join('')}<text x="60" y="58" text-anchor="middle" font-size="9" fill="var(--mut)">${rows.length} nhóm</text><text x="60" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${tot>=1e6?(tot/1e6).toFixed(1)+'tr':Math.round(tot/1e3)+'k'}</text></svg>
 <ul>${rows.slice(0,6).map(([k,v],i)=>`<li><i style="background:${col(i+off)}"></i><span>${fi(k)} ${esc(k)}</span><b>${Math.round(v/tot*100)}%</b></li>`).join('')}</ul></div>`}
@@ -126,7 +134,7 @@ function issueBanner(){if(!S.issues.length)return '';const e=S.issues.filter(i=>
   return `<div class="warn ${e?'err':''}">⚠️ ${e?e+' dòng dữ liệu bị lỗi (chưa được tính vào số liệu)':''}${e&&w?' · ':''}${w?w+' dòng cần lưu ý':''}. <button data-a="issues">Xem chi tiết</button></div>`}
 
 /* =============== TRANG =============== */
-function home(){const{thu,chi}=sums(S.m),total=S.acc.reduce((s,a)=>s+bal(a),0),M=S.tx.filter(t=>inM(t,S.m)),rows=group(chiM(S.m),t=>t.cat||'Chưa phân loại'),mx=rows[0]?rows[0][1]:1;
+function home(){const{thu,chi}=sums(S.m),total=ownAcc().reduce((s,a)=>s+bal(a),0),M=stx().filter(t=>inM(t,S.m)),rows=group(chiM(S.m),t=>t.cat||'Chưa phân loại'),mx=rows[0]?rows[0][1]:1;
 const months=[];for(let i=11;i>=0;i--)months.push(shift(S.m,-i));const d=months.map(m=>({m,...sums(m)})),top=Math.max(1,...d.map(x=>Math.max(x.thu,x.chi)));
 const ch=[0,.5,1].map(f=>`<line x1="0" x2="480" y1="${130-f*120}" y2="${130-f*120}" stroke="var(--line)"/>`).join('')+d.map((x,i)=>{const w=40,h1=x.thu/top*120,h2=x.chi/top*120;return `<rect x="${i*w+6}" y="${130-h1}" width="13" height="${h1}" rx="2" fill="var(--thu)"/><rect x="${i*w+20}" y="${130-h2}" width="13" height="${h2}" rx="2" fill="var(--chi)"/><text x="${i*w+20}" y="148" font-size="10" text-anchor="middle" fill="var(--mut)">${x.m.slice(5)}</text>`}).join('');
 const y=+S.m.slice(0,4),mo=+S.m.slice(5),dim=new Date(y,mo,0).getDate(),off=(new Date(y,mo-1,1).getDay()+6)%7,dc={};chiM(S.m).forEach(t=>dc[+t.date.slice(8)]=(dc[+t.date.slice(8)]||0)+t.amount);
@@ -134,7 +142,7 @@ const cmx=Math.max(1,...Object.values(dc)),sh=n=>n>=1e6?(n/1e6).toFixed(1)+'tr':
 const dnum=S.m===ymd(new Date()).slice(0,7)?new Date().getDate():dim,big=chiM(S.m).sort((a,b)=>b.amount-a.amount)[0],LC=limCalc(),rec=M.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
 const limHtml=LC.map(x=>limBar(x,(x.cat?emo(x.cat)+' ':'')+esc(x.name)+' · '+(x.per==='Ngày'?'hôm nay':'tháng'))).join(''),ov=LC.filter(x=>x.over).length;
 return head('Tổng quan',mlabel(S.m)+' · '+M.length+' giao dịch')+issueBanner()+
-`<div class="kpis">${kpi('Tổng tài sản',vnd(total),'',S.acc.length+' tài khoản','h')}${kpi('Thu',vnd(thu),'thu','Tháng này')}${kpi('Chi',vnd(chi),'chi','TB '+vnd(chi/dnum)+'/ngày')}${kpi('Còn lại',vnd(thu-chi),thu-chi<0?'chi':'','Tiết kiệm '+(thu?Math.round((thu-chi)/thu*100):0)+'%')}</div>
+`<div class="kpis">${kpi('Tổng tài sản',vnd(total),'',ownAcc().length+' tài khoản','h')}${kpi('Thu',vnd(thu),'thu','Tháng này')}${kpi('Chi',vnd(chi),'chi','TB '+vnd(chi/dnum)+'/ngày')}${kpi('Còn lại',vnd(thu-chi),thu-chi<0?'chi':'','Tiết kiệm '+(thu?Math.round((thu-chi)/thu*100):0)+'%')}</div>
 <div class="grid a"><div class="card"><div class="ch">Thu chi 12 tháng <small><span class="thu">■</span> thu &nbsp;<span class="chi">■</span> chi</small></div><svg viewBox="0 0 480 154" width="100%" role="img" aria-label="Biểu đồ thu chi 12 tháng">${ch}</svg></div>
 <div class="card"><div class="ch">Cơ cấu chi tiêu <small>${big?'Lớn nhất '+num(big.amount):''}</small></div>${donut(rows,chi)}</div></div>
 <div class="grid b"><div class="card"><div class="ch">Chi theo hạng mục</div>${rows.length?rows.map(([k,v],i)=>bar(emo(k)+' '+esc(k),v,mx,col(i)).replace('</b>',' <small class="mut">'+Math.round(v/chi*100)+'%</small></b>')).join(''):empty('Chưa có khoản chi','Bấm + để ghi khoản đầu tiên của tháng.')}${rows.length?`<div class="ch" style="margin:16px 0 0;padding-top:12px;border-top:1px solid var(--line)">Khoản chi lớn nhất</div>${chiM(S.m).sort((a,b)=>b.amount-a.amount).slice(0,3).map(txRow).join('')}`:''}</div>
@@ -145,10 +153,10 @@ return head('Tổng quan',mlabel(S.m)+' · '+M.length+' giao dịch')+issueBanne
 function txs(){const q=S.q.toLowerCase();let l=S.tx.filter(t=>{if(S.rg==='m'&&!inM(t,S.m))return false;if(S.rg==='c'&&((S.d1&&t.date<S.d1)||(S.d2&&t.date>S.d2)))return false;if(S.f!=='all'&&t.type!==S.f)return false;if(S.xa&&t.acc!==S.xa&&t.accTo!==S.xa)return false;if(S.xc&&t.cat!==S.xc)return false;if(S.mn!==''&&t.amount<+S.mn)return false;if(S.mx!==''&&t.amount>+S.mx)return false;
 return !q||[noteTxt(t.note),t.cat,t.sub,t.acc,t.accTo,String(t.amount)].join(' ').toLowerCase().includes(q)});
 const ds=S.so==='dn'||S.so==='do';l.sort({dn:(a,b)=>b.date.localeCompare(a.date),do:(a,b)=>a.date.localeCompare(b.date),ah:(a,b)=>b.amount-a.amount,al:(a,b)=>a.amount-b.amount}[S.so]);
-const dsum={};l.forEach(t=>{if(t.type===S.f&&(S.f==='Thu'||S.f==='Chi'))dsum[t.date]=(dsum[t.date]||0)+t.amount});const thu=l.filter(t=>t.type==='Thu').reduce((a,t)=>a+t.amount,0),chi=l.filter(t=>t.type==='Chi').reduce((a,t)=>a+t.amount,0),dt={};S.tx.forEach(t=>{if(t.type==='Chi')dt[t.date]=(dt[t.date]||0)+t.amount});const ld=limOf('Ngày','');
+const dsum={};l.forEach(t=>{if(t.type===S.f&&(S.f==='Thu'||S.f==='Chi'))dsum[t.date]=(dsum[t.date]||0)+t.amount});const thu=l.filter(t=>t.type==='Thu').reduce((a,t)=>a+t.amount,0),chi=l.filter(t=>t.type==='Chi').reduce((a,t)=>a+t.amount,0),dt={};stx().forEach(t=>{if(t.type==='Chi')dt[t.date]=(dt[t.date]||0)+t.amount});const ld=limOf('Ngày','');
 let h='',last='';l.forEach(t=>{if(ds&&t.date!==last){last=t.date;const dd=new Date(t.date+'T00:00'),ov=ld&&dt[t.date]>ld;h+=`<div class="dh ${ov?'over':''}"><span>${dd.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'})}</span><span class="sens">${S.f==='Thu'?(dsum[t.date]?'thu '+num(dsum[t.date]):''):S.f==='Chi'||S.f==='all'?(dt[t.date]?'chi '+num(dt[t.date])+(ov?' ⚠️ vượt hạn mức ngày':''):''):''}</span></div>`}h+=txRow(t)});
 const op=(a,v,ph)=>`<option value="">${ph}</option>`+a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join(''),pars=[...new Set(S.cat.map(c=>c.p))],n=[S.xa,S.xc,S.mn,S.mx,S.d1,S.d2].filter(x=>x!=='').length+(S.rg!=='m'?1:0);
-return head('Giao dịch',S.rg==='m'?mlabel(S.m):S.rg==='a'?'Toàn bộ thời gian':'Khoảng ngày tùy chọn',`<button class="btn" data-a="csv">${ic('dl')}CSV</button>`)+
+return head('Giao dịch',S.rg==='m'?mlabel(S.m):S.rg==='a'?'Toàn bộ thời gian':'Khoảng ngày tùy chọn',`<button class="btn" data-a="csv">${ic('dl')}CSV</button>`)+txSwitch()+
 `<div class="tb"><input class="search" id="q" placeholder="Tìm theo ghi chú, hạng mục, số tiền" value="${esc(S.q)}" aria-label="Tìm giao dịch"><div class="chips">${['all',...TYPES].map(t=>`<button class="chip ${S.f===t?'on':''}" data-f="${t}">${t==='all'?'Tất cả':t}</button>`).join('')}<button class="chip ${n?'on':''}" data-a="fo">${ic('fl').replace('class="i"','class="i" style="width:14px;height:14px;vertical-align:-2px"')} Bộ lọc${n?' ('+n+')':''}</button></div></div>
 ${S.fo?`<div class="card" style="margin-bottom:12px"><div class="fp"><label class="l w">Thời gian<select id="x_rg"><option value="m" ${S.rg==='m'?'selected':''}>Theo tháng đang xem</option><option value="a" ${S.rg==='a'?'selected':''}>Toàn bộ thời gian</option><option value="c" ${S.rg==='c'?'selected':''}>Khoảng ngày tùy chọn</option></select></label>
 ${S.rg==='c'?`<label class="l">Từ ngày<input type="date" id="x_d1" value="${S.d1}"></label><label class="l">Đến ngày<input type="date" id="x_d2" value="${S.d2}"></label>`:''}
@@ -198,17 +206,17 @@ async function doBal(k){if(k==='form')return openForm(null,'Chuyển khoản');c
   }
   S.act={};commit(rows.map(row=>({op:'tx.save',row})),{ok:'Đã ghi '+rows.length+' giao dịch cân đối',local:()=>{S.tx=S.tx.concat(rows)}})}
 
-function accs(){const bs=S.acc.map(a=>({a,b:bal(a)})),tot=bs.reduce((s,x)=>s+x.b,0),pos=bs.filter(x=>x.b>0).reduce((s,x)=>s+x.b,0),neg=bs.filter(x=>x.b<0).reduce((s,x)=>s+x.b,0),mo={};
+function accs(){const bs=S.acc.map(a=>({a,b:bal(a)})),own=bs.filter(x=>x.a.type!==HELD),tot=own.reduce((s,x)=>s+x.b,0),pos=own.filter(x=>x.b>0).reduce((s,x)=>s+x.b,0),neg=own.filter(x=>x.b<0).reduce((s,x)=>s+x.b,0),mo={};
 S.tx.forEach(t=>{if(!inM(t,S.m))return;const o=mo[t.acc]=mo[t.acc]||{thu:0,chi:0};if(t.type==='Thu')o.thu+=t.amount;if(t.type==='Chi')o.chi+=t.amount});
-const types=[...new Set([...ATORD,...S.acc.map(a=>a.type)])].filter(t=>bs.some(x=>x.a.type===t)),pie=bs.filter(x=>x.b>0).sort((a,b)=>b.b-a.b).map(x=>[x.a.name,x.b]);
+const types=[...new Set([...ATORD,...S.acc.map(a=>a.type)])].filter(t=>bs.some(x=>x.a.type===t)),pie=own.filter(x=>x.b>0).sort((a,b)=>b.b-a.b).map(x=>[x.a.name,x.b]);
 const grp=types.map(t=>{const l=bs.filter(x=>x.a.type===t),sub=l.reduce((s,x)=>s+x.b,0);return `<div class="card flush"><div class="ch" style="padding-top:14px;margin:0"><span>${(ATYPE[t]||['🏦'])[0]} ${esc(t)} <small>· ${l.length} tài khoản</small></span><b class="sens ${sub<0?'chi':''}">${vnd(sub)}</b></div>${l.map(({a,b})=>{const i=S.acc.indexOf(a),m=mo[a.name]||{thu:0,chi:0};return `<button class="row" data-ed="tk:${i}">${aIco(a)}<span class="m"><b>${esc(a.name)}</b><small class="sens">${mlabel(S.m)}: <span class="thu">+${num(m.thu)}</span> · <span class="chi">−${num(m.chi)}</span></small></span><b class="sens ${b<0?'chi':''}">${vnd(b)}</b></button>`}).join('')}</div>`}).join('');
-const th=Object.values(mo).reduce((s,x)=>s+x.thu,0),ch=Object.values(mo).reduce((s,x)=>s+x.chi,0);
+const th=Object.entries(mo).filter(([k])=>!heldSet().has(k)).reduce((s,[,x])=>s+x.thu,0),ch=Object.entries(mo).filter(([k])=>!heldSet().has(k)).reduce((s,[,x])=>s+x.chi,0);
 return head('Tài khoản',S.acc.length+' tài khoản · bấm vào để sửa hoặc xem giao dịch',`<button class="btn p" data-ed="tk:new">${ic('pl')}Thêm tài khoản</button>`)+
-`<div class="kpis">${kpi('Tổng tài sản ròng',vnd(tot),tot<0?'chi':'','Sau khi trừ nợ','h')}${kpi('Tiền đang có',vnd(pos),'thu',bs.filter(x=>x.b>0).length+' tài khoản')}${kpi('Đang nợ',vnd(neg),neg<0?'chi':'',bs.filter(x=>x.b<0).length+' tài khoản')}${kpi('Thu − chi '+mlabel(S.m).toLowerCase(),vnd(th-ch),th-ch<0?'chi':'thu','+'+num(th)+' / −'+num(ch))}</div>
+`<div class="kpis">${kpi('Tổng tài sản ròng',vnd(tot),tot<0?'chi':'','Sau khi trừ nợ','h')}${kpi('Tiền đang có',vnd(pos),'thu',own.filter(x=>x.b>0).length+' tài khoản')}${kpi('Đang nợ',vnd(neg),neg<0?'chi':'',own.filter(x=>x.b<0).length+' tài khoản')}${kpi('Thu − chi '+mlabel(S.m).toLowerCase(),vnd(th-ch),th-ch<0?'chi':'thu','+'+num(th)+' / −'+num(ch))}</div>
 <div class="grid a" style="align-items:start"><div class="col">${grp||`<div class="card">${empty('Chưa có tài khoản','Bấm “Thêm tài khoản” để bắt đầu.')}</div>`}</div><div class="card"><div class="ch">Phân bổ tài sản</div>${donut(pie,pos,0,k=>'')}</div></div>`}
 function cats(){const g={},sp={},known=new Set(),mk=(t,x)=>t+'|'+x,lo={Chi:{},Thu:{}},tt={Thu:0,Chi:0};
 S.cat.forEach((c,i)=>{(g[c.t+'|'+c.p]=g[c.t+'|'+c.p]||[]).push([c,i]);known.add(mk(c.t,c.c))});
-S.tx.forEach(t=>{if((t.type!=='Chi'&&t.type!=='Thu')||!inM(t,S.m))return;tt[t.type]+=t.amount;const k=mk(t.type,t.sub);
+stx().forEach(t=>{if((t.type!=='Chi'&&t.type!=='Thu')||!inM(t,S.m))return;tt[t.type]+=t.amount;const k=mk(t.type,t.sub);
   if(known.has(k))sp[k]=(sp[k]||0)+t.amount;else{const n=t.sub||t.cat||'Chưa phân loại';lo[t.type][n]=(lo[t.type][n]||0)+t.amount}});
 const amt=(t,v)=>v?` <b class="${t==='Thu'?'thu':'chi'} sens">${num(v)}</b>`:'';
 const cards=Object.entries(g).map(([k,v])=>{const[t,p]=k.split('|'),sum=v.reduce((s,[c])=>s+(sp[mk(t,c.c)]||0),0);
@@ -222,9 +230,9 @@ const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p
 
 /* =============== KHUNG & SỰ KIỆN =============== */
 function nav(){$('#sb').innerHTML=`<div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></span>Sổ Thu Chi</div>`+TABS.map(([k,l,gr])=>(gr?`<div class="g">${gr}</div>`:'')+`<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${l}</button>`).join('')+`<div class="foot">Phím tắt: <b>N</b> thêm · <b>C</b> gõ nhanh · <b>/</b> tìm · <b>Ctrl+Z</b> hoàn tác</div>`;
-$('#bn').innerHTML=MOB.map(k=>{const t=TABS.find(x=>x[0]===k);return `<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${t[1]}</button>`}).join('')+`<button class="${MOB.includes(S.tab)?'':'on'}" data-a="more">${ic('more')}${MOB.includes(S.tab)?'Thêm':TABS.find(x=>x[0]===S.tab)[1]}</button>`;
+const mt=GRP_TX.includes(S.tab)?'tx':S.tab;$('#bn').innerHTML=MOB.map(k=>{const t=TABS.find(x=>x[0]===k);return `<button class="${mt===k?'on':''}" data-tab="${k}">${ic(k)}${SHORT[k]||t[1]}</button>`}).join('')+`<button class="${MOB.includes(mt)?'':'on'}" data-a="more">${ic('more')}${MOB.includes(mt)?'Thêm':TABS.find(x=>x[0]===S.tab)[1]}</button>`;
 const n=S.issues.length;$('#isb').classList.toggle('hide',!n);$('#isn').textContent=n>99?'99+':n;if(typeof qbNav==='function')qbNav();if(typeof nbUpdate==='function')nbUpdate()}
-function render(){nav();$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,rp:reportPage,rec:recon,lim:limPage,acc:accs,cat:cats,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
+function render(){nav();$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,ba:accView,bc:catView,bl:limView,rp:reportPage,rec:recon,lim:limPage,acc:accs,cat:cats,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate();mdFix()}
 const go=t=>{S.tab=t;location.hash=t;scrollTo(0,0);closeSheet();render()};
 document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-a],[data-bdo],[data-ed],[data-rs]');if(!t||t.closest('#ov'))return;const d=t.dataset;
 if(d.tab)return go(d.tab);if(d.m){S.m=shift(S.m,+d.m);return render()}if(d.f){S.f=d.f;return render()}
@@ -246,7 +254,7 @@ const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""'
 
 /* =============== HỘP THOẠI =============== */
 const openSheet=()=>$('#ov').classList.add('open'),closeSheet=()=>$('#ov').classList.remove('open');
-function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['rec','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-nt="open">${ic('bell')}<span class="m"><b>Thông báo &amp; ứng dụng</b><small>Bật thông báo, cài đặt ứng dụng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button></div>`;ED=null;E=null;openSheet()}
+function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['ba','bc','bl','rec','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-nt="open">${ic('bell')}<span class="m"><b>Thông báo &amp; ứng dụng</b><small>Bật thông báo, cài đặt ứng dụng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button></div>`;ED=null;E=null;openSheet()}
 function openIssues(){const L=S.issues;ED=null;E=null;$('#sh').innerHTML=`<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0,80).map(i=>`<div class="iss ${i.lv}"><b>${esc(SN[i.sheet]||i.sheet)} · dòng ${i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length>80?`<p class="mut" style="margin-top:8px">… và ${L.length-80} mục nữa</p>`:''}`;openSheet()}
 function catFields(ty,cat,sub,ip,is){const L=S.cat.map((c,i)=>({...c,i})).filter(c=>c.t===ty),pars=[...new Set(L.map(c=>c.p))],o=c=>`<option value="${c.i}" ${c.p===cat&&c.c===sub?'selected':''}>${esc(c.c)}</option>`;
 return `<label>Hạng mục<select id="${ip}"><option value="">Chọn…</option>${pars.map(p=>`<option ${p===cat?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Chi tiết<select id="${is}"><option value="">${cat?'Chọn…':'Chọn (tự điền hạng mục)…'}</option>${cat?L.filter(c=>c.p===cat).map(o).join(''):pars.map(p=>`<optgroup label="${esc(p)}">${L.filter(c=>c.p===p).map(o).join('')}</optgroup>`).join('')}</select></label>`}
@@ -588,8 +596,8 @@ function lineChart(series, n, opt = {}) {
 /* ---- dữ liệu ---- */
 function netSeries(m) {   // tổng tài sản cuối mỗi ngày trong tháng m (đến hôm nay nếu là tháng hiện tại)
   const start = m + '-01', per = {};
-  let base = S.acc.reduce((s, a) => s + (+a.open || 0), 0);
-  S.tx.forEach(t => { if (t.date < start) base += flow(t); else if (t.date.slice(0, 7) === m) per[+t.date.slice(8)] = (per[+t.date.slice(8)] || 0) + flow(t) });
+  let base = ownAcc().reduce((s, a) => s + (+a.open || 0), 0);
+  stx().forEach(t => { if (t.date < start) base += flow(t); else if (t.date.slice(0, 7) === m) per[+t.date.slice(8)] = (per[+t.date.slice(8)] || 0) + flow(t) });
   const last = isCurM(m) ? new Date().getDate() : daysIn(m), v = []; let b = base;
   for (let d = 1; d <= last; d++) { b += per[d] || 0; v.push(b) } return { v, base };
 }
@@ -600,7 +608,7 @@ function cumChi(m) {
 }
 function anomalies(m) {   // khoản chi lớn bất thường so với 6 tháng trước, cùng chi tiết
   const start = m + '-01', from = shift(m, -6) + '-01', H = {};
-  S.tx.forEach(t => { if (t.type === 'Chi' && t.date >= from && t.date < start) { const k = t.sub || t.cat || ''; (H[k] = H[k] || []).push(t.amount) } });
+  stx().forEach(t => { if (t.type === 'Chi' && t.date >= from && t.date < start) { const k = t.sub || t.cat || ''; (H[k] = H[k] || []).push(t.amount) } });
   const out = [];
   chiM(m).forEach(t => {
     const h = H[t.sub || t.cat || '']; if (!h || h.length < 4) return;
@@ -658,12 +666,12 @@ ${cur && a.chi ? `<div class="card insight">📈 <span>Với tốc độ chi hi�
 /* ---- BÁO CÁO NĂM ---- */
 function rpYear() {
   const Y = +S.m.slice(0, 4), rows = [];
-  for (let i = 1; i <= 12; i++) { const m = Y + '-' + String(i).padStart(2, '0'), s = sums(m); rows.push({ m, i, ...s, n: s.thu - s.chi, c: S.tx.filter(t => inM(t, m)).length }) }
+  for (let i = 1; i <= 12; i++) { const m = Y + '-' + String(i).padStart(2, '0'), s = sums(m); rows.push({ m, i, ...s, n: s.thu - s.chi, c: stx().filter(t => inM(t, m)).length }) }
   const T = rows.reduce((o, r) => ({ thu: o.thu + r.thu, chi: o.chi + r.chi }), { thu: 0, chi: 0 }), active = rows.filter(r => r.thu || r.chi).length || 1;
   const pY = { thu: 0, chi: 0 }; for (let i = 1; i <= 12; i++) { const s = sums((Y - 1) + '-' + String(i).padStart(2, '0')); pY.thu += s.thu; pY.chi += s.chi }
   const topM = Math.max(1, ...rows.map(r => Math.max(r.thu, r.chi))), maxChi = rows.reduce((b, r) => r.chi > b.chi ? r : b, rows[0]), minChi = rows.filter(r => r.chi).reduce((b, r) => r.chi < b.chi ? r : b, maxChi);
   const bars = [0, .5, 1].map(f => `<line x1="0" x2="480" y1="${130 - f * 120}" y2="${130 - f * 120}" stroke="var(--line)"/>`).join('') + rows.map((x, i) => { const h1 = x.thu / topM * 120, h2 = x.chi / topM * 120; return `<rect x="${i * 40 + 6}" y="${130 - h1}" width="13" height="${h1}" rx="2" fill="var(--thu)"/><rect x="${i * 40 + 20}" y="${130 - h2}" width="13" height="${h2}" rx="2" fill="var(--chi)"/><text x="${i * 40 + 20}" y="148" font-size="10" text-anchor="middle" fill="var(--mut)">${x.i}</text>` }).join('');
-  const cats = group(S.tx.filter(t => t.type === 'Chi' && t.date.startsWith(Y + '-')), t => t.cat || 'Chưa phân loại'), cmx = cats[0] ? cats[0][1] : 1;
+  const cats = group(stx().filter(t => t.type === 'Chi' && t.date.startsWith(Y + '-')), t => t.cat || 'Chưa phân loại'), cmx = cats[0] ? cats[0][1] : 1;
   return rpHead('Năm ' + Y, navM('Năm ' + Y, 12)) +
     `<div class="kpis">${kpi('Tổng chi', vnd(T.chi), 'chi', delta(T.chi, pY.chi) + ' so với ' + (Y - 1), 'h')}${kpi('Tổng thu', vnd(T.thu), 'thu', delta(T.thu, pY.thu, false) + ' so với ' + (Y - 1))}${kpi('Tiết kiệm', vnd(T.thu - T.chi), T.thu - T.chi < 0 ? 'chi' : '', (T.thu ? Math.round((T.thu - T.chi) / T.thu * 100) : 0) + '% thu nhập')}${kpi('Chi TB mỗi tháng', vnd(T.chi / active), '', 'Cao nhất T' + maxChi.i + ' · thấp nhất T' + minChi.i)}</div>
 <div class="card" style="margin-bottom:14px"><div class="ch">Thu chi từng tháng ${Y} <small><span class="thu">■</span> thu &nbsp;<span class="chi">■</span> chi</small></div><svg viewBox="0 0 480 154" width="100%" role="img" aria-label="Thu chi theo tháng">${bars}</svg></div>
@@ -678,3 +686,161 @@ document.addEventListener('click', e => {
   S.rpv = b.dataset.rp; render();
 });
 
+/* ===== views ===== */
+/* =====================================================================
+ * views.js — Giao dịch theo TÀI KHOẢN · theo DANH MỤC · theo HẠN MỨC CHI
+ * Bố cục "danh sách bên trái – chi tiết bên phải" (trên điện thoại: dải chọn cuộn ngang ở trên).
+ * ===================================================================== */
+Object.assign(S, { sa: '', sc: '', ss: '', ct: 'Chi', sl: '', lo: false, vf: 'all' });
+const TXV = [['tx', 'Tất cả'], ['ba', 'Theo tài khoản'], ['bc', 'Theo danh mục'], ['bl', 'Theo hạn mức']];
+const txSwitch = () => `<div class="tabs vsw" role="tablist">${TXV.map(([k, l]) => `<button type="button" role="tab" class="${S.tab === k ? 'on' : ''}" data-tab="${k}">${ic(k)}${l}</button>`).join('')}</div>`;
+
+/* ---------- tiện ích ---------- */
+const keyOr = (keys, cur, def) => keys.includes(cur) ? cur : def;
+const byTime = (a, b) => b.date.localeCompare(a.date) || (b.at || '').localeCompare(a.at || '');
+const dayName = d => new Date(d + 'T00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' });
+const dayHd = (d, r, cls) => `<div class="dh ${cls || ''}"><span>${dayName(d)}</span><span class="sens">${r || ''}</span></div>`;
+const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '') + num(Math.abs(n));
+function dayList(l, hd, v) { let h = '', last = ''; l.forEach(t => { if (t.date !== last) { last = t.date; h += hd(t.date) } h += txRow(t, v) }); return h }
+const mdWrap = (l, d) => `<div class="md"><div class="mdl" role="tablist">${l}</div><div class="mdd">${d}</div></div>`;
+const mdi = (on, k, v, ico, name, sub, amt, ratio, color, dim) =>
+  `<button type="button" role="tab" aria-selected="${!!on}" class="mi ${on ? 'on' : ''} ${dim ? 'z' : ''}" data-pk="${k}" data-pv="${esc(v)}"><span class="mt">${ico}<span class="mtx"><b>${name}</b><small>${sub}</small></span><span class="ma sens">${amt}</span></span><i class="mbar" style="--bc:${color}"><s style="width:${Math.min(100, Math.max(0, ratio * 100))}%"></s></i></button>`;
+const dhead = (ico, name, sub, right) => `<div class="card dcard"><div class="dtop">${ico}<div class="dtt"><h2>${name}</h2><p>${sub}</p></div>${right || ''}</div></div>`;
+const noData = (a, b, btn) => `<div class="card">${empty(a, b)}${btn || ''}</div>`;
+const sKpis = a => `<div class="kpis sm">${a.join('')}</div>`;
+
+/* ---------- 1) THEO TÀI KHOẢN ---------- */
+function accInfo(a) {
+  let thu = 0, chi = 0, tin = 0, tout = 0, adj = 0; const l = [];
+  S.tx.forEach(t => {
+    if (!inM(t, S.m)) return;
+    const mine = t.acc === a.name, to = t.type === 'Chuyển khoản' && t.accTo === a.name; if (!mine && !to) return; l.push(t);
+    if (mine) { if (t.type === 'Thu') thu += t.amount; else if (t.type === 'Chi') chi += t.amount; else if (t.type === 'Chuyển khoản') tout += t.amount; else adj += t.amount }
+    if (to) tin += t.amount;
+  });
+  return { thu, chi, tin, tout, adj, l: l.sort(byTime), net: thu + tin + adj - chi - tout };
+}
+function accView() {
+  const head0 = head('Giao dịch', 'Theo tài khoản · ' + mlabel(S.m)) + txSwitch();
+  if (!S.acc.length) return head0 + noData('Chưa có tài khoản', 'Thêm tài khoản ở mục Tài khoản.');
+  const A = S.acc.slice().sort((x, y) => (x.type === HELD) - (y.type === HELD)), I = new Map(A.map(a => [a.name, accInfo(a)]));
+  const key = keyOr(A.map(a => a.name), S.sa, (A.find(a => I.get(a.name).l.length) || A[0]).name), a = A.find(x => x.name === key), f = I.get(key), b = bal(a);
+  const act = Math.max(1, ...A.map(x => I.get(x.name).thu + I.get(x.name).chi + I.get(x.name).tin + I.get(x.name).tout));
+  const list = A.map(x => {
+    const i = I.get(x.name), B = bal(x), c = (ATYPE[x.type] || ['', '#667085'])[1];
+    return mdi(x.name === key, 'sa', x.name, aIco(x), esc(x.name), `${i.l.length} giao dịch · <span class="thu">+${short(i.thu + i.tin)}</span> <span class="chi">−${short(i.chi + i.tout)}</span>`,
+      `<span class="${B < 0 ? 'chi' : ''}">${vnd(B)}</span>`, (i.thu + i.chi + i.tin + i.tout) / act, c, !i.l.length);
+  }).join('');
+  const L = f.l.filter(t => S.vf === 'all' || t.type === S.vf), D = {};
+  L.forEach(t => { const mine = t.acc === key, v = t.type === 'Thu' ? t.amount : t.type === 'Chi' ? -t.amount : t.type === 'Điều chỉnh' ? t.amount : t.type === 'Chuyển khoản' ? (mine ? -t.amount : t.amount) : 0; D[t.date] = (D[t.date] || 0) + (mine || t.accTo === key ? v : 0) });
+  const hd = d => dayHd(d, D[d] ? 'ròng <b class="' + (D[d] < 0 ? 'chi' : 'thu') + '">' + sgn(D[d]) + '</b>' : '');
+  const det = dhead(aIco(a), esc(a.name), esc(a.type) + (a.type === HELD ? ' · không tính vào thống kê' : '') + ' · ' + mlabel(S.m),
+    `<div class="dbal"><small>Số dư hiện tại</small><b class="sens ${b < 0 ? 'chi' : ''}">${vnd(b)}</b></div>`)
+    + sKpis([kpi('Thu', vnd(f.thu), 'thu', 'Tiền vào'), kpi('Chi', vnd(f.chi), 'chi', 'Tiền ra'), kpi('Chuyển khoản ròng', sgn(f.tin - f.tout) + ' ₫', 'chuyen', 'vào ' + short(f.tin) + ' · ra ' + short(f.tout)), kpi('Biến động', sgn(f.net) + ' ₫', f.net < 0 ? 'chi' : 'thu', mlabel(S.m))])
+    + `<div class="tb"><div class="chips">${['all', ...TYPES].map(t => `<button class="chip ${S.vf === t ? 'on' : ''}" data-pk="vf" data-pv="${t}">${t === 'all' ? 'Tất cả' : t}</button>`).join('')}</div><button class="btn" data-vgo="acc" data-pv="${esc(key)}">Xem toàn bộ thời gian</button></div>`
+    + `<div class="card flush">${L.length ? dayList(L, hd, key) : empty('Không có giao dịch', 'Tài khoản này chưa có giao dịch trong ' + mlabel(S.m).toLowerCase() + '.')}</div>`;
+  return head0 + mdWrap(list, det);
+}
+
+/* ---------- 2) THEO DANH MỤC ---------- */
+function catView() {
+  const ty = S.ct, cl = ty === 'Thu' ? 'thu' : 'chi', L = stx().filter(t => t.type === ty && inM(t, S.m)), tot = L.reduce((s, t) => s + t.amount, 0), G = {};
+  const NS = '(không chi tiết)';
+  S.cat.filter(c => c.t === ty).forEach(c => { G[c.p] = G[c.p] || { k: c.p, v: 0, n: 0, s: {} } });
+  L.forEach(t => { const k = t.cat || '', g = G[k] = G[k] || { k, v: 0, n: 0, s: {} }; g.v += t.amount; g.n++; const sk = t.sub || NS; g.s[sk] = (g.s[sk] || 0) + t.amount });
+  const R = Object.values(G).sort((x, y) => y.v - x.v || x.k.localeCompare(y.k, 'vi')), mx = R[0] ? R[0].v : 1, nm = k => k || 'Chưa phân loại';
+  const sw = `<div class="tabs ctsw">${['Chi', 'Thu'].map(t => `<button type="button" class="${ty === t ? 'on' : ''}" data-pk="ct" data-pv="${t}">${t === 'Chi' ? 'Khoản chi' : 'Khoản thu'}</button>`).join('')}</div>`;
+  const head0 = head('Giao dịch', 'Theo danh mục · ' + mlabel(S.m), sw) + txSwitch();
+  if (!R.length) return head0 + noData('Chưa có hạng mục', 'Thêm hạng mục ở mục Hạng mục.');
+  const key = keyOr(R.map(r => r.k), S.sc, (R.find(r => r.v) || R[0]).k), g = G[key], ss = keyOr(Object.keys(g.s), S.ss, '');
+  const list = R.map((r, i) => mdi(r.k === key, 'sc', r.k, `<span class="dot">${emo(r.k)}</span>`, esc(nm(r.k)), `${r.n} giao dịch · ${tot ? Math.round(r.v / tot * 100) : 0}%`, `<span class="${r.v ? cl : ''}">${vnd(r.v)}</span>`, mx ? r.v / mx : 0, col(i), !r.v)).join('');
+  const subs = Object.entries(g.s).sort((x, y) => y[1] - x[1]);
+  let T = L.filter(t => (t.cat || '') === key); const base = T; if (ss) T = T.filter(t => (t.sub || NS) === ss);
+  T.sort(byTime);
+  const sum = T.reduce((s, t) => s + t.amount, 0), big = T.reduce((b, t) => t.amount > b ? t.amount : b, 0),
+    pv = stx().filter(t => t.type === ty && (t.cat || '') === key && inM(t, shift(S.m, -1))).reduce((s, t) => s + t.amount, 0), D = {};
+  T.forEach(t => D[t.date] = (D[t.date] || 0) + t.amount);
+  const hd = d => dayHd(d, (ty === 'Thu' ? 'thu ' : 'chi ') + num(D[d]));
+  const det = dhead(`<span class="dot lg">${emo(key)}</span>`, esc(nm(key)), (ty === 'Thu' ? 'Khoản thu' : 'Khoản chi') + ' · ' + mlabel(S.m) + (tot ? ' · ' + Math.round(g.v / tot * 100) + '% tổng ' + ty.toLowerCase() : ''),
+    `<div class="dbal"><small>Tổng tháng này</small><b class="sens ${cl}">${vnd(g.v)}</b>${delta(g.v, pv, ty === 'Chi')}</div>`)
+    + sKpis([kpi(ss ? 'Đang lọc' : 'Tổng', vnd(sum), cl, ss ? esc(ss) : mlabel(S.m)), kpi('Số giao dịch', String(T.length), '', 'TB ' + vnd(T.length ? sum / T.length : 0)), kpi('Lớn nhất', vnd(big), '', 'Một giao dịch'), kpi('Tháng trước', vnd(pv), '', mlabel(shift(S.m, -1)))])
+    + (subs.length ? `<div class="card"><div class="ch">Chi tiết trong hạng mục <small>${subs.length} nhóm · bấm để lọc</small></div><div class="dsub">${subs.length > 1 ? donut(subs, g.v, 1, () => '') : ''}<div class="cg"><button class="chip ${ss ? '' : 'on'}" data-pk="ss" data-pv="">Tất cả <b class="sens">${num(g.v)}</b></button>${subs.map(([k, v]) => `<button class="chip ${ss === k ? 'on' : ''}" data-pk="ss" data-pv="${esc(k)}">${esc(k)} <b class="sens ${ss === k ? '' : cl}">${num(v)}</b></button>`).join('')}</div></div></div>` : '')
+    + (key ? `<div class="tb"><span class="mut" style="font-size:13px">${T.length} giao dịch</span><button class="btn" data-vgo="cat" data-pv="${esc(key)}">Xem toàn bộ thời gian</button></div>` : '')
+    + `<div class="card flush">${T.length ? dayList(T, hd) : empty('Không có giao dịch', 'Hạng mục này chưa có giao dịch trong ' + mlabel(S.m).toLowerCase() + '.')}</div>`;
+  return head0 + mdWrap(list, det);
+}
+
+/* ---------- 3) THEO HẠN MỨC CHI ---------- */
+function limStat(L) {
+  const l = chiM(S.m).filter(t => !L.cat || t.cat === L.cat), pd = {}; l.forEach(t => pd[t.date] = (pd[t.date] || 0) + t.amount);
+  const used = l.reduce((s, t) => s + t.amount, 0), dim = daysIn(S.m), cur = isCurM(S.m), dn = cur ? new Date().getDate() : dim,
+    od = Object.entries(pd).filter(([, a]) => a > L.v).map(([d, a]) => [d, a - L.v]);
+  return { ...L, name: L.cat || 'Tổng chi', l, pd, used, dim, cur, dn, avg: used / Math.max(1, dn), od, odx: od.reduce((s, x) => s + x[1], 0), fc: cur ? used / Math.max(1, dn) * dim : used,
+    over: L.per === 'Ngày' ? od.length > 0 : used > L.v };
+}
+function dayBars(pd, lim, dim) {
+  const W = 480, H = 150, T = 12, B = 22, mx = Math.max(lim * 1.15, ...Object.values(pd), 1), bw = W / dim, y = v => T + (1 - v / mx) * (H - T - B);
+  const bd = {}; Object.keys(pd).forEach(x => bd[+x.slice(8)] = pd[x]);
+  let r = ''; for (let d = 1; d <= dim; d++) { const k = bd[d] || 0, yy = y(k); r += `<rect x="${((d - 1) * bw + 1.5).toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(1, bw - 3).toFixed(1)}" height="${Math.max(0, H - B - yy).toFixed(1)}" rx="2" fill="${k > lim ? 'var(--chi)' : 'var(--acc)'}" opacity="${k ? 1 : 0}"/>`; if (d === 1 || (d % 5 === 0 && dim - d >= 3)|| d === dim) r += `<text x="${((d - .5) * bw).toFixed(1)}" y="${H - 6}" font-size="10" text-anchor="middle" fill="var(--mut)">${d}</text>` }
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Chi mỗi ngày so với hạn mức"><line x1="0" x2="${W}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"/>${r}<line x1="0" x2="${W}" y1="${y(lim).toFixed(1)}" y2="${y(lim).toFixed(1)}" stroke="var(--dc)" stroke-width="1.6" stroke-dasharray="5 4"/><text x="${W - 2}" y="${(y(lim) - 4).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--dc)">Hạn mức</text></svg>`;
+}
+function limView() {
+  const head0 = head('Giao dịch', 'Theo hạn mức chi · ' + mlabel(S.m), `<button class="btn p" data-a="lim">Thiết lập hạn mức</button>`) + txSwitch();
+  const LS = S.lim.filter(l => l.v > 0).map(limStat).sort((a, b) => (a.per === b.per ? 0 : a.per === 'Ngày' ? -1 : 1) || (a.cat ? 1 : 0) - (b.cat ? 1 : 0) || a.name.localeCompare(b.name, 'vi'));
+  if (!LS.length) return head0 + noData('Chưa đặt hạn mức', 'Đặt hạn mức theo ngày hoặc theo tháng để xem giao dịch tính vào từng hạn mức.', '<button class="btn p w" data-a="lim">Thiết lập hạn mức</button>');
+  const K = x => x.per + '|' + x.cat, key = keyOr(LS.map(K), S.sl, K(LS.find(x => x.over) || LS[0])), x = LS.find(z => K(z) === key), isD = x.per === 'Ngày';
+  let last = '', list = '';
+  LS.forEach(z => {
+    if (z.per !== last) { last = z.per; list += `<div class="mh">Hạn mức theo ${z.per === 'Ngày' ? 'ngày' : 'tháng'}</div>` }
+    const r = z.per === 'Ngày' ? z.avg / z.v : z.used / z.v, c = z.over ? 'var(--chi)' : r > .8 ? 'var(--dc)' : 'var(--thu)';
+    list += mdi(K(z) === key, 'sl', K(z), `<span class="dot">${z.cat ? emo(z.cat) : '∑'}</span>`, esc(z.name) + ` <em class="pb">${z.per === 'Ngày' ? 'ngày' : 'tháng'}</em>`,
+      z.per === 'Ngày' ? (z.od.length ? `<span class="chi">${z.od.length} ngày vượt</span>` : 'Không ngày nào vượt') : (z.over ? `<span class="chi">vượt ${vnd(z.used - z.v)}</span>` : 'còn ' + vnd(z.v - z.used)),
+      z.per === 'Ngày' ? `${short(z.v)}/ngày` : `${short(z.used)} / ${short(z.v)}`, r, c, false);
+  });
+  /* chi tiết */
+  let T = x.l.slice().sort(byTime), D = {}, cum = {}, ch = '', hd;
+  x.l.forEach(t => D[t.date] = (D[t.date] || 0) + t.amount);
+  if (isD) {
+    if (S.lo) T = T.filter(t => D[t.date] > x.v);
+    hd = d => { const o = D[d] > x.v; return dayHd(d, 'chi ' + num(D[d]) + ' / ' + num(x.v) + (o ? ' · <b class="chi">vượt ' + num(D[d] - x.v) + '</b>' : ''), o ? 'over' : '') };
+    ch = `<div class="card"><div class="ch">Chi mỗi ngày <small><span class="chi">■</span> vượt &nbsp;<span style="color:var(--acc)">■</span> trong hạn mức</small></div>${dayBars(x.pd, x.v, x.dim)}</div>`;
+  } else {
+    let c = 0; Object.keys(D).sort().forEach(d => { c += D[d]; cum[d] = c });
+    hd = d => dayHd(d, 'chi ' + num(D[d]) + ' · lũy kế <b class="' + (cum[d] > x.v ? 'chi' : '') + '">' + num(cum[d]) + '</b>', cum[d] > x.v ? 'over' : '');
+    const cv = []; let cc = 0; for (let d = 1; d <= x.dn; d++) { cc += D[S.m + '-' + String(d).padStart(2, '0')] || 0; cv.push(cc) }
+    ch = `<div class="card"><div class="ch">Chi lũy kế trong tháng <small><span style="color:var(--dc)">■</span> hạn mức &nbsp;<span class="chi">■</span> đã chi</small></div>${lineChart([{ v: Array(x.dim).fill(x.v), c: 'var(--dc)', dash: true }, { v: cv, c: x.over ? 'var(--chi)' : 'var(--acc)', area: true }], x.dim, { zero: true, label: 'Chi lũy kế so với hạn mức tháng' })}</div>`;
+  }
+  const today = x.cur ? (x.pd[todayS()] || 0) : null;
+  const kp = isD
+    ? [kpi('Hạn mức mỗi ngày', vnd(x.v), '', x.cat ? 'Hạng mục ' + esc(x.cat) : 'Tổng chi'), x.cur ? kpi('Chi hôm nay', vnd(today), today > x.v ? 'chi' : '', today > x.v ? 'Đã vượt ' + vnd(today - x.v) : 'Còn ' + vnd(x.v - today)) : kpi('Chi TB mỗi ngày', vnd(x.avg), '', 'Cả tháng'), kpi('Số ngày vượt', x.od.length + ' ngày', x.od.length ? 'chi' : 'thu', 'Trên ' + x.dn + ' ngày'), kpi('Tổng số tiền vượt', vnd(x.odx), x.odx ? 'chi' : '', 'Cộng dồn các ngày')]
+    : [kpi('Hạn mức tháng', vnd(x.v), '', x.cat ? 'Hạng mục ' + esc(x.cat) : 'Tổng chi'), kpi('Đã chi', vnd(x.used), x.over ? 'chi' : '', Math.round(x.used / x.v * 100) + '% hạn mức'), kpi(x.over ? 'Đã vượt' : 'Còn lại', vnd(Math.abs(x.v - x.used)), x.over ? 'chi' : 'thu', x.over ? 'Vượt hạn mức' : 'Trong hạn mức'), x.cur ? kpi('Dự báo cuối tháng', vnd(x.fc), x.fc > x.v ? 'chi' : '', x.fc > x.v ? 'Có thể vượt ' + vnd(x.fc - x.v) : 'Vẫn trong hạn mức') : kpi('TB mỗi ngày', vnd(x.avg), '', 'Cả tháng')];
+  const pct0 = x.v ? x.used / x.v : 0, stat = x.over ? `<span class="pill bad">${isD ? x.od.length + ' ngày vượt' : 'Đã vượt'}</span>` : pct0 > .8 && !isD ? '<span class="pill warn">Sắp chạm hạn mức</span>' : '<span class="pill ok">Trong hạn mức</span>';
+  const det = dhead(`<span class="dot lg">${x.cat ? emo(x.cat) : '∑'}</span>`, esc(x.name), 'Hạn mức theo ' + (isD ? 'ngày' : 'tháng') + ' · ' + mlabel(S.m), `<div class="dbal">${stat}</div>`)
+    + sKpis(kp) + ch
+    + `<div class="tb"><span class="mut" style="font-size:13px">${T.length} giao dịch tính vào hạn mức này</span>${isD ? `<button class="chip ${S.lo ? 'on' : ''}" data-pk="lo" data-pv="1">Chỉ ngày vượt hạn mức</button>` : ''}</div>`
+    + `<div class="card flush">${T.length ? dayList(T, hd) : empty(S.lo ? 'Không có ngày nào vượt' : 'Không có giao dịch', S.lo ? 'Tháng này chưa ngày nào chi quá hạn mức.' : 'Chưa có khoản chi nào tính vào hạn mức này.')}</div>`;
+  return head0 + mdWrap(list, det);
+}
+
+/* ---------- tương tác ---------- */
+function mdFix() {   // đưa mục đang chọn vào giữa dải cuộn
+  const el = $('.mdl .mi.on'), p = el && el.parentElement; if (!p) return;
+  if (p.scrollWidth > p.clientWidth + 2) p.scrollLeft = el.offsetLeft - (p.clientWidth - el.offsetWidth) / 2;
+  else if (p.scrollHeight > p.clientHeight + 2) p.scrollTop = el.offsetTop - (p.clientHeight - el.offsetHeight) / 2;
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('#ov')) return;
+  const g = e.target.closest('[data-vgo]');
+  if (g) {
+    const v = g.dataset.pv;
+    if (g.dataset.vgo === 'acc') Object.assign(S, { xa: v, xc: '', rg: 'a', fo: true, f: 'all', q: '' });
+    else Object.assign(S, { xc: v, xa: '', rg: 'a', fo: true, f: S.ct, q: '' });
+    return go('tx');
+  }
+  const b = e.target.closest('[data-pk]'); if (!b) return;
+  const k = b.dataset.pk, v = b.dataset.pv, sl = $('.mdl'), st = sl ? [sl.scrollLeft, sl.scrollTop] : null;
+  if (k === 'sc') { S.sc = v; S.ss = '' } else if (k === 'ct') { S.ct = v; S.sc = ''; S.ss = '' } else if (k === 'lo') S.lo = !S.lo;
+  else if (k === 'ss') S.ss = S.ss === v ? '' : v; else S[k] = v;
+  render();
+  const n = $('.mdl'); if (n && st) { n.scrollLeft = st[0]; n.scrollTop = st[1] }
+});

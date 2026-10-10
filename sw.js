@@ -1,5 +1,5 @@
 /* Sổ Thu Chi — service worker: chạy offline, hiện thông báo, nhận push */
-const V = 'stc-v2';
+const V = 'stc-v3';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/app.js', 'js/notify.js', 'js/upload.js', 'js/main.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {

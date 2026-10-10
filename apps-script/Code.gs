@@ -1,5 +1,5 @@
 /************************************************************
- * SỔ THU CHI — Code.gs (v6: ảnh có cột riêng, Số dư cuối tính bằng script)
+ * SỔ THU CHI — Code.gs (v7: ảnh có cột riêng, Số dư cuối tính bằng script, loại TK "Giữ Hộ")
  *
  * Hàm chính:
  *   dongBo(ops, rev)  : đồng bộ 2 CHIỀU (web ⇄ Gsheet)
@@ -7,14 +7,14 @@
  *   datTatCa_()       : ghi lại công thức chuẩn TaiKhoan + cột "Số dư cuối" + TongQuan
  *
  * Tab dữ liệu: GiaoDich, TaiKhoan, DanhMuc, HanMuc, DaXoa (+ _CongThuc là tab hệ thống)
- * TongQuan: chỉ bị ghi lại khi bạn bấm menu "Khôi phục công thức ngay".
+ * TongQuan: chỉ bị ghi lại khi bạn bấm menu "Sửa toàn bộ Gsheet".
  ************************************************************/
 
-const VER = 'v6';
+const VER = 'v7';
 const FALLBACK_SHEET_ID = '10yJGQB7IalkqKE8b1nYu2YG78DOURNTtss7sPRbwmKE';
 const TAB = { tx: 'GiaoDich', acc: 'TaiKhoan', cat: 'DanhMuc', lim: 'HanMuc', del: 'DaXoa', fx: '_CongThuc' };
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'];
-const ACC_TYPES = ['Tiền mặt', 'Ngân hàng', 'Thẻ tín dụng', 'Ví điện tử', 'Tiết kiệm'];
+const ACC_TYPES = ['Tiền mặt', 'Ngân hàng', 'Thẻ tín dụng', 'Ví điện tử', 'Tiết kiệm', 'Giữ Hộ'];   // "Giữ Hộ": tiền giữ hộ người khác, web không tính vào báo cáo
 const PERIODS = ['Ngày', 'Tháng'];
 const MAX_ACC = 20, MAX_CAT = 99, MAX_LIM = 200;
 const RED = '#fecaca', YEL = '#fef3c7';   // màu tô ô lỗi / ô cảnh báo
@@ -515,6 +515,29 @@ function ensureSystemTabs(L) {
   if (!opt(TAB.fx)) { const s = ss().insertSheet(TAB.fx); s.appendRow(['sheet', 'mode', 'cột:dòng đầu', 'R1C1']); s.hideSheet(); L.push('• Đã tạo tab ẩn _CongThuc'); }
 }
 
+/* ---- Dấu phân cách công thức: Gsheet đặt vùng Việt Nam dùng ";" thay cho "," → công thức viết bằng "," sẽ báo #ERROR! ---- */
+let _sep = null;
+function sep_() {
+  if (_sep) return _sep;
+  _sep = ',';
+  const c = fxSheet().getRange('H1');
+  try {
+    try { c.setFormula('=IF(1=1,5,6)'); SpreadsheetApp.flush(); } catch (e) {}
+    if (String(c.getValue()) !== '5') {
+      try { c.setFormula('=IF(1=1;5;6)'); SpreadsheetApp.flush(); } catch (e) {}
+      if (String(c.getValue()) === '5') _sep = ';';
+    }
+  } finally { c.clear(); }
+  return _sep;
+}
+function fx_(f) {
+  if (sep_() === ',') return f;
+  let q = false, o = '';
+  for (const ch of String(f)) { if (ch === '"') q = !q; o += (!q && ch === ',') ? ';' : ch; }
+  return o;
+}
+const fxs_ = a => a.map(r => r.map(fx_));
+
 /* ---- Công thức: bản chuẩn lưu ở tab _CongThuc ---- */
 function fxSheet() { return opt(TAB.fx) || (function () { const s = ss().insertSheet(TAB.fx); s.appendRow(['sheet', 'mode', 'cột:dòng đầu', 'R1C1']); s.hideSheet(); return s; })(); }
 function saveFormulas() {
@@ -535,7 +558,7 @@ function saveFormulas() {
       rows.push([z.sheet, ARRAYISH.test(col[first]) ? 'array' : 'fill', (z.from + c) + ':' + (first + 1), col[first]]);
     }
   });
-  if (rows.length) st.getRange(2, 1, rows.length, 4).setValues(rows);
+  if (rows.length) { const rg = st.getRange(2, 1, rows.length, 4); rg.setNumberFormat('@'); rg.setValues(rows); }   // định dạng văn bản: chuỗi bắt đầu bằng "=" không thành công thức sống
   return rows.length;
 }
 function healFormulas() {
@@ -546,12 +569,12 @@ function healFormulas() {
     if (badFx(f1)) return;                                            // bản chuẩn hỏng (=0, #REF!...): bỏ qua
     try {
       const z = ZONES.find(x => x.sheet === sn), s = opt(sn); if (!z || !s) return;
-      if (mode === 'cell') { const r = s.getRange(key); if (r.getFormulaR1C1() !== f1) { r.setFormulaR1C1(f1); fixed++; } return; }
+      if (mode === 'cell') { const r = s.getRange(key); if (r.getFormulaR1C1() !== f1) { r.setFormulaR1C1(fx_(f1)); fixed++; } return; }
       const [c, top] = String(key).split(':').map(Number), lr = s.getLastRow(); if (lr < top) return;
       if (sn === TAB.tx && c === sdcCol_(s)) return;                    // "Số dư cuối" là giá trị do script tính, không khôi phục công thức
       if (mode === 'array') {
         const a = s.getRange(top, c);
-        if (a.getFormulaR1C1() !== f1) { if (lr > top) s.getRange(top + 1, c, lr - top, 1).clearContent(); a.setFormulaR1C1(f1); fixed++; }
+        if (a.getFormulaR1C1() !== f1) { if (lr > top) s.getRange(top + 1, c, lr - top, 1).clearContent(); a.setFormulaR1C1(fx_(f1)); fixed++; }
         else if (String(a.getDisplayValue()).indexOf('#REF') === 0 && lr > top) { s.getRange(top + 1, c, lr - top, 1).clearContent(); fixed++; }
       } else {
         const keys = s.getRange(1, z.key, lr, 1).getValues(), cur = s.getRange(1, c, lr, 1).getFormulasR1C1(), end = Math.min(lr, z.max || lr), runs = [];
@@ -561,7 +584,7 @@ function healFormulas() {
           else if (run) { runs.push(run); run = null; }
         }
         if (run) runs.push(run);
-        runs.forEach(([a, b]) => { s.getRange(a, c, b - a + 1, 1).setFormulaR1C1(f1); fixed += b - a + 1; });
+        runs.forEach(([a, b]) => { s.getRange(a, c, b - a + 1, 1).setFormulaR1C1(fx_(f1)); fixed += b - a + 1; });
       }
     } catch (er) { Logger.log('Công thức ' + sn + ': ' + er); }
   });
@@ -584,14 +607,14 @@ function fxTaiKhoanRow_(r) {
 function datCongThucTaiKhoan_() {
   const a = need(TAB.acc), F = []; let n = 0;
   for (let r = 2; r <= 21; r++) F.push(fxTaiKhoanRow_(r));
-  a.getRange(2, 4, 20, 6).setFormulas(F);
+  a.getRange(2, 4, 20, 6).setFormulas(fxs_(F));
   a.getRange(2, 1, 20, 1).getValues().forEach(v => { if (str(v[0])) n++; });
-  a.getRange(22, 3, 1, 7).setFormulas([['C', 'D', 'E', 'F', 'G', 'H', 'I'].map(c => '=SUM(' + c + '2:' + c + '21)')]);   // hàng 22 = TỔNG
+  a.getRange(22, 3, 1, 7).setFormulas(fxs_([['C', 'D', 'E', 'F', 'G', 'H', 'I'].map(c => '=SUM(' + c + '2:' + c + '21)')]));   // hàng 22 = TỔNG
   const T = t => 'SUMIFS(GiaoDich!$D:$D,GiaoDich!$C:$C,"' + t + '")';                                                  // hàng 24 = đối chiếu (phải = 0)
-  a.getRange(24, 4, 1, 6).setFormulas([[
+  a.getRange(24, 4, 1, 6).setFormulas(fxs_([[
     '=' + T('Thu') + '-D22', '=' + T('Chi') + '-E22', '=' + T('Chuyển khoản') + '-F22',
     '=' + T('Chuyển khoản') + '-G22', '=' + T('Điều chỉnh') + '-H22', '=I22-(C22+D22-E22+F22-G22+H22)'
-  ]]);
+  ]]));
   return n;
 }
 // DanhMuc!D = số tiền tháng đang xem (tháng chọn ở TongQuan!B3:B4) của từng hạng mục con
@@ -599,7 +622,7 @@ function datDanhMuc_() {
   const s = opt(TAB.cat); if (!s) return 0;
   const last = Math.min(101, s.getMaxRows()), F = [];
   for (let r = 2; r <= last; r++) F.push(['=IF(C' + r + '="","",SUMIFS(GiaoDich!$D:$D,GiaoDich!$C:$C,A' + r + ',GiaoDich!$H:$H,C' + r + ',GiaoDich!$B:$B,">="&TongQuan!$B$6,GiaoDich!$B:$B,"<"&TongQuan!$B$7))']);
-  s.getRange(2, 4, last - 1, 1).setFormulas(F);
+  s.getRange(2, 4, last - 1, 1).setFormulas(fxs_(F));
   return last - 1;
 }
 
@@ -672,12 +695,12 @@ function datTongQuan_() {
   const win = (f, t) => B + ',">="&' + f + ',' + B + ',"<"&' + t;
   const sum = (type, f, t) => 'SUMIFS(' + D + ',' + C + ',"' + type + '",' + win(f, t) + ')';
   const W = win('$B$6', '$B$7');
-  s.getRange('B6:B7').setFormulas([['=DATE($B$3,$B$4,1)'], ['=DATE($B$3,$B$4+1,1)']]);
-  s.getRange('E9').setFormula('="THU - CHI THEO THÁNG NĂM "&$B$3');
-  s.getRange('B10:B16').setFormulas([
+  s.getRange('B6:B7').setFormulas(fxs_([['=DATE($B$3,$B$4,1)'], ['=DATE($B$3,$B$4+1,1)']]));
+  s.getRange('E9').setFormula(fx_('="THU - CHI THEO THÁNG NĂM "&$B$3'));
+  s.getRange('B10:B16').setFormulas(fxs_([
     ['=TaiKhoan!$I$22'], ['=' + sum('Thu', '$B$6', '$B$7')], ['=' + sum('Chi', '$B$6', '$B$7')],
     ['=B11-B12'], ['=IF(B11=0,0,B13/B11)'], ['=' + sum('Điều chỉnh', '$B$6', '$B$7')], ['=COUNTIFS(' + W + ')']
-  ]);
+  ]));
   // Cột phụ K:O (dòng 2..60): hạng mục cha trong DanhMuc!E:F, số tiền tháng đang xem, khóa xếp hạng (số tiền + ROW()/1e6 để không trùng)
   const H1 = 2, H2 = 60, help = [];
   for (let r = H1; r <= H2; r++) help.push([
@@ -687,7 +710,7 @@ function datTongQuan_() {
     '=IF(AND(L' + r + '="Chi",M' + r + '>0),M' + r + '+ROW()/1000000,"")',
     '=IF(AND(L' + r + '="Thu",M' + r + '>0),M' + r + '+ROW()/1000000,"")'
   ]);
-  s.getRange(H1, 11, H2 - H1 + 1, 5).setFormulas(help);
+  s.getRange(H1, 11, H2 - H1 + 1, 5).setFormulas(fxs_(help));
   s.getRange('K1').setValue('Cột phụ xếp hạng (ẩn, đừng sửa)');
   s.hideColumns(11, 5);
   const rg = c => '$' + c + '$' + H1 + ':$' + c + '$' + H2;
@@ -701,25 +724,25 @@ function datTongQuan_() {
         '=IF(' + total + '=0,0,B' + r + '/' + total + ')'
       ]);
     }
-    s.getRange(r1, 1, n, 3).setFormulas(rows);
+    s.getRange(r1, 1, n, 3).setFormulas(fxs_(rows));
   };
   block(20, 13, 'Chi', 'N', '$B$12');
-  s.getRange('B33:C34').setFormulas([
+  s.getRange('B33:C34').setFormulas(fxs_([
     ['=B12-SUMIFS(' + D + ',' + C + ',"Chi",' + G + ',"<>",' + W + ')', '=IF($B$12=0,0,B33/$B$12)'],
     ['=B12', '=IF($B$12=0,0,B34/$B$12)']
-  ]);
+  ]));
   block(38, 6, 'Thu', 'O', '$B$11');
-  s.getRange('B44:C45').setFormulas([
+  s.getRange('B44:C45').setFormulas(fxs_([
     ['=B11-SUMIFS(' + D + ',' + C + ',"Thu",' + G + ',"<>",' + W + ')', '=IF($B$11=0,0,B44/$B$11)'],
     ['=B11', '=IF($B$11=0,0,B45/$B$11)']
-  ]);
+  ]));
   const m = [];
   for (let r = 11; r <= 22; r++) {
     const f = 'DATE($B$3,$E' + r + ',1)', t = 'DATE($B$3,$E' + r + '+1,1)';
     m.push(['=' + sum('Thu', f, t), '=' + sum('Chi', f, t), '=F' + r + '-G' + r]);
   }
-  s.getRange(11, 6, 12, 3).setFormulas(m);
-  s.getRange(23, 6, 1, 3).setFormulas([['=SUM(F11:F22)', '=SUM(G11:G22)', '=SUM(H11:H22)']]);
+  s.getRange(11, 6, 12, 3).setFormulas(fxs_(m));
+  s.getRange(23, 6, 1, 3).setFormulas(fxs_([['=SUM(F11:F22)', '=SUM(G11:G22)', '=SUM(H11:H22)']]));
   return 1;
 }
 
@@ -742,7 +765,7 @@ function datTatCa_() {
   SpreadsheetApp.flush();
   const bad = quetLoiCongThuc_();
   return '• Đã ghi lại công thức: TaiKhoan (' + n + ' tài khoản), DanhMuc (cột D), cột "' + SDC_HEAD + '" (cột ' + c + ' của GiaoDich)' + (q ? ', TongQuan' : '') + '\n' +
-    (bad.length ? '• CÒN LỖI: ' + bad.join(' · ') : '• Quét lỗi công thức: sạch');
+    (bad.length ? '• CÒN LỖI: ' + bad.join(' · ') : '• Quét lỗi công thức: sạch') + '\n• Dấu phân cách công thức của Gsheet này: "' + sep_() + '"';
 }
 
 /* ---- Chuẩn hóa dữ liệu GiaoDich (chỉ ghi cột A:D và J, không đụng cột E:I và cột công thức) ---- */
@@ -791,13 +814,10 @@ function installTriggers() {
 /* ======================= MENU ======================= */
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Sổ Thu Chi')
-    .addItem('Khôi phục công thức ngay', 'menuKhoiPhuc')
-    .addItem('Ghi nhớ công thức hiện tại làm chuẩn', 'menuGhiNho')
-    .addItem('Cài đặt tự động', 'menuCaiDat')
-    .addItem('Tạo các tab HanMuc, DaXoa', 'menuTaoTab')
-    .addSeparator()
-    .addItem('Đồng bộ ngay', 'menuDongBo')
     .addItem('Sửa toàn bộ Gsheet (công thức + dữ liệu + ràng buộc)', 'menuSua')
+    .addItem('Đồng bộ ngay', 'menuDongBo')
+    .addSeparator()
+    .addItem('Ghi nhớ công thức hiện tại làm chuẩn', 'menuGhiNho')
     .addToUi();
 }
 const alertBox = (title, text) => SpreadsheetApp.getUi().alert(title, text, SpreadsheetApp.getUi().ButtonSet.OK);
@@ -805,20 +825,11 @@ function withLock(fn) {
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try { return fn(); } finally { CacheService.getScriptCache().remove('rev'); lock.releaseLock(); }
 }
-function menuKhoiPhuc() {
-  const t = withLock(() => {
-    const f = healFormulas();
-    return '• Khôi phục từ bản chuẩn: ' + (f.first ? 'chưa có bản chuẩn, đã tạo mới' : f.fixed + ' ô/dòng') + '\n' + datTatCa_();
-  });
-  alertBox('Khôi phục công thức', t);
-}
 function menuGhiNho() {
   const ui = SpreadsheetApp.getUi();
   if (ui.alert('Ghi nhớ công thức hiện tại làm chuẩn?', 'Từ giờ công thức đang có sẽ là bản chuẩn để tự khôi phục. Chỉ làm khi bạn chắc công thức hiện tại đang ĐÚNG (công thức chứa #REF! sẽ tự bị bỏ qua).', ui.ButtonSet.YES_NO) === ui.Button.YES)
     ui.alert('Đã lưu ' + withLock(saveFormulas) + ' vùng công thức.');
 }
-function menuCaiDat() { withLock(() => { applyValidation(); installTriggers(); }); alertBox('Cài đặt tự động', 'Đã cài ràng buộc nhập liệu, kiểm tra khi sửa tay, và tự sửa mỗi 10 phút.'); }
-function menuTaoTab() { const L = []; withLock(() => ensureSystemTabs(L)); alertBox('Tạo các tab', L.length ? L.join('\n') : 'Các tab HanMuc, DaXoa, _CongThuc đã có đủ.'); }
 function menuDongBo() {
   CacheService.getScriptCache().remove('rev');
   const r = dongBo([], '');
