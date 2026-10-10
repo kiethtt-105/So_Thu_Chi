@@ -248,3 +248,82 @@ html.dark .kpi b.chi{text-shadow:0 0 14px color-mix(in srgb,var(--chi) 40%,trans
 }
 @media print{body:before{display:none!important}*{box-shadow:none!important;text-shadow:none!important}}
 .kpi.h b{color:#fff;font-size:clamp(22px,2.1vw,28px)}
+/* ===== UX polish: collapsible sidebar, motion, micro-interactions ===== */
+*{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+html{scroll-behavior:smooth}
+html.tt *,html.tt *:before,html.tt *:after{transition:background-color .28s,color .28s,border-color .28s,box-shadow .28s,fill .28s,stroke .28s!important}
+
+@keyframes up{from{opacity:0;transform:translateY(12px)}}
+@keyframes grow{from{transform:scaleX(0)}}
+@keyframes pop{from{opacity:0;transform:scale(.88) rotate(-8deg)}}
+@keyframes sheetin{from{opacity:0;transform:translateY(22px) scale(.97)}}
+.pgin :is(.ph,.kpis>.card,.card,.tb,.sum,.warn,.chips,.insight,.dh){animation:up .42s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:var(--d,0ms)}
+.pgin .card .card{animation:none}
+.pgin .bar i s{transform-origin:left center;animation:grow .8s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--d,0ms) + 120ms)}
+.pgin .cd svg{animation:pop .6s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--d,0ms) + 80ms)}
+
+.kpis>.card,.dcard,.card.flush{transition:transform .22s cubic-bezier(.2,.8,.2,1),border-color .2s,box-shadow .25s}
+.kpis>.card:hover,.dcard:hover{transform:translateY(-3px);box-shadow:var(--sh2)}
+button.row{transition:background .15s,transform .15s}
+button.row:hover{transform:translateX(2px)}
+.btn,.pri,.ib,.fab,.chip,#bn button{transition:transform .15s cubic-bezier(.2,.8,.2,1),background .15s,border-color .15s,box-shadow .2s,color .15s}
+.btn:active,.pri:active,.ib:active,.fab:active,.chip:active,#bn button:active{transform:scale(.95)}
+.pri:hover,.fab:hover{box-shadow:0 8px 22px color-mix(in srgb,var(--acc) 38%,transparent);transform:translateY(-1px)}
+.card.flush .row{content-visibility:auto;contain-intrinsic-size:auto 64px}
+@media(min-width:960px){.ov.open .sheet{animation:sheetin .3s cubic-bezier(.2,.9,.3,1.05)}}
+
+/* collapsible sidebar (desktop only) */
+#sbt{display:none}
+@media(min-width:960px){
+ .wrap,#sd{transition:padding-left .28s cubic-bezier(.4,0,.2,1),width .28s cubic-bezier(.4,0,.2,1)}
+ html.sbc{--sw:72px}
+ #sd{overflow-x:hidden}
+ #sbt{display:flex;align-items:center;gap:11px;margin-top:auto;height:38px;padding:0 10px;border-radius:9px;color:var(--mut);font-weight:600;font-size:13.5px;width:100%}
+ #sbt:hover{background:var(--soft);color:var(--ink)}
+ #sbt svg{flex:none;transition:transform .28s}
+ html.sbc #sbt svg{transform:rotate(180deg)}
+ html.sbc #sd{padding-inline:12px}
+ html.sbc #sd .brand{padding-inline:0;justify-content:center}
+ html.sbc #sd .brand>span:last-child,html.sbc #tb button>span,html.sbc #sbt>span,html.sbc #tb .sep:not(:empty){display:none}
+ html.sbc #tb button,html.sbc #sbt{justify-content:center;padding:0}
+ html.sbc #tb .sep:empty{margin:10px 8px}
+ #tb button>span,#sd .brand>span:last-child,#sbt>span{white-space:nowrap}
+}
+
+/* ===== hover effects + ripple + sound toggle ===== */
+@keyframes rp{to{transform:scale(1);opacity:0}}
+.rp{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.22;transform:scale(0);animation:rp .55s ease-out forwards}
+.btn:hover,.chip:hover{transform:translateY(-1px)}
+.btn:active,.pri:active,.ib:active,.fab:active,.chip:active,#bn button:active{transform:scale(.95)}
+#tb button svg,#sbt svg{transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+#tb button:hover svg{transform:translateX(2px) scale(1.12)}
+.row .dot{transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+button.row:hover .dot{transform:scale(1.1) rotate(-5deg)}
+.dcard{position:relative;overflow:hidden}
+.kpis>.card::after,.dcard::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--acc) 17%,transparent),transparent 70%)}
+.kpis>.card:hover::after,.dcard:hover::after{opacity:1}
+.bar i s{transition:filter .2s}.bar:hover i s{filter:brightness(1.18) saturate(1.1)}
+.cal span{transition:transform .15s,box-shadow .15s}.cal span:hover{transform:scale(1.12);position:relative;z-index:1;box-shadow:var(--sh2)}
+.cd li{transition:transform .15s}.cd li:hover{transform:translateX(3px)}
+.ib{position:relative}
+#fxb .sl{display:none}html.fxoff #fxb .sl{display:block}html.fxoff #fxb .w{display:none}
+
+.nbd{margin-left:auto;font-style:normal;font-size:11px;font-weight:700;min-width:20px;padding:1px 6px;border-radius:10px;background:var(--soft);color:var(--mut);text-align:center}
+html.sbc .nbd{display:none}
+
+@keyframes recp{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--chi) 25%,transparent)}}
+#qmic.rec{background:var(--chi);color:#fff;animation:recp 1s infinite}
+
+/* ---- Đếm tiền mặt (màn Cân đối) ---- */
+.rr .cnt{flex:none;width:42px;height:42px}
+.rr .cnt:hover{color:var(--acc);border-color:var(--acc)}
+.cash{display:grid;gap:8px;margin-bottom:12px}
+.cr{display:grid;grid-template-columns:86px 14px 84px 1fr;align-items:center;gap:8px}
+.cr b{font-weight:700;font-variant-numeric:tabular-nums}
+.cr .x{color:var(--mut);text-align:center}
+.cr .cin{width:100%;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.cr .cs{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums;font-size:14px}
+.ctot{display:flex;justify-content:space-between;align-items:baseline;padding:12px 14px;border-radius:12px;background:var(--soft);margin-bottom:2px}
+.ctot span{color:var(--mut);font-weight:600}.ctot small{margin-left:6px;font-weight:500}
+.ctot b{font-size:22px;font-variant-numeric:tabular-nums}
+@media(max-width:480px){.rr .cnt{width:38px;height:38px}.cr{grid-template-columns:76px 12px 74px 1fr;gap:6px}}

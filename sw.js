@@ -1,5 +1,5 @@
-const V = 'stc-v5';
-const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/core.js', 'js/sync.js', 'js/data.js', 'js/screens.js', 'js/events.js', 'js/forms.js', 'js/txform.js', 'js/quick.js', 'js/report.js', 'js/lists.js', 'js/notify.js', 'js/upload.js', 'js/trend.js', 'js/goals.js', 'js/main.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon.png'];
+const V = 'stc-v10';
+const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/core.js', 'js/sync.js', 'js/data.js', 'js/screens.js', 'js/events.js', 'js/forms.js', 'js/txform.js', 'js/quick.js', 'js/report.js', 'js/lists.js', 'js/notify.js', 'js/upload.js', 'js/trend.js', 'js/goals.js', 'js/trash.js', 'js/extras.js', 'js/fx.js', 'js/main.js', 'manifest.webmanifest', 'icons/icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -23,7 +23,7 @@ self.addEventListener('fetch', e => {
   const u = new URL(r.url);
   if (u.origin === location.origin) {
     e.respondWith(
-      fetch(r)
+      Promise.race([fetch(r), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))])
         .then(res => {
           if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put(r, cp)); }
           return res;

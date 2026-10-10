@@ -41,11 +41,35 @@ const nsave = a => { try {
 }
 catch (e) { } };
 const ago = t => { const s = (Date.now() - t) / 1e3; return s < 60 ? 'vừa xong' : s < 3600 ? Math.floor(s / 60) + ' phút trước' : s < 86400 ? Math.floor(s / 3600) + ' giờ trước' : new Date(t).toLocaleDateString('vi-VN'); };
+/* Nhật ký thông báo dùng chung giữa các thiết bị: ngoài nhật ký cục bộ, dựng thêm
+   "Giao dịch đã được tạo" từ chính dữ liệu đồng bộ (mã giao dịch chứa mốc thời gian tạo). */
+const idTs = id => { const m = /^G([0-9a-z]{8})/.exec(String(id || '')); if (!m)
+    return 0; const t = parseInt(m[1], 36); return t > 1.4e12 && t < 4.1e12 ? t : 0; };
+let _fd = null;
+function feedAll() {
+    const raw = (localStorage.nlog || '') + '|' + (localStorage.nclr || '') + '|' + cfg().kinds.sync;
+    if (_fd && _fd.t === S.tx && _fd.n === S.tx.length && _fd.r === raw && Date.now() - _fd.at < 30000)
+        return _fd.l;
+    const L = nlog(), clr = +localStorage.nclr || 0, have = new Set();
+    L.forEach(n => { if (/tạo/.test(n.title || ''))
+        (String(n.body).match(/G[0-9a-z]{8,}/g) || []).forEach(x => have.add(x)); });
+    let D = [];
+    if (S.ready && kindOn('sync')) {
+        const lim = Date.now() - 30 * 864e5;
+        D = S.tx.map(t => [t, idTs(t.id)]).filter(([t, ts]) => ts > lim && ts > clr && !have.has(t.id)).sort((a, b) => b[1] - a[1]).slice(0, 30)
+            .map(([t, ts]) => ({ t: ts, title: 'Giao dịch đã được tạo', body: txMsg(t), ico: '🧾', err: false, tab: 'tx', derived: 1 }));
+    }
+    const l = L.concat(D).sort((a, b) => b.t - a.t).slice(0, 60);
+    _fd = { t: S.tx, n: S.tx.length, r: raw, at: Date.now(), l };
+    return l;
+}
 function nbUpdate() {
     const el = $('#nbn');
     if (!el)
         return;
-    const n = nlog().filter(x => x.t > (+localStorage.nseen || 0)).length;
+    if (!localStorage.nseen)
+        localStorage.nseen = Date.now();
+    const n = feedAll().filter(x => x.t > (+localStorage.nseen || 0)).length;
     el.classList.toggle('hide', !n);
     el.textContent = n > 99 ? '99+' : n;
 }
@@ -121,7 +145,9 @@ function notify(body, o) {
         return;
     }
     const a = nlog();
-    a.unshift({ t: Date.now(), title, body, ico, err: !!o.err, tab: o.tab || '' });
+    if (o.tag === 'sync' && a[0] && a[0].tag === 'sync')
+        a.shift();
+    a.unshift({ t: Date.now(), title, body, ico, err: !!o.err, tab: o.tab || '', tag: o.tag || '' });
     nsave(a);
     nbUpdate();
     toast(body, o.undo, { title, ico, err: o.err, sticky: o.sticky });
@@ -187,10 +213,13 @@ function reportOf(date) {
     lines.push('Tháng này đã chi ' + vnd(mo.chi));
     return lines.join('\n');
 }
+/* Giờ gửi trước 12:00 -> báo cáo hôm qua; từ 12:00 trở đi -> báo cáo hôm nay */
+const rpToday = () => { const m = toMin(cfg().rp.at); return m >= 12 * 60; };
 function dailyReport(preview) {
-    const y = new Date();
-    y.setDate(y.getDate() - 1);
-    notify(reportOf(ymd(y)), { title: 'Báo cáo thu chi hôm qua', ico: '📒', tag: 'daily-report', kind: 'report', bg: !preview, force: true, sticky: true, tab: 'rp' });
+    const y = new Date(), td = rpToday();
+    if (!td)
+        y.setDate(y.getDate() - 1);
+    notify(reportOf(ymd(y)), { title: td ? 'Báo cáo thu chi hôm nay' : 'Báo cáo thu chi hôm qua', ico: '📒', tag: 'daily-report', kind: 'report', bg: !preview, force: true, sticky: true, tab: 'rp' });
 }
 const firedMap = () => { try {
     return JSON.parse(localStorage.nfired || '{}');
@@ -234,9 +263,11 @@ function schedTick() {
         });
     if (c.rp.on && c.kinds.report !== false && S.synced && !$('#app').classList.contains('hide') && alive()) {
         const k = 'rp:' + today;
-        if (cur >= toMin(c.rp.at) && !fired(k)) {
+        const m = toMin(c.rp.at);
+        if (m >= 0 && cur >= m && !fired(k)) {
             markFired(k);
-            dailyReport(false);
+            if (cur - m <= 240)   // mở app quá trễ so với giờ hẹn thì bỏ qua, không báo bù lệch giờ
+                dailyReport(false);
         }
     }
 }
@@ -276,7 +307,7 @@ function openNotif() {
     E = null;
     localStorage.nseen = Date.now();
     nbUpdate();
-    const L = nlog();
+    const L = feedAll();
     $('#sh').innerHTML = `<div class="shh"><h3>Thông báo</h3><button class="chip" data-nt="settings">${ic('set')}Cài đặt</button></div>
 ${L.length ? `<div class="shh sub"><b>Gần đây</b><button class="chip" data-nt="clear">Xóa hết</button></div>` : ''}
 <div class="menu">${L.map(n => `<div class="row"><span class="dot">${esc(n.ico)}</span><span class="m"><b>${esc(n.title)}</b><small style="white-space:pre-line">${esc(n.body)}</small></span><small class="mut">${ago(n.t)}</small></div>`).join('') || empty('Chưa có thông báo', 'Giao dịch, bội chi, nhắc nhở và báo cáo sẽ xuất hiện ở đây.')}</div>`;
@@ -304,9 +335,9 @@ ${hint ? `<p class="hint">${hint}</p>` : ''}
 <div class="sec">Thông báo về</div>
 <div class="menu">${Object.entries(CFG_KINDS).map(([k, [i, t, s]]) => sw('k:' + k, i, t, s, c.kinds[k] !== false)).join('')}</div>
 
-<div class="sec">Báo cáo thu chi hôm qua</div>
-<div class="menu">${sw('k:report', '📒', 'Gửi báo cáo mỗi ngày', 'Tổng thu, chi và hạng mục chi nhiều nhất của hôm qua', c.kinds.report !== false && c.rp.on)}
-<div class="row"><span class="m"><b>Giờ gửi</b><small>Mặc định 06:00 sáng</small></span><input type="time" class="tm" data-cfg="rp.at" value="${esc(c.rp.at)}"><button class="chip" data-nt="report">Xem thử</button></div></div>
+<div class="sec">Báo cáo thu chi hằng ngày</div>
+<div class="menu">${sw('k:report', '📒', 'Gửi báo cáo mỗi ngày', 'Tổng thu, chi và hạng mục chi nhiều nhất của ' + (rpToday() ? 'hôm nay' : 'hôm qua'), c.kinds.report !== false && c.rp.on)}
+<div class="row"><span class="m"><b>Giờ gửi</b><small>Trước 12:00 báo cáo hôm qua, từ 12:00 báo cáo hôm nay</small></span><input type="time" class="tm" data-cfg="rp.at" value="${esc(c.rp.at)}"><button class="chip" data-nt="report">Xem thử</button></div></div>
 
 <div class="sec">Nhắc nhở ghi chép thu chi</div>
 ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="tm" data-rm="at:${r.id}" value="${esc(r.at)}"><input class="tx" data-rm="text:${r.id}" value="${esc(r.text)}" placeholder="Nội dung nhắc" aria-label="Nội dung nhắc"><label class="sw"><input type="checkbox" role="switch" data-rm="on:${r.id}" ${r.on ? 'checked' : ''} aria-label="Bật nhắc nhở"></label><button class="x" data-nt="rm-del:${r.id}" aria-label="Xóa nhắc nhở">×</button></div>
@@ -348,6 +379,8 @@ document.addEventListener('click', async (e) => {
     }
     if (k === 'clear') {
         nsave([]);
+        localStorage.nclr = Date.now();
+        _fd = null;
         nbUpdate();
         return openNotif();
     }

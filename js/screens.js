@@ -49,11 +49,13 @@ function txs() {
         dt[t.date] = (dt[t.date] || 0) + t.amount; });
     const ld = limOf('Ngày', '');
     let h = '', last = '';
-    l.forEach(t => { if (ds && t.date !== last) {
+    l.slice(0, S.pg).forEach(t => { if (ds && t.date !== last) {
         last = t.date;
         const dd = new Date(t.date + 'T00:00'), ov = ld && dt[t.date] > ld;
         h += `<div class="dh ${ov ? 'over' : ''}"><span>${dd.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}</span><span class="sens">${S.f === 'Thu' ? (dsum[t.date] ? 'thu ' + num(dsum[t.date]) : '') : S.f === 'Chi' || S.f === 'all' ? (dt[t.date] ? 'chi ' + num(dt[t.date]) + (ov ? ' ⚠️ vượt hạn mức ngày' : '') : '') : ''}</span></div>`;
     } h += txRow(t); });
+    if (l.length > S.pg)
+        h += `<button class="btn w" data-a="moretx" style="margin:10px 0">Xem thêm (còn ${l.length - S.pg} giao dịch)</button>`;
     const op = (a, v, ph) => `<option value="">${ph}</option>` + a.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join(''), pars = [...new Set(S.cat.map(c => c.p))], n = [S.xa, S.xc, S.mn, S.mx, S.d1, S.d2].filter(x => x !== '').length + (S.rg !== 'm' ? 1 : 0);
     return head('Giao dịch', S.rg === 'm' ? mlabel(S.m) : S.rg === 'a' ? 'Toàn bộ thời gian' : 'Khoảng ngày tùy chọn', `<button class="btn" data-a="csv">${ic('dl')}CSV</button>`) + txSwitch() +
         `<div class="tb"><input class="search" id="q" placeholder="Tìm theo ghi chú, hạng mục, số tiền" value="${esc(S.q)}" aria-label="Tìm giao dịch"><div class="chips">${['all', ...TYPES].map(t => `<button class="chip ${S.f === t ? 'on' : ''}" data-f="${t}">${t === 'all' ? 'Tất cả' : t}</button>`).join('')}<button class="chip ${n ? 'on' : ''}" data-a="fo">${ic('fl').replace('class="i"', 'class="i" style="width:14px;height:14px;vertical-align:-2px"')} Bộ lọc${n ? ' (' + n + ')' : ''}</button></div></div>
@@ -88,7 +90,7 @@ function recon() {
     const D = diffs();
     return head('Cân đối', 'So số dư thực tế với hệ thống; lệch thì chuyển tiền qua lại giữa các tài khoản, phần còn lại ghi điều chỉnh') +
         `<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="card kpi h kfull"><small>Tổng chênh lệch</small><b class="sens" id="r_t">–</b><em id="r_n"></em></div><div class="card kpi"><small>Hệ thống</small><b class="sens" id="r_s">–</b></div><div class="card kpi"><small>Thực tế</small><b class="sens" id="r_a">–</b></div></div>
-<div class="grid c"><div class="card"><div class="ch">Nhập số dư thực tế</div>${D.map((x, i) => `<div class="rr"><span style="display:flex;align-items:center;gap:10px">${aIco(x.a)}<span style="min-width:0"><b style="font-weight:500">${esc(x.a.name)}</b><small class="sens">Hệ thống: ${vnd(x.sys)}</small></span></span><input class="ba money" data-neg="1" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has ? num(x.act) : ''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('') || empty('Chưa có tài khoản')}</div>
+<div class="grid c"><div class="card"><div class="ch">Nhập số dư thực tế</div>${D.map((x, i) => `<div class="rr"><span style="display:flex;align-items:center;gap:10px">${aIco(x.a)}<span style="min-width:0"><b style="font-weight:500">${esc(x.a.name)}</b><small class="sens">Hệ thống: ${vnd(x.sys)}</small></span></span>${x.a.type === 'Tiền mặt' ? `<button type="button" class="ib cnt" data-cash="${i}" aria-label="Đếm tiền mặt" title="Đếm số tờ">${ic('cnt')}</button>` : ''}<input class="ba money" data-neg="1" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has ? num(x.act) : ''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('') || empty('Chưa có tài khoản')}</div>
 <div class="card"><div class="ch">Xử lý</div><div id="rbtn"></div></div></div>`;
 }
 function reconUpdate() {
@@ -169,7 +171,7 @@ function trashPage() { return head('Thùng rác', 'Các mục đã xóa có th�
 const errCard = () => `<div class="card"><h3>Chưa tải được dữ liệu</h3><p class="chi" style="margin-bottom:10px">${esc(S.err === 'Failed to fetch' || S.err === 'Không có kết nối mạng' ? 'Không kết nối được tới máy chủ' : S.err)}</p><p class="mut" style="font-size:13px">Vui lòng kiểm tra kết nối mạng rồi thử lại. Nếu vẫn không được, hãy liên hệ người quản trị để kiểm tra lại cấu hình.</p><button class="btn p w" data-a="retry">Thử lại</button></div>`;
 function nav() {
     const tb = $('#tb');
-    tb.innerHTML = TABS.map(([k, l, gr]) => (gr ? '<i class="sep">' + gr + '</i>' : '') + `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}">${ic(k)}<span>${l}</span></button>`).join('') + `<i class="sep"></i><button data-nt="settings">${ic('set')}<span>Cài đặt</span></button>`;
+    tb.innerHTML = TABS.map(([k, l, gr]) => (gr ? '<i class="sep">' + gr + '</i>' : '') + `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" title="${l}">${ic(k)}<span>${l}</span>${k === 'tr' && S.trash.length ? '<em class="nbd">' + S.trash.length + '</em>' : ''}</button>`).join('') + `<i class="sep"></i><button data-nt="settings" title="Cài đặt">${ic('set')}<span>Cài đặt</span></button>`;
     const mt = GRP_TX.includes(S.tab) ? 'tx' : S.tab;
     $('#bn').innerHTML = MOB.map(k => { const t = TABS.find(x => x[0] === k); return `<button class="${mt === k ? 'on' : ''}" data-tab="${k}">${ic(k)}${SHORT[k] || t[1]}</button>`; }).join('') + `<button class="${MOB.includes(mt) ? '' : 'on'}" data-a="more">${ic('more')}${MOB.includes(mt) ? 'Thêm' : TABS.find(x => x[0] === S.tab)[1]}</button>`;
     const n = S.issues.length;
@@ -194,4 +196,5 @@ function drawView() {
     }
 }
 function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '<div class="sk"></div><div class="sk"></div><div class="sk"></div>') : drawView(); if (S.ready && S.tab === 'rec')
-    reconUpdate(); mdFix(); }
+    reconUpdate(); mdFix(); if (typeof fxEnter === 'function')
+    fxEnter(); }

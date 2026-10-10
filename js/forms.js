@@ -1,12 +1,49 @@
 function csv() {
     const r = [['ID', 'Ngày', 'Loại', 'Số tiền', 'Tài khoản', 'Tài khoản đến', 'Hạng mục cha', 'Hạng mục con', 'Ghi chú'], ...S.tx.map(t => [t.id, t.date, t.type, t.amount, t.acc, t.accTo, t.cat, t.sub, t.note])];
-    const b = new Blob(['\ufeff' + r.map(x => x.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n')], { type: 'text/csv' }), a = document.createElement('a');
+    const b = new Blob(['\ufeff' + r.map(x => x.map(v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s) && !(typeof v === 'number'))
+        s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }).join(',')).join('\n')], { type: 'text/csv' }), a = document.createElement('a');
     a.href = URL.createObjectURL(b);
     a.download = 'so-thu-chi.csv';
     a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
-const openSheet = () => $('#ov').classList.add('open'), closeSheet = () => $('#ov').classList.remove('open');
-function openMore() { $('#sh').innerHTML = `<h3>Thêm</h3><div class="menu">${['ba', 'bc', 'bl', 'rec', 'goal', 'acc', 'cat', 'tr'].map(k => `<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x => x[0] === k)[1]}</b></span>${k === 'tr' && S.trash.length ? `<small class="mut">${S.trash.length}</small>` : ''}</button>`).join('')}<button class="row" data-nt="settings">${ic('set')}<span class="m"><b>Cài đặt</b><small>Giao diện, thông báo, nhắc nhở, báo cáo mỗi sáng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button></div>`; ED = null; E = null; openSheet(); }
+let _opener = null;
+function openSheet() {
+    const ov = $('#ov');
+    if (!ov.classList.contains('open'))
+        _opener = document.activeElement;
+    ov.classList.add('open');
+    setTimeout(() => { const a = $('#ov.open #fa'); if (a && !ov.contains(document.activeElement))
+        a.focus(); }, 60);
+}
+function closeSheet() {
+    const ov = $('#ov'), was = ov.classList.contains('open');
+    ov.classList.remove('open');
+    if (was && _opener && _opener.isConnected && typeof _opener.focus === 'function') {
+        try { _opener.focus({ preventScroll: true }); } catch (e) { }
+    }
+    _opener = null;
+}
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Tab')
+        return;
+    const ov = $('#ov');
+    if (!ov.classList.contains('open') || $('#cf').classList.contains('open'))
+        return;
+    const f = [...ov.querySelectorAll('button,input,select,textarea,a[href],[tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent !== null);
+    if (!f.length)
+        return;
+    const a = document.activeElement, i = f.indexOf(a);
+    if (e.shiftKey && (i <= 0)) {
+        e.preventDefault();
+        f[f.length - 1].focus();
+    }
+    else if (!e.shiftKey && (i === f.length - 1 || i < 0)) {
+        e.preventDefault();
+        f[0].focus();
+    }
+});
+function openMore() { $('#sh').innerHTML = `<h3>Thêm</h3><div class="menu">${['ba', 'bc', 'bl', 'rec', 'goal', 'rc', 'debt', 'card', 'acc', 'cat', 'tr'].map(k => `<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x => x[0] === k)[1]}</b></span>${k === 'tr' && S.trash.length ? `<small class="mut">${S.trash.length}</small>` : ''}</button>`).join('')}<button class="row" data-nt="settings">${ic('set')}<span class="m"><b>Cài đặt</b><small>Giao diện, thông báo, nhắc nhở, báo cáo mỗi sáng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button>${typeof extraMenu === 'function' ? extraMenu() : ''}</div>`; ED = null; E = null; openSheet(); }
 function openIssues() { const L = S.issues; ED = null; E = null; $('#sh').innerHTML = `<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0, 80).map(i => `<div class="iss ${i.lv}"><b>${esc(SN[i.sheet] || i.sheet)} · dòng ${i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length > 80 ? `<p class="mut" style="margin-top:8px">… và ${L.length - 80} mục nữa</p>` : ''}`; openSheet(); }
 function catFields(ty, cat, sub, ip, is) {
     const L = S.cat.map((c, i) => ({ ...c, i })).filter(c => c.t === ty), pars = [...new Set(L.map(c => c.p))], o = c => `<option value="${c.i}" ${c.p === cat && c.c === sub ? 'selected' : ''}>${esc(c.c)}</option>`;
@@ -139,7 +176,7 @@ $('#ov').addEventListener('click', async (e) => {
             }
         }
         if (q('[data-edel]')) {
-            if (!await ask('Chuyển vào Thùng rác?', 'Bạn có thể khôi phục lại trong Thùng rác.', { danger: 1, ok: 'Xóa' }))
+            if (!await ask('Chuyển vào Thùng rác?', edelMsg(kind, o), { danger: 1, ok: 'Xóa' }))
                 return;
             if (kind === 'tk')
                 return act([{ op: 'acc.del', name: o.name }], 'Đã chuyển vào Thùng rác');

@@ -8,10 +8,12 @@ document.addEventListener('click', e => {
         return go(d.tab);
     if (d.m) {
         S.m = shift(S.m, +d.m);
+        S.pg = 100;
         return render();
     }
     if (d.f) {
         S.f = d.f;
+        S.pg = 100;
         return render();
     }
     if (d.edit) {
@@ -40,7 +42,12 @@ document.addEventListener('click', e => {
             S.fo = !S.fo;
             return render();
         case 'rs':
-            Object.assign(S, { xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', so: 'dn', rg: 'm', f: 'all', q: '' });
+            Object.assign(S, { xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', so: 'dn', rg: 'm', f: 'all', q: '', pg: 100 });
+            return render();
+        case 'sb': return sbToggle();
+        case 'fx': return fxToggle();
+        case 'moretx':
+            S.pg += 100;
             return render();
         case 'csv': return csv();
         case 'lim': return openLim();
@@ -48,15 +55,36 @@ document.addEventListener('click', e => {
         case 'issues': return openIssues();
     }
 });
+let qT = 0, qComp = false;
+function qApply() {
+    const t = $('#q');
+    if (!t)
+        return;
+    S.q = t.value;
+    S.pg = 100;
+    const p = t.selectionStart;
+    render();
+    const q = $('#q');
+    if (q) {
+        q.focus();
+        q.setSelectionRange(p, p);
+    }
+}
+document.addEventListener('compositionstart', e => { if (e.target.id === 'q')
+    qComp = true; });
+document.addEventListener('compositionend', e => { if (e.target.id === 'q') {
+    qComp = false;
+    clearTimeout(qT);
+    qApply();
+} });
 document.addEventListener('input', e => {
     const t = e.target;
     if (t.id === 'q') {
         S.q = t.value;
-        const p = t.selectionStart;
-        render();
-        const q = $('#q');
-        q.focus();
-        q.setSelectionRange(p, p);
+        if (qComp || e.isComposing)
+            return;
+        clearTimeout(qT);
+        qT = setTimeout(qApply, 180);
         return;
     }
     if (t.classList && t.classList.contains('money'))
@@ -74,6 +102,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => { const k = { x_rg: 'rg', x_acc: 'xa', x_cat: 'xc', x_mn: 'mn', x_mx: 'mx', x_so: 'so', x_d1: 'd1', x_d2: 'd2' }[e.target.id]; if (k) {
     S[k] = e.target.value;
+    S.pg = 100;
     render();
 } });
 document.addEventListener('keydown', e => {
@@ -81,6 +110,10 @@ document.addEventListener('keydown', e => {
         return closeSheet();
     if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || '') || !$('#login').classList.contains('hide'))
         return;
+    if (e.key === '[') {
+        e.preventDefault();
+        return sbToggle();
+    }
     if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         openForm();

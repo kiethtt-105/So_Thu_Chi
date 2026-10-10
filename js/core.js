@@ -1,12 +1,18 @@
-const { PASS, API } = window.CONFIG || {}, WANT = 'v5', POLL_MS = 2000, TTL = 24 * 3600e3;
-const alive = () => { const t = +localStorage.sess || 0; return t && Date.now() - t < TTL; }, touch = () => { localStorage.sess = Date.now(); };
+const { PASS, API } = window.CONFIG || {}, POLL_MS = 10000, TTL = 24 * 3600e3;
+const alive = () => { const t = +localStorage.sess || 0; return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { localStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-const num = n => new Intl.NumberFormat('vi-VN').format(n), vnd = n => num(Math.round(n)) + ' ₫';
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
 const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const newId = i => 'G' + Date.now().toString(36) + (i || 0) + Math.floor(Math.random() * 1296).toString(36);
 const pm = v => { const s = String(v || '').trim(), n = Number(s.replace(/[^\d]/g, '')); return n ? (s.startsWith('-') ? -n : n) : 0; };
-const fm = el => { const s = el.value.trim(), ng = el.dataset.neg && s.startsWith('-'), d = s.replace(/[^\d]/g, ''); el.value = (ng ? '-' : '') + (d ? num(+d) : ''); };
+const fm = el => {
+    const s = el.value.trim(), ng = el.dataset.neg && s.startsWith('-'), d = s.replace(/[^\d]/g, '');
+    const cur = document.activeElement === el, left = cur ? el.value.slice(0, el.selectionStart).replace(/\D/g, '').length : 0;
+    el.value = (ng ? '-' : '') + (d ? num(+d) : '');
+    if (cur) { let p = 0, c = 0; while (p < el.value.length && c < left) { if (/\d/.test(el.value[p])) c++; p++; } try { el.setSelectionRange(p, p); } catch (e) { } }
+};
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'], CLS = { Thu: 'thu', Chi: 'chi', 'Chuyển khoản': 'chuyen', 'Điều chỉnh': 'dc' };
 const HELD = 'Giữ Hộ';
 const ACC_TYPES = ['Tiền mặt', 'Ngân hàng', 'Thẻ tín dụng', 'Ví điện tử', 'Tiết kiệm', HELD];
@@ -19,7 +25,8 @@ const TABS = [['home', 'Tổng quan', 'Sổ sách'], ['rp', 'Báo cáo'], ['tx',
 const SN = { GiaoDich: 'Giao dịch', TaiKhoan: 'Tài khoản', DanhMuc: 'Hạng mục', HanMuc: 'Hạn mức', DaXoa: 'Thùng rác' };
 const PAL = [1, 2, 3, 4, 5, 6, 7, 8].map(i => 'var(--c' + i + ')'), col = i => PAL[i % PAL.length];
 const EMO = [[/đầu tư|lãi|lời|cổ phiếu|chứng khoán/i, '📈'], [/làm thêm|freelance|việc phụ/i, '💼'], [/cân đối|điều chỉnh/i, '⚖️'], [/^\s*khác\s*$/i, '📦'], [/ăn|uống|cơm|cafe|cà phê|nhà hàng/i, '🍜'], [/xe|xăng|đi lại|grab|taxi/i, '🛵'], [/nhà|thuê|điện|nước|internet/i, '🏠'], [/mua|sắm|quần|áo/i, '🛍️'], [/y tế|thuốc|khám|sức khỏe/i, '💊'], [/học|sách|giáo dục/i, '📚'], [/giải trí|phim|game|du lịch/i, '🎮'], [/lương|thưởng|thu/i, '💰'], [/quà|từ thiện|cho/i, '🎁'], [/tiết kiệm/i, '🐷']];
-const emo = k => (EMO.find(e => e[0].test(k || '')) || [0, '🧾'])[1];
+const _emo = new Map();
+const emo = k => { k = k || ''; let v = _emo.get(k); if (v === undefined) { v = (EMO.find(e => e[0].test(k)) || [0, '🧾'])[1]; _emo.set(k, v); } return v; };
 const ATYPE = { 'Tiền mặt': ['💵', '#15803D'], 'Ngân hàng': ['🏦', '#2563EB'], 'Thẻ tín dụng': ['💳', '#7C3AED'], 'Ví điện tử': ['👛', '#DB2777'], 'Tiết kiệm': ['🐷', '#D97706'], [HELD]: ['🤝', '#667085'] }, ATORD = ['Tiền mặt', 'Ngân hàng', 'Ví điện tử', 'Thẻ tín dụng', 'Tiết kiệm', HELD], EM = ['💵', '🏦', '💳', '👛', '🐷', '📱', '💰', '🪙', '🏧', '🛒', '📈', '🎯'];
 const BR = [[/grab/i, 'G', '#00B14F'], [/momo/i, 'M', '#A50064'], [/zalo/i, 'Z', '#0068FF'], [/shopee/i, 'S', '#EE4D2D'], [/vcb|vietcombank/i, 'VCB', '#007A3D'], [/tcb|techcom/i, 'TCB', '#E3000F'], [/\bmb\b|mbbank/i, 'MB', '#1C3FAA'], [/bidv/i, 'BIDV', '#1D6E8C'], [/acb/i, 'ACB', '#0057A8'], [/vpbank/i, 'VP', '#00A651'], [/tpbank/i, 'TP', '#6A1B9A'], [/agribank/i, 'AGR', '#AE1C3F'], [/sacombank/i, 'STB', '#0A5EAB'], [/vietinbank|ctg/i, 'CTG', '#0B4DA2'], [/vnpay/i, 'VN', '#0F4C99'], [/viettel/i, 'VT', '#EE0033']];
 let AI = {};
@@ -38,7 +45,7 @@ function aIco(a) {
 }
 if (!window.CONFIG)
     $('#lerr').textContent = 'Thiếu file config.js';
-const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: location.hash.slice(1) || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: {}, ready: false, busy: 0, err: '' };
+const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: location.hash.slice(1) || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: {}, ready: false, busy: 0, err: '', pg: 100 };
 let E = null, ED = null;
 if (!TABS.some(t => t[0] === S.tab))
     S.tab = 'home';
@@ -54,7 +61,7 @@ const themeMode = () => localStorage.theme || (localStorage.dark === '1' ? 'dark
 const isDark = () => { const m = themeMode(); return m === 'dark' || (m === 'auto' && matchMedia('(prefers-color-scheme:dark)').matches); };
 function applyTheme() { const d = isDark(); [document.documentElement, document.body].forEach(e => e.classList.toggle('dark', d)); const m = document.querySelector('meta[name=theme-color]'); if (m)
     m.content = d ? '#080C16' : '#F1F3F8'; }
-function setTheme(v) { try {
+function setTheme(v) { const h = document.documentElement; h.classList.add('tt'); clearTimeout(setTheme._t); setTheme._t = setTimeout(() => h.classList.remove('tt'), 380); try {
     localStorage.theme = v;
 }
 catch (e) { } applyTheme(); }

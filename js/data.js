@@ -4,17 +4,20 @@ const heldSet = () => new Set(S.acc.filter(a => a.type === HELD).map(a => a.name
 const stx = () => { if (_own && _own.t === S.tx && _own.a === S.acc && _own.n === S.tx.length)
     return _own.l; const h = heldSet(), l = h.size ? S.tx.filter(t => !h.has(t.acc) && !(t.accTo && h.has(t.accTo))) : S.tx; _own = { t: S.tx, a: S.acc, n: S.tx.length, l }; return l; };
 const ownAcc = () => S.acc.filter(a => a.type !== HELD);
-const sums = m => { let thu = 0, chi = 0; stx().forEach(t => { if (!inM(t, m))
-    return; if (t.type === 'Thu')
-    thu += t.amount; if (t.type === 'Chi')
-    chi += t.amount; }); return { thu, chi }; };
-const bal = a => { let b = a.open; S.tx.forEach(t => { const x = t.amount; if (t.acc === a.name) {
-    if (t.type === 'Thu' || t.type === 'Điều chỉnh')
-        b += x;
-    else
-        b -= x;
-} if (t.type === 'Chuyển khoản' && t.accTo === a.name)
-    b += x; }); return b; };
+let _ag = null;
+function monthAgg() {
+    const tx = stx();
+    if (_ag && _ag.k === tx && _ag.n === tx.length)
+        return _ag.m;
+    const m = {};
+    tx.forEach(t => { const o = m[mOf(t)] || (m[mOf(t)] = { thu: 0, chi: 0 }); if (t.type === 'Thu')
+        o.thu += t.amount; else if (t.type === 'Chi')
+        o.chi += t.amount; });
+    _ag = { k: tx, n: tx.length, m };
+    return m;
+}
+const sums = m => { const o = monthAgg()[m]; return o ? { thu: o.thu, chi: o.chi } : { thu: 0, chi: 0 }; };
+const bal = a => { balMap(); const v = _bk.B[a.name]; return v === undefined ? (+a.open || 0) : v; };
 const mlabel = m => 'Tháng ' + m.slice(5) + '/' + m.slice(0, 4), shift = (m, d) => ymd(new Date(+m.slice(0, 4), +m.slice(5) - 1 + d, 1)).slice(0, 7);
 const group = (l, f) => { const o = {}; l.forEach(t => { const k = f(t); o[k] = (o[k] || 0) + t.amount; }); return Object.entries(o).sort((a, b) => b[1] - a[1]); };
 const chiM = m => stx().filter(t => t.type === 'Chi' && inM(t, m));
@@ -55,13 +58,13 @@ function balMap() {
             B[t.accTo] = (B[t.accTo] || 0) + x;
         m[t.id] = B[t.acc];
     });
-    _bk = { t: S.tx, a: S.acc, n: S.tx.length, m };
+    _bk = { t: S.tx, a: S.acc, n: S.tx.length, m, B };
     return m;
 }
 function txRow(t, v) {
-    const xs = typeof v === 'string' && t.type === 'Chuyển khoản', sg = xs ? (t.acc === v ? '−' : '+') : (t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : ''), hb = xs && t.acc !== v;
+    const bm = balMap(), xs = typeof v === 'string' && t.type === 'Chuyển khoản', sg = xs ? (t.acc === v ? '−' : '+') : (t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : ''), hb = xs && t.acc !== v;
     const c = CLS[t.type], ttl = t.type === 'Chuyển khoản' ? `${esc(t.acc)} → ${esc(t.accTo)}` : esc(t.sub || t.cat || (t.type === 'Chi' || t.type === 'Thu' ? 'Chưa phân loại' : t.type)), ico = t.type === 'Chuyển khoản' ? '⇄' : t.type === 'Điều chỉnh' ? '±' : emo(t.sub || t.cat);
-    return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(noteTxt(t.note) || t.cat || '') + (hasImg(t.note) ? ' 📎' : '')}${t.type === 'Chuyển khoản' ? '' : (noteTxt(t.note) || t.cat || hasImg(t.note) ? ' · ' : '') + esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${sg}${num(t.amount)}</b>${balMap()[t.id] !== undefined && !hb ? `<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(balMap()[t.id])}</small>` : ''}</span></button>`;
+    return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(noteTxt(t.note) || t.cat || '') + (hasImg(t.note) ? ' 📎' : '')}${t.type === 'Chuyển khoản' ? '' : (noteTxt(t.note) || t.cat || hasImg(t.note) ? ' · ' : '') + esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${sg}${num(t.amount)}</b>${bm[t.id] !== undefined && !hb ? `<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(bm[t.id])}</small>` : ''}</span></button>`;
 }
 function donut(rows, tot, off = 0, fi = emo) {
     if (!rows.length || !tot)

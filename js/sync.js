@@ -86,6 +86,12 @@ async function sync(manual) {
         spin(1);
     try {
         const first = !S.synced, j = await call([], manual ? '' : S.rev);
+        if (S.busy) {
+            inflight = false;
+            if (manual)
+                spin(0);
+            return;
+        }
         S.synced = true;
         fails = 0;
         setLive('ok');
