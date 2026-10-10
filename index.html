@@ -11,7 +11,7 @@ body{font:400 15px/1.45 'Be Vietnam Pro',system-ui,sans-serif;background:var(--b
 button,input,select{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none}
 :focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
 .hide{display:none!important}
-#login{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--acc);color:#fff}
+#login{position:fixed;inset:0;z-index:50;overflow:auto;display:grid;place-items:center;padding:24px;background:var(--acc);color:#fff}
 #login form{width:min(340px,100%);text-align:center}
 #login h1{font-size:30px;font-weight:700;margin:14px 0 6px}#login p{opacity:.75;margin-bottom:26px}
 #login input{width:100%;text-align:center;font-size:28px;letter-spacing:.5em;padding:14px;border-radius:14px;border:2px solid #ffffff44;background:#ffffff14;color:#fff}
@@ -65,6 +65,7 @@ nav button{flex:1;padding:6px;font-size:12px;color:var(--mut);display:grid;justi
 </div>
 <div class="ov" id="ov"><div class="sheet" id="sh" role="dialog" aria-modal="true"></div></div><div id="toast" role="status"></div>
 <script>
+const PASS='0000'; // mật khẩu đăng nhập (đổi tại đây)
 const API='https://script.google.com/macros/s/AKfycbxYb3wpByClOV4omgi7xDjtix9pL_l6OOYit139McWLPkFOR8c9kDjJufRTFi2BAB1Q/exec';
 const $=s=>document.querySelector(s),vnd=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n))+' ₫',num=n=>new Intl.NumberFormat('vi-VN').format(n);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -73,16 +74,15 @@ const TYPES=['Chi','Thu','Chuyển khoản','Điều chỉnh'],CLS={Thu:'thu',Ch
 const NAV=[['home','Tổng quan','◧'],['tx','Giao dịch','☰'],['acc','Tài khoản','▣'],['cat','Hạng mục','◈']];
 let S={tx:[],acc:[],cat:[],m:ymd(new Date()).slice(0,7),tab:'home',f:'all',q:'',ready:false,busy:0},E=null;
 try{const c=JSON.parse(sessionStorage.cache||'null');if(c){Object.assign(S,c);S.ready=true}}catch(e){}
-async function api(a,d={}){let r;try{r=await fetch(API,{method:'POST',body:JSON.stringify({a,t:sessionStorage.tk,...d})})}catch(e){throw Error('Không có kết nối mạng')}
-const j=await r.json();if(j.err==='auth'){lock();throw Error('Phiên đã hết hạn')}if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
+async function api(a,d={}){let r;try{r=await fetch(API,{method:'POST',body:JSON.stringify({a,...d})})}catch(e){throw Error('Không có kết nối mạng')}
+const j=await r.json();if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.i);toast.i=setTimeout(()=>e.classList.remove('on'),2600)}
 function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.ready=true;sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat});$('#st').textContent='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}
 async function sync(quiet){$('#rf').classList.add('spin');try{apply(await api('all'));render()}catch(e){if(!quiet)toast(e.message);$('#st').textContent='Chưa đồng bộ được'}$('#rf').classList.remove('spin')}
 async function push(a,d,undo){S.busy++;$('#rf').classList.add('spin');try{apply(await api(a,d));toast('Đã lưu')}catch(e){undo();toast('Chưa lưu được: '+e.message)}S.busy--;if(!S.busy)$('#rf').classList.remove('spin');render()}
 function lock(){sessionStorage.clear();$('#app').classList.add('hide');$('#login').classList.remove('hide');$('#pw').value='';$('#ov').classList.remove('open')}
-$('#lf').onsubmit=async ev=>{ev.preventDefault();const b=$('#lb');b.disabled=true;b.textContent='Đang kiểm tra…';$('#lerr').textContent='';
-try{const r=await fetch(API,{method:'POST',body:JSON.stringify({a:'login',pass:$('#pw').value})}),j=await r.json();if(!j.ok)throw Error(j.err);sessionStorage.tk=j.token;boot()}
-catch(e){$('#lerr').textContent=e.message==='Failed to fetch'?'Không kết nối được máy chủ':e.message;$('#lf').classList.remove('shake');void $('#lf').offsetWidth;$('#lf').classList.add('shake');$('#pw').select()}b.disabled=false;b.textContent='Mở sổ'};
+$('#lf').onsubmit=ev=>{ev.preventDefault();if($('#pw').value===PASS){sessionStorage.tk='1';boot()}
+else{$('#lerr').textContent='Mật khẩu không đúng';$('#lf').classList.remove('shake');void $('#lf').offsetWidth;$('#lf').classList.add('shake');$('#pw').select()}};
 function boot(){$('#login').classList.add('hide');$('#app').classList.remove('hide');render();sync(true)}
 $('#rf').onclick=()=>sync();$('#lo').onclick=lock;$('#fab').onclick=()=>openForm();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&sessionStorage.tk)sync(true)});setInterval(()=>{if(!document.hidden&&sessionStorage.tk&&!S.busy)sync(true)},60000);
