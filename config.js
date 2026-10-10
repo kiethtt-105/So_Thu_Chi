@@ -1,1 +1,4 @@
-window.CONFIG={PASS:'0000',API:'https://script.google.com/macros/s/AKfycbznLXXBUWBGhPbmfPal7FDN6WD7gQPqcdGLsRFEcvImPtbMKwhVEaBljv_7Jt2j_3g7/exec'};
+window.CONFIG = {
+  PASS: "0000",
+  API: "https://script.google.com/macros/s/AKfycbynqa-XJh8yAIq4Pj76tY7duFowP7vAeeyPg7KgF5Q_kb_ZJa-mcv7B0zn03Tc_44o/exec"
+};
