@@ -126,7 +126,7 @@ const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+Stri
 const TYPES=['Chi','Thu','Chuyển khoản','Điều chỉnh'],CLS={Thu:'thu',Chi:'chi','Chuyển khoản':'chuyen','Điều chỉnh':'dc'},SIGN={Thu:'+',Chi:'−','Chuyển khoản':'⇄','Điều chỉnh':'±'};
 const IC={home:'M3 11l9-8 9 8M5 10v10h14V10',tx:'M4 6h16M4 12h16M4 18h10',rec:'M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',lim:'M4 18a8 8 0 1 1 16 0M12 18l4-6',rc:'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5',acc:'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18',cat:'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',tr:'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',more:'M5 12h.01M12 12h.01M19 12h.01',dl:'M12 4v11M7 11l5 5 5-5M5 20h14',pl:'M12 5v14M5 12h14',fl:'M4 5h16l-6 8v6l-4-2v-4z'};
 const ic=k=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[k]}"/></svg>`;
-const TABS=[['home','Tổng quan','Sổ sách'],['tx','Giao dịch'],['rec','Cân đối'],['lim','Hạn mức','Kế hoạch'],['rc','Định kỳ'],['acc','Tài khoản','Danh mục'],['cat','Hạng mục'],['tr','Thùng rác']],MOB=['home','tx','rec','lim'],MONTHLY=['home','tx','lim'];
+const TABS=[['home','Tổng quan','Sổ sách'],['tx','Giao dịch'],['rec','Cân đối'],['lim','Hạn mức','Kế hoạch'],['acc','Tài khoản','Danh mục'],['cat','Hạng mục'],['tr','Thùng rác']],MOB=['home','tx','rec','lim'],MONTHLY=['home','tx','lim'];
 const PAL=['#0F766E','#2563EB','#D97706','#DB2777','#7C3AED','#65A30D','#0891B2','#DC2626'],col=i=>PAL[i%PAL.length];
 const EMO=[[/ăn|uống|cơm|cafe|cà phê|nhà hàng/i,'🍜'],[/xe|xăng|đi lại|grab|taxi/i,'🛵'],[/nhà|thuê|điện|nước|internet/i,'🏠'],[/mua|sắm|quần|áo/i,'🛍️'],[/y tế|thuốc|khám|sức khỏe/i,'💊'],[/học|sách|giáo dục/i,'📚'],[/giải trí|phim|game|du lịch/i,'🎮'],[/lương|thưởng|thu/i,'💰'],[/quà|từ thiện|cho/i,'🎁']];
 const emo=k=>(EMO.find(e=>e[0].test(k||''))||[0,'🧾'])[1];
@@ -136,7 +136,7 @@ let AI={};try{AI=JSON.parse(localStorage.aicon||'{}')}catch(e){}
 function aIco(a){const t=ATYPE[a.type]||['🏦','#667085'],o=AI[a.name];if(o)return `<span class="dot" style="background:color-mix(in srgb,${t[1]} 16%,transparent)">${o}</span>`;const b=BR.find(x=>x[0].test(a.name));
 if(b)return `<span class="dot" style="background:${b[2]};color:#fff;font-size:${b[1].length>2?10:b[1].length>1?12:15}px">${b[1]}</span>`;return `<span class="dot" style="background:color-mix(in srgb,${t[1]} 16%,transparent)">${t[0]}</span>`}
 if(!window.CONFIG)$('#lerr').textContent='Thiếu file config.js';
-let S={tx:[],acc:[],cat:[],rec:[],trash:[],bad:0,lim:{d:0,m:0,c:{},cd:{}},m:ymd(new Date()).slice(0,7),tab:(location.hash.slice(1)||'home'),f:'all',q:'',rg:'m',so:'dn',xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',fo:false,mg:'',act:{},ready:false,busy:0,err:''},E=null,ED=null;
+let S={tx:[],acc:[],cat:[],trash:[],bad:0,lim:{d:0,m:0,c:{},cd:{}},m:ymd(new Date()).slice(0,7),tab:(location.hash.slice(1)||'home'),f:'all',q:'',rg:'m',so:'dn',xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',fo:false,mg:'',act:{},ready:false,busy:0,err:''},E=null,ED=null;
 if(!TABS.some(t=>t[0]===S.tab))S.tab='home';
 try{const c=JSON.parse(sessionStorage.cache||'null');if(c){Object.assign(S,c);S.ready=true}}catch(e){}
 try{const l=JSON.parse(localStorage.lim||'null');if(l)S.lim=l}catch(e){}
@@ -144,10 +144,10 @@ if(localStorage.dark==='1'||(localStorage.dark==null&&matchMedia('(prefers-color
 if(localStorage.hb==='1')document.body.classList.add('hb');
 /* ---------- api / sync ---------- */
 async function api(a,d={}){if(!API)throw Error('Thiếu địa chỉ API: file config.js chưa được tải');let r;const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);try{r=await fetch(API,{method:'POST',signal:ac.signal,body:JSON.stringify({a,...d})})}catch(e){throw Error('Không có kết nối mạng')}finally{clearTimeout(tm)}
-let j;try{j=await r.json()}catch(x){throw Error('Apps Script chưa cấp quyền hoặc chưa Deploy bản mới (máy chủ không trả về JSON)')}if(!j.ok){if(/không hợp lệ/i.test(j.err||''))throw Error('Apps Script chưa hỗ trợ hành động "'+a+'" (bản Code.gs đang Deploy quá cũ). Dán Code.gs mới nhất rồi Deploy phiên bản mới.');throw Error(j.err||'Lỗi máy chủ')}return j}
-const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim,j.trash,j.rec]),POLL_MS=5000;
-function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.bad=j.bad||0;S.trash=j.trash||[];S.rec=j.rec||[];if(j.lim&&Object.keys(j.lim).length){S.lim=j.lim;localStorage.lim=JSON.stringify(j.lim)}S.sig=sigOf(j);if(j.h)S.h=j.h;S.ready=true;
-try{sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat,rec:S.rec,trash:S.trash})}catch(e){}
+let j;try{j=await r.json()}catch(x){throw Error('Apps Script chưa cấp quyền hoặc chưa Deploy bản mới (máy chủ không trả về JSON)')}if(!j.ok){if(/^Hành động không hợp lệ$/i.test((j.err||'').trim()))throw Error('Apps Script chưa hỗ trợ hành động "'+a+'" (bản Code.gs đang Deploy quá cũ). Dán Code.gs mới nhất rồi Deploy phiên bản mới.');throw Error(j.err||'Lỗi máy chủ')}return j}
+const sigOf=j=>JSON.stringify([j.tx,j.acc,j.cat,j.lim,j.trash]),POLL_MS=5000;
+function apply(j){S.tx=j.tx;S.acc=j.acc;S.cat=j.cat;S.bad=j.bad||0;S.trash=j.trash||[];if(j.lim&&Object.keys(j.lim).length){S.lim=j.lim;localStorage.lim=JSON.stringify(j.lim)}S.sig=sigOf(j);if(j.h)S.h=j.h;S.ready=true;
+try{sessionStorage.cache=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat,trash:S.trash})}catch(e){}
 const t='Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});$('#st').textContent=t;$('#st2').textContent=t}
 const setLive=s=>{const e=$('#live');if(!e||e.dataset.s===s)return;e.dataset.s=s;e.className='live '+s;e.lastChild.textContent={ok:'Live',err:'Mất kết nối',wait:'Đang kết nối'}[s]};
 const spin=on=>$('#rf').classList.toggle('spin',on);
@@ -251,22 +251,20 @@ return head('Tài khoản',S.acc.length+' tài khoản · bấm vào để sửa
 function cats(){const g={};S.cat.forEach((c,i)=>{(g[c.t+'|'+c.p]=g[c.t+'|'+c.p]||[]).push([c,i])});const sp={};chiM(S.m).forEach(t=>sp[t.sub]=(sp[t.sub]||0)+t.amount);
 return head('Hạng mục','Chi tiêu theo hạng mục con trong '+mlabel(S.m).toLowerCase(),`<button class="btn p" data-ed="dm:new">${ic('pl')}Thêm hạng mục</button>`).replace(/<div class="pa">/,'<div class="pa">'+monthNav())+
 `<div class="grid b" style="align-items:start">${Object.entries(g).map(([k,v])=>{const[t,p]=k.split('|');return `<div class="card"><div class="ch"><span>${emo(p)} ${esc(p)}</span><small class="${t==='Thu'?'thu':'chi'}">${t}</small></div><div class="cg">${v.map(([c,i])=>`<button class="chip" data-ed="dm:${i}">${esc(c.c)}${sp[c.c]&&t==='Chi'?` <b class="chi sens">${num(sp[c.c])}</b>`:''}</button>`).join('')}</div></div>`}).join('')||empty('Chưa có hạng mục')}</div>`}
-function recs(){return head('Giao dịch định kỳ','Tự động ghi hằng tháng',`<button class="btn p" data-ed="rec:new">${ic('pl')}Thêm định kỳ</button>`)+
-`<div class="card flush">${S.rec.map((r,i)=>`<button class="row" data-ed="rec:${i}"><span class="dot">🔁</span><span class="m"><b>${esc(r.sub||r.cat||r.type)}</b><small>Ngày ${r.day} hằng tháng · ${esc(r.acc)}</small></span><b class="sens ${CLS[r.type]}">${num(r.amount)}</b></button>`).join('')||empty('Chưa có giao dịch định kỳ','Thêm khoản lặp lại như tiền nhà, lương.')}</div>`}
 const KT={gd:'Giao dịch',tk:'Tài khoản',dm:'Hạng mục'};
 function trashPage(){return head('Thùng rác','Mục đã xóa vẫn lưu ở tab DaXoa, có thể khôi phục')+`<div class="card flush">${S.trash.map((t,i)=>`<div class="row"><span class="m"><b>${KT[t.k]||''}: ${esc(t.k==='gd'?(t.sub||t.cat||t.type)+' · '+num(t.amount):t.k==='tk'?t.id:t.cat+' › '+t.sub)}</b><small>${t.k==='gd'?esc(t.date+' · '+t.acc)+' · ':''}Xóa lúc ${esc(t.at)}</small></span><button class="chip" data-rs="${i}">Khôi phục</button></div>`).join('')||empty('Thùng rác trống')}</div>`}
 const errCard=()=>`<div class="card"><h3>Chưa tải được dữ liệu</h3><p class="chi" style="margin-bottom:10px">${esc(S.err==='Failed to fetch'||S.err==='Không có kết nối mạng'?'Không kết nối được tới Apps Script':S.err)}</p><p class="mut" style="font-size:13px">Kiểm tra: (1) đã dán Code.gs mới và Deploy phiên bản mới; (2) quyền truy cập là Anyone; (3) Google Sheet có đủ 3 sheet GiaoDich, TaiKhoan, DanhMuc; (4) đã chạy menu Sổ Thu Chi → Cài đặt tự động.</p><button class="btn p w" data-a="retry">Thử lại</button></div>`;
 /* ---------- shell render ---------- */
 function nav(){let g='';$('#sb').innerHTML=`<div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M5 16l5-5 4 4 6-8"/></svg></span>Sổ Thu Chi</div>`+TABS.map(([k,l,gr])=>(gr?`<div class="g">${gr}</div>`:'')+`<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${l}</button>`).join('')+`<div class="foot">Phím tắt: <b>N</b> thêm · <b>/</b> tìm</div>`;
 $('#bn').innerHTML=MOB.map(k=>{const t=TABS.find(x=>x[0]===k);return `<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic(k)}${t[1]}</button>`}).join('')+`<button class="${MOB.includes(S.tab)?'':'on'}" data-a="more">${ic('more')}${MOB.includes(S.tab)?'Thêm':TABS.find(x=>x[0]===S.tab)[1]}</button>`}
-function render(){nav();$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,rec:recon,lim:limPage,rc:recs,acc:accs,cat:cats,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
+function render(){nav();$('#v').innerHTML=!S.ready?(S.err?errCard():'<div class="sk"></div><div class="sk"></div><div class="sk"></div>'):{home,tx:txs,rec:recon,lim:limPage,acc:accs,cat:cats,tr:trashPage}[S.tab]();if(S.ready&&S.tab==='rec')reconUpdate()}
 /* ---------- events ---------- */
 const go=t=>{S.tab=t;location.hash=t;scrollTo(0,0);closeSheet();render()};
 document.addEventListener('click',e=>{const t=e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-a],[data-bdo],[data-ed],[data-rs]');if(!t||t.closest('#ov'))return;const d=t.dataset;
 if(d.tab)return go(d.tab);if(d.m){S.m=shift(S.m,+d.m);return render()}if(d.f){S.f=d.f;return render()}
 if(d.edit)return openForm(S.tx.find(x=>x.id===d.edit));if(d.bdo)return doBal(d.bdo);
 if(d.rs!=null){const x=S.trash[+d.rs];return x&&act('restore',{at:x.at,kind:x.k},'Đã khôi phục')}
-if(d.ed){const[k,i]=d.ed.split(':'),src={tk:S.acc,dm:S.cat,rec:S.rec}[k];return ed(k,i==='new'?{}:{...src[+i]},i==='new'?null:+i)}
+if(d.ed){const[k,i]=d.ed.split(':'),src={tk:S.acc,dm:S.cat}[k];return ed(k,i==='new'?{}:{...src[+i]},i==='new'?null:+i)}
 switch(d.a){case'new':return openForm();case'sync':return sync();case'lock':return lock();case'retry':S.err='';render();return sync();
 case'dark':localStorage.dark=document.body.classList.toggle('dark')?1:0;return;case'hide':localStorage.hb=document.body.classList.toggle('hb')?1:0;return;
 case'fo':S.fo=!S.fo;return render();case'rs':Object.assign(S,{xa:'',xc:'',mn:'',mx:'',d1:'',d2:'',so:'dn',rg:'m',f:'all',q:''});return render();
@@ -280,7 +278,7 @@ function csv(){const r=[['ID','Ngày','Loại','Số tiền','Tài khoản','Tà
 const b=new Blob(['\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='so-thu-chi.csv';a.click()}
 /* ---------- sheets ---------- */
 const openSheet=()=>$('#ov').classList.add('open'),closeSheet=()=>$('#ov').classList.remove('open');
-function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['rc','acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button></div>`;openSheet()}
+function openMore(){$('#sh').innerHTML=`<h3>Thêm</h3><div class="menu">${['acc','cat','tr'].map(k=>`<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x=>x[0]===k)[1]}</b></span>${k==='tr'&&S.trash.length?`<small class="mut">${S.trash.length}</small>`:''}</button>`).join('')}<button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button></div>`;openSheet()}
 function catFields(ty,cat,sub,ip,is){const L=S.cat.map((c,i)=>({...c,i})).filter(c=>c.t===ty),pars=[...new Set(L.map(c=>c.p))],o=c=>`<option value="${c.i}" ${c.p===cat&&c.c===sub?'selected':''}>${esc(c.c)}</option>`;
 return `<label>Hạng mục<select id="${ip}"><option value="">Chọn…</option>${pars.map(p=>`<option ${p===cat?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Chi tiết<select id="${is}"><option value="">${cat?'Chọn…':'Chọn (tự điền hạng mục)…'}</option>${cat?L.filter(c=>c.p===cat).map(o).join(''):pars.map(p=>`<optgroup label="${esc(p)}">${L.filter(c=>c.p===p).map(o).join('')}</optgroup>`).join('')}</select></label>`}
 function openForm(t,ty){E=t?{...t}:{id:'G'+Date.now().toString(36),date:ymd(new Date()),type:ty||'Chi',amount:0,acc:(S.acc[0]||{}).name||'',accTo:'',cat:'',sub:'',note:'',isNew:true};ED=null;form();openSheet()}
