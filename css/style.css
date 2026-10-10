@@ -348,3 +348,8 @@ html{--z:1}
   .ov.open .sheet{width:min(540px,calc(92vw / var(--z)))}
 }
 @media print{html{zoom:1!important}}
+
+/* ---- Logo dùng icons/icon.png ---- */
+.logo.pic{background:none;box-shadow:none;overflow:hidden}
+.logo.pic img{width:100%;height:100%;object-fit:contain;display:block;border-radius:inherit;pointer-events:none}
+#login .logo.pic{width:64px;height:64px;border-radius:16px}
