@@ -1,5 +1,7 @@
 const { PASS, API } = window.CONFIG || {}, POLL_MS = 10000, TTL = 24 * 3600e3;
-const alive = () => { const t = +localStorage.sess || 0; return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { localStorage.sess = n; } catch (e) { } }; })();
+/* Phiên đăng nhập chỉ lưu trong sessionStorage: đóng tab/cửa sổ là mất phiên, phải nhập lại mật khẩu. Reload trong cùng tab vẫn giữ. */
+try { localStorage.removeItem('sess'); } catch (e) { }   // dọn phiên cũ từng lưu lâu dài
+const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
