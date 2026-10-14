@@ -169,7 +169,7 @@ function qSubmit(edit) {
 function qbNav() {
     const b = $('#qb');
     if (!b) return;
-    b.classList.toggle('hide', !S.ready || S.tab === 'tr');
+    b.classList.toggle('hide', !S.ready || S.tab === 'tr' || !tabOn('qb'));
     if (typeof renderTpl === 'function') renderTpl();
 }
 (() => {

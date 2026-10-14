@@ -79,13 +79,8 @@ function limPage() {
 }
 const diffs = () => S.acc.map(a => { const sys = bal(a), v = S.act[a.name], has = v !== undefined; return { a, sys, has, act: v, diff: has ? v - sys : 0 }; });
 function balPlan(L) {
-    const r = L.map(x => ({ n: x.a.name, d: x.diff })), T = [], neg = r.filter(x => x.d < 0).sort((a, b) => a.d - b.d), pos = r.filter(x => x.d > 0).sort((a, b) => b.d - a.d);
-    neg.forEach(n => pos.forEach(p => { const m = Math.min(-n.d, p.d); if (m > 0) {
-        T.push({ from: n.n, to: p.n, amount: m });
-        n.d += m;
-        p.d -= m;
-    } }));
-    return { T, A: r.filter(x => x.d !== 0) };
+    // Không tự bịa chuyển khoản giữa các tài khoản: mỗi tài khoản lệch chỉ ghi đúng 1 dòng điều chỉnh bằng đúng số lệch.
+    return { T: [], A: L.map(x => ({ n: x.a.name, d: x.diff })).filter(x => x.d !== 0) };
 }
 function recon() {
     const D = diffs();
@@ -106,7 +101,7 @@ function reconUpdate() {
     $('#r_a').textContent = has.length ? vnd(has.reduce((s, x) => s + x.act, 0)) : '–';
     const pos = bad.some(x => x.diff > 0), neg = bad.some(x => x.diff < 0);
     const PL = balPlan(bad), sgn = n => (n > 0 ? '+' : '−') + num(Math.abs(n));
-    $('#rbtn').innerHTML = (bad.length ? `<button class="btn p w" data-bdo="bal" style="margin-top:0">Cân đối ${PL.T.length ? PL.T.length + ' chuyển khoản' : ''}${PL.T.length && PL.A.length ? ' + ' : ''}${PL.A.length ? PL.A.length + ' điều chỉnh' : ''}</button><p class="note">Tài khoản dư và tài khoản thiếu sẽ được <b>chuyển tiền qua lại</b> cho khớp${PL.T.length ? ':<br>' + PL.T.map(t => '• ' + esc(t.from) + ' → ' + esc(t.to) + ': <b>' + num(t.amount) + '</b>').join('<br>') : ''}${PL.A.length ? '<br>Phần còn lại không bù được ghi bằng <b>dòng “Điều chỉnh” đặc biệt</b>:<br>' + PL.A.map(x => '• ' + esc(x.n) + ': <b>' + sgn(x.d) + '</b>').join('<br>') : ''}</p><button class="btn w" data-bdo="adj">Chỉ ghi điều chỉnh (không chuyển khoản)</button>` : has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px">Nhập số dư thực tế để xem chênh lệch.</p>') + `<button class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`;
+    $('#rbtn').innerHTML = (bad.length ? `<button class="btn p w" data-bdo="bal" style="margin-top:0">Cân đối ${PL.T.length ? PL.T.length + ' chuyển khoản' : ''}${PL.T.length && PL.A.length ? ' + ' : ''}${PL.A.length ? PL.A.length + ' điều chỉnh' : ''}</button><p class="note">Mỗi tài khoản lệch được ghi <b>1 dòng “Điều chỉnh”</b> đúng số lệch, không tự chuyển khoản giữa các tài khoản${PL.A.length ? ':<br>' + PL.A.map(x => '• ' + esc(x.n) + ': <b>' + sgn(x.d) + '</b>').join('<br>') : ''}</p><button class="btn w" data-bdo="adj">Chỉ ghi điều chỉnh (không chuyển khoản)</button>` : has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px">Nhập số dư thực tế để xem chênh lệch.</p>') + `<button class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`;
 }
 async function doBal(k) {
     if (k === 'form')
@@ -170,11 +165,22 @@ function cats() {
 const KT = { gd: 'Giao dịch', tk: 'Tài khoản', dm: 'Hạng mục' };
 function trashPage() { return head('Thùng rác', 'Các mục đã xóa có thể được khôi phục') + `<div class="card flush">${S.trash.map((t, i) => `<div class="row"><span class="m"><b>${KT[t.k] || ''}: ${esc(t.k === 'gd' ? (t.sub || t.cat || t.type) + ' · ' + num(t.amount) : t.k === 'tk' ? t.id : t.cat + ' › ' + t.sub)}</b><small>${t.k === 'gd' ? esc(t.date + ' · ' + t.acc) + ' · ' : ''}Xóa lúc ${esc(t.at)}</small></span><button class="chip" data-rs="${i}">Khôi phục</button></div>`).join('') || empty('Thùng rác trống')}</div>`; }
 const errCard = () => `<div class="card"><h3>Chưa tải được dữ liệu</h3><p class="chi" style="margin-bottom:10px">${esc(S.err === 'Failed to fetch' || S.err === 'Không có kết nối mạng' ? 'Không kết nối được tới máy chủ' : S.err)}</p><p class="mut" style="font-size:13px">Vui lòng kiểm tra kết nối mạng rồi thử lại. Nếu vẫn không được, hãy liên hệ người quản trị để kiểm tra lại cấu hình.</p><button class="btn p w" data-a="retry">Thử lại</button></div>`;
+const hidSet = () => { try { return new Set(JSON.parse(localStorage.hidtabs || '[]')); } catch (e) { return new Set(); } };
+const tabOn = k => k === 'home' || !hidSet().has(k);
+// 4 ô thanh dưới trên điện thoại: lấy 4 mục đầu còn hiện trong danh sách ưu tiên (ẩn mục nào thì mục kế tiếp bù vào, không bị hụt ô)
+const mobTabs = () => ['home', 'tx', 'rp', 'lim', 'rec', 'goal', 'acc', 'cat'].filter(k => tabOn(k) || k === S.tab).slice(0, 4);
 function nav() {
     const tb = $('#tb');
-    tb.innerHTML = TABS.map(([k, l, gr]) => (gr ? '<i class="sep">' + gr + '</i>' : '') + `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" title="${l}">${ic(k)}<span>${l}</span>${k === 'tr' && S.trash.length ? '<em class="nbd">' + S.trash.length + '</em>' : ''}</button>`).join('') + `<i class="sep"></i><button data-nt="settings" title="Cài đặt">${ic('set')}<span>Cài đặt</span></button>`;
-    const mt = GRP_TX.includes(S.tab) ? 'tx' : S.tab;
-    $('#bn').innerHTML = MOB.map(k => { const t = TABS.find(x => x[0] === k); return `<button class="${mt === k ? 'on' : ''}" data-tab="${k}">${ic(k)}${SHORT[k] || t[1]}</button>`; }).join('') + `<button class="${MOB.includes(mt) ? '' : 'on'}" data-a="more">${ic('more')}${MOB.includes(mt) ? 'Thêm' : TABS.find(x => x[0] === S.tab)[1]}</button>`;
+    let h = '', pend = '';
+    TABS.forEach(([k, l, gr]) => {
+        if (gr) pend = gr;                         // nhãn nhóm chuyển sang mục hiện đầu tiên của nhóm; nhóm ẩn hết thì không hiện nhãn
+        if (!tabOn(k) && S.tab !== k) return;
+        if (pend) { h += '<i class="sep">' + pend + '</i>'; pend = ''; }
+        h += `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" title="${l}">${ic(k)}<span>${l}</span>${k === 'tr' && S.trash.length ? '<em class="nbd">' + S.trash.length + '</em>' : ''}</button>`;
+    });
+    tb.innerHTML = h + `<i class="sep"></i><button data-nt="settings" title="Cài đặt">${ic('set')}<span>Cài đặt</span></button>`;
+    const mt = GRP_TX.includes(S.tab) ? 'tx' : S.tab, MB = mobTabs();
+    $('#bn').innerHTML = MB.map(k => { const t = TABS.find(x => x[0] === k); return `<button class="${mt === k ? 'on' : ''}" data-tab="${k}">${ic(k)}${SHORT[k] || t[1]}</button>`; }).join('') + `<button class="${MB.includes(mt) ? '' : 'on'}" data-a="more">${ic('more')}${MB.includes(mt) ? 'Thêm' : TABS.find(x => x[0] === S.tab)[1]}</button>`;
     const n = S.issues.length;
     $('#isb').classList.toggle('hide', !n);
     $('#isn').textContent = n > 99 ? '99+' : n;
@@ -183,6 +189,21 @@ function nav() {
     if (typeof nbUpdate === 'function')
         nbUpdate();
 }
+// Cài đặt → Menu hiển thị: bật/tắt từng mục, lưu trên máy này
+document.addEventListener('change', e => {
+    const t = e.target;
+    if (!t.dataset || t.dataset.vis === undefined) return;
+    const s = hidSet();
+    if (t.checked) s.delete(t.dataset.vis); else s.add(t.dataset.vis);
+    try { localStorage.hidtabs = JSON.stringify([...s]); } catch (x) { }
+    nav();
+});
+document.addEventListener('click', e => {
+    if (!e.target.closest('[data-visreset]')) return;
+    try { localStorage.removeItem('hidtabs'); } catch (x) { }
+    nav();
+    if (typeof openSettings === 'function') openSettings();
+});
 const VIEWS = {
     home: () => home(), tx: () => txs(), ba: () => accView(), bc: () => catView(), bl: () => limView(),
     rp: () => reportPage(), rec: () => recon(), lim: () => limPage(), goal: () => goalPage(),

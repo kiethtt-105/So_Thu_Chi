@@ -1,4 +1,4 @@
-const V = 'stc-v16';
+const V = 'stc-v17';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/core.js', 'js/sync.js', 'js/data.js', 'js/screens.js', 'js/cash.js', 'js/events.js', 'js/forms.js', 'js/txform.js', 'js/quick.js', 'js/report.js', 'js/lists.js', 'js/notify.js', 'js/upload.js', 'js/trend.js', 'js/goals.js', 'js/trash.js', 'js/extras.js', 'js/fx.js', 'js/main.js', 'js/deeplink.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
