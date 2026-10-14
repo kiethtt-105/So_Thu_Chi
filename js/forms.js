@@ -196,7 +196,7 @@ $('#ov').addEventListener('click', async (e) => {
     }
     if (q('[data-dup]')) {
         pull();
-        E = { ...E, id: newId(), date: ymd(new Date()), isNew: true };
+        E = { ...E, id: newId(), date: ymd(new Date()), time: hm(new Date()), at: '', isNew: true };
         form();
         return;
     }
