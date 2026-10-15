@@ -2,7 +2,15 @@
 // Dùng đúng bộ đọc câu của ô "Gõ nhanh" (js/quick.js) rồi ghi vào Google Apps Script. Không cần giao diện.
 // Trả về JSON: {ok:true, msg:"Đã ghi: ..."} hoặc {ok:false, msg:"lý do"}.
 const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
-const J = f => fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8');
+const R = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+// app.js gom nhiều file; mỗi phần bắt đầu bằng dòng "/* ===== tên.js ===== */". J('quick.js') lấy đúng phần đó.
+const J = f => {
+    if (f === 'config.js') return R('config.js');
+    const all = R('app.js'), tag = '/* ===== ' + f + ' ===== */\n', i = all.indexOf(tag);
+    if (i < 0) throw Error('Thiếu phần ' + f);
+    const j = all.indexOf('/* ===== ', i + tag.length);
+    return all.slice(i + tag.length, j < 0 ? all.length : j);
+};
 
 function loadConfig() {
     const w = {}; vm.runInNewContext(J('config.js'), { window: w }); return w.CONFIG || {};
