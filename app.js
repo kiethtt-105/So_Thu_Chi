@@ -468,10 +468,10 @@ function txs() {
 <div class="chips ty">${['all', ...TYPES].map(t => `<button class="chip ${S.f === t ? 'on' : ''}" data-f="${t}">${t === 'all' ? 'Tất cả' : t}</button>`).join('')}</div>
 ${act.length ? `<div class="chips afl">${act.map(([k, lb]) => `<button type="button" class="chip on fx" data-clr="${k}" aria-label="Bỏ lọc ${esc(lb)}">${esc(lb)}<i>×</i></button>`).join('')}<button type="button" class="chip" data-a="rs">Xóa hết</button></div>` : ''}</div>
 ${S.fo ? `<div class="card fpn">
-<div class="fg"><div class="fgl">Thời gian</div><div class="chips wrap">${fset('rg', 'm', 'Tháng đang xem')}${fset('rg', 'a', 'Toàn bộ')}${fset('rg', 'c', 'Tùy chọn')}</div>${S.rg === 'c' ? `<div class="fp2"><label class="l">Từ ngày<input type="date" id="x_d1" value="${S.d1}"></label><label class="l">Đến ngày<input type="date" id="x_d2" value="${S.d2}"></label></div>` : ''}</div>
+<div class="fg"><div class="fgl">Thời gian</div><div class="chips fw">${fset('rg', 'm', 'Tháng đang xem')}${fset('rg', 'a', 'Toàn bộ')}${fset('rg', 'c', 'Tùy chọn')}</div>${S.rg === 'c' ? `<div class="fp2"><label class="l">Từ ngày<input type="date" id="x_d1" value="${S.d1}"></label><label class="l">Đến ngày<input type="date" id="x_d2" value="${S.d2}"></label></div>` : ''}</div>
 <div class="fg"><div class="fgl">Tài khoản · Hạng mục</div><div class="fp2"><select id="x_acc" aria-label="Tài khoản">${op(S.acc.map(a => a.name), S.xa, 'Mọi tài khoản')}</select><select id="x_cat" aria-label="Hạng mục">${op(pars, S.xc, 'Mọi hạng mục')}</select></div></div>
 <div class="fg"><div class="fgl">Số tiền (₫)</div><div class="fp2"><input type="number" id="x_mn" inputmode="numeric" placeholder="Từ" value="${S.mn}" aria-label="Số tiền từ"><input type="number" id="x_mx" inputmode="numeric" placeholder="Đến" value="${S.mx}" aria-label="Số tiền đến"></div></div>
-<div class="fg"><div class="fgl">Sắp xếp</div><div class="chips wrap">${Object.entries(SO).map(([k, v]) => fset('so', k, v)).join('')}</div></div>
+<div class="fg"><div class="fgl">Sắp xếp</div><div class="chips fw">${Object.entries(SO).map(([k, v]) => fset('so', k, v)).join('')}</div></div>
 <div class="fb"><button type="button" class="btn" data-a="rs">Xóa bộ lọc</button><button type="button" class="btn p" data-a="fo">Xong</button></div></div>` : ''}
 <div class="sum"><span>${l.length} giao dịch</span><span class="thu sens">Thu ${vnd(thu)}</span><span class="chi sens">Chi ${vnd(chi)}</span><span class="sens">Ròng ${vnd(thu - chi)}</span>${nHeld ? `<span class="mut" title="Tài khoản Giữ Hộ không tính vào thu, chi, ròng">không tính ${nHeld} giao dịch Giữ Hộ</span>` : ''}</div>
 <div class="card flush">${l.length ? h : empty('Không có giao dịch', 'Thử đổi bộ lọc hoặc khoảng thời gian.')}</div>`;
@@ -904,28 +904,25 @@ document.addEventListener('keydown', e => {
 function openMore() { $('#sh').innerHTML = `<h3>Thêm</h3><div class="menu">${['ba', 'bc', 'bl', 'rec', 'goal', 'rc', 'debt', 'card', 'acc', 'cat', 'tr'].filter(k => (tabOn(k) || k === S.tab) && !mobTabs().includes(k)).map(k => `<button class="row" data-sheettab="${k}">${ic(k)}<span class="m"><b>${TABS.find(x => x[0] === k)[1]}</b></span>${k === 'tr' && S.trash.length ? `<small class="mut">${S.trash.length}</small>` : ''}</button>`).join('')}<button class="row" data-nt="settings">${ic('set')}<span class="m"><b>Cài đặt</b><small>Giao diện, thông báo, nhắc nhở, báo cáo mỗi sáng</small></span></button><button class="row" data-a2="csv">${ic('dl')}<span class="m"><b>Tải CSV toàn bộ</b></span></button>${typeof extraMenu === 'function' ? extraMenu() : ''}</div>`; ED = null; E = null; openSheet(); }
 function openIssues() { const L = S.issues; ED = null; E = null; $('#sh').innerHTML = `<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0, 80).map(i => `<div class="iss ${i.lv}"><b>${esc(SN[i.sheet] || i.sheet)} · dòng ${i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length > 80 ? `<p class="mut" style="margin-top:8px">… và ${L.length - 80} mục nữa</p>` : ''}`; openSheet(); }
 const catNorm = s => nz(String(s || '')).replace(/\s+/g, ' ').trim();
-function catHints(ty, q) {
-    const all = S.cat.map((c, i) => ({ ...c, i })).filter(c => c.t === ty);
-    q = catNorm(q);
+/* Hạng mục / Chi tiết: ô chọn có tìm kiếm ngay trong ô (gõ không dấu cũng được) */
+function cbOpts(kind, ty, cat, q) {
+    const all = S.cat.filter(c => c.t === ty);
     let L;
-    if (q) {
-        const w = q.split(' ');
-        L = all.filter(c => { const h = catNorm(c.p + ' ' + c.c); return w.every(x => h.includes(x)); }).slice(0, 14);
-        if (!L.length) return '<small class="mut">Không thấy hạng mục “' + esc(q) + '”. Thử từ khác, hoặc thêm ở mục Hạng mục.</small>';
+    if (kind === 'p') {
+        const seen = new Set();
+        L = [];
+        all.forEach(c => { if (!seen.has(c.p)) { seen.add(c.p); L.push({ p: c.p, c: '', lb: c.p }); } });
     }
-    else {
-        const cnt = new Map();
-        S.tx.slice(-500).forEach(t => { if (t.type === ty && t.cat && t.sub) { const k = t.cat + '\u0001' + t.sub; cnt.set(k, (cnt.get(k) || 0) + 1); } });
-        L = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => { const [p, c] = k.split('\u0001'); return all.find(x => x.p === p && x.c === c); }).filter(Boolean).slice(0, 8);
-        if (!L.length) L = all.slice(0, 8);
-    }
-    const on = c => E && E.cat === c.p && E.sub === c.c;
-    return (q ? '' : '<small class="mut">Hay dùng</small>') + '<div class="chips wrap">' + L.map(c => `<button type="button" class="chip ${on(c) ? 'on' : ''}" data-pick="${c.i}">${emo(c.p)} ${esc(c.p)} › ${esc(c.c)}</button>`).join('') + '</div>';
+    else L = (cat ? all.filter(c => c.p === cat) : all).map(c => ({ p: c.p, c: c.c, lb: cat ? c.c : c.p + ' › ' + c.c }));
+    const w = catNorm(q).split(' ').filter(Boolean);
+    return w.length ? L.filter(o => { const h = catNorm(o.p + ' ' + o.c); return w.every(x => h.includes(x)); }) : L;
 }
-function catFields(ty, cat, sub, ip, is) {
-    const L = S.cat.map((c, i) => ({ ...c, i })).filter(c => c.t === ty), pars = [...new Set(L.map(c => c.p))], o = c => `<option value="${c.i}" ${c.p === cat && c.c === sub ? 'selected' : ''}>${esc(c.c)}</option>`;
-    const picked = cat && sub ? `<div class="catsel"><span>${emo(cat)} ${esc(cat)} › ${esc(sub)}</span><button type="button" data-catclr aria-label="Bỏ chọn hạng mục">×</button></div>` : '';
-    return `<div class="w catpick"><label>Tìm hạng mục<input id="fcs" type="search" autocomplete="off" enterkeyhint="done" placeholder="Gõ để tìm: ăn sáng, xăng, lương…"></label>${picked}<div id="fcr" class="cres">${catHints(ty, '')}</div></div><label>Hạng mục<select id="${ip}"><option value="">Chọn…</option>${pars.map(p => `<option ${p === cat ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label><label>Chi tiết<select id="${is}"><option value="">${cat ? 'Chọn…' : 'Chọn (tự điền hạng mục)…'}</option>${cat ? L.filter(c => c.p === cat).map(o).join('') : pars.map(p => `<optgroup label="${esc(p)}">${L.filter(c => c.p === p).map(o).join('')}</optgroup>`).join('')}</select></label>`;
+const cbHtml = (kind, L) => L.length
+    ? L.map((o, k) => `<div class="cbo ${k === 0 ? 'on' : ''}" role="option" data-cbo="${kind}" data-p="${esc(o.p)}" data-c="${esc(o.c)}">${emo(o.p)} ${esc(o.lb)}</div>`).join('')
+    : '<div class="cbe">Không thấy kết quả. Thử từ khác, hoặc thêm ở mục Hạng mục.</div>';
+function catFields(ty, cat, sub) {
+    return `<div class="cbw"><span class="l">Hạng mục</span><div class="cb"><input id="fp" data-cb="p" autocomplete="off" placeholder="Chọn hoặc gõ để tìm…" value="${esc(cat)}"><div class="cbl hide"></div></div></div>
+<div class="cbw"><span class="l">Chi tiết</span><div class="cb"><input id="fs" data-cb="s" autocomplete="off" placeholder="${cat ? 'Chọn hoặc gõ để tìm…' : 'Gõ để tìm (tự điền hạng mục)…'}" value="${esc(sub)}"><div class="cbl hide"></div></div></div>`;
 }
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: (S.acc[0] || {}).name || '', accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
@@ -934,7 +931,7 @@ function form() {
     $('#sh').innerHTML = `<div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div>${tplRow()}
 <input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><div class="f">
 <label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label><label class="w">${ty === 'Chuyển khoản' ? 'Từ tài khoản' : 'Tài khoản'}<select id="fc">${op(S.acc.map(a => a.name), E.acc)}</select></label>
-${ty === 'Chuyển khoản' ? `<label class="w">Đến tài khoản<select id="ft"><option value="">Chọn…</option>${op(S.acc.map(a => a.name).filter(n => n !== E.acc), E.accTo)}</select></label>` : ty === 'Điều chỉnh' ? '' : catFields(ty, E.cat, E.sub, 'fp', 'fs')}
+${ty === 'Chuyển khoản' ? `<label class="w">Đến tài khoản<select id="ft"><option value="">Chọn…</option>${op(S.acc.map(a => a.name).filter(n => n !== E.acc), E.accTo)}</select></label>` : ty === 'Điều chỉnh' ? '' : catFields(ty, E.cat, E.sub)}
 <label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="w" id="att"></div></div>
 <button class="btn p w" data-save>${E.isNew ? 'Lưu giao dịch' : 'Lưu thay đổi'}</button><button class="btn w" data-tplsave style="margin-top:6px">☆ Lưu thành mẫu</button>${E.isNew ? '' : '<button class="btn w" data-dup>⧉ Nhân đôi giao dịch</button><button class="btn d w" data-del style="margin-top:2px">Xóa giao dịch</button>'}`;
     renderAtt();
@@ -962,54 +959,77 @@ function ed(kind, o, idx) {
 }
 $('#ov').addEventListener('input', e => {
     const t = e.target;
-    if (t.id === 'fcs') {
-        const r = $('#fcr');
-        if (r && E) r.innerHTML = catHints(E.type, t.value);
-        return;
-    }
     if (t.classList.contains('money'))
         fm(t);
-    if (E && ['fc', 'fp', 'fs'].includes(t.id)) {
-        const id = t.id, val = t.value;
+    if (E && t.dataset.cb) return cbOpen(t, true);
+    if (E && t.id === 'fc') {
         pull();
-        if (id === 'fp') {
-            E.cat = val;
-            if (E.sub && !S.cat.some(c => c.t === E.type && c.p === E.cat && c.c === E.sub))
-                E.sub = '';
-        }
-        if (id === 'fs') {
-            if (val !== '') {
-                const c = S.cat[+val];
-                E.cat = c.p;
-                E.sub = c.c;
-            }
-            else
-                E.sub = '';
-        }
         form();
-        $('#' + id).focus();
+        $('#fc').focus();
     }
 });
+function cbOpen(inp, filter) {
+    if (!E) return;
+    const kind = inp.dataset.cb, box = inp.parentElement.querySelector('.cbl');
+    box.innerHTML = cbHtml(kind, cbOpts(kind, E.type, kind === 's' ? E.cat : '', filter ? inp.value : ''));
+    box.classList.remove('hide');
+    try { box.scrollIntoView({ block: 'nearest' }); } catch (x) { }
+}
+const cbClose = () => $$('#ov .cbl').forEach(b => b.classList.add('hide'));
+function cbPick(el) {
+    pull();
+    const k = el.dataset.cbo, p = el.dataset.p, c = el.dataset.c;
+    E.cat = p;
+    if (k === 'p') { if (E.sub && !catOk(E.type, p, E.sub)) E.sub = ''; }
+    else E.sub = c;
+    form();
+    if (k === 'p' && !E.sub) { const f = $('#fs'); if (f) f.focus(); }
+    else if (!E.amount) { const f = $('#fa'); if (f) f.focus(); }
+}
+$('#ov').addEventListener('focusin', e => {
+    const t = e.target;
+    if (!E || !t.dataset || !t.dataset.cb) return;
+    cbOpen(t, false);
+    setTimeout(() => { try { t.select(); } catch (x) { } }, 0);
+});
+$('#ov').addEventListener('focusout', () => setTimeout(() => {
+    if (!E || document.activeElement.closest('.cb')) return;
+    cbClose();
+    const p = $('#fp'), s = $('#fs');
+    if (p && !p.value.trim()) { E.cat = ''; E.sub = ''; }
+    if (s && !s.value.trim()) E.sub = '';
+    if (p) p.value = E.cat || '';
+    if (s) s.value = E.sub || '';
+}, 160));
+$('#ov').addEventListener('mousedown', e => { if (e.target.closest('.cbl')) e.preventDefault(); });
 $('#ov').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.id === 'fcs') {
+    const t = e.target;
+    if (!E || !t.dataset || !t.dataset.cb) return;
+    const box = t.parentElement.querySelector('.cbl'), open = !box.classList.contains('hide'), items = [...box.querySelectorAll('.cbo')];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
-        const b = $('#fcr [data-pick]');
-        if (b) b.click();
+        if (!open) return cbOpen(t, false);
+        let i = items.findIndex(x => x.classList.contains('on'));
+        items.forEach(x => x.classList.remove('on'));
+        i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
+        if (items[i]) { items[i].classList.add('on'); items[i].scrollIntoView({ block: 'nearest' }); }
+    }
+    else if (e.key === 'Enter') {
+        e.preventDefault();
+        const b = box.querySelector('.cbo.on') || items[0];
+        if (open && b) cbPick(b);
+    }
+    else if (e.key === 'Escape' && open) {
+        e.stopPropagation();
+        cbClose();
     }
 });
 $('#ov').addEventListener('click', e => {
     if (!E) return;
-    const p = e.target.closest('[data-pick]'), c = e.target.closest('[data-catclr]');
-    if (!p && !c) return;
-    pull();
-    if (p) {
-        const x = S.cat[+p.dataset.pick];
-        if (x) { E.cat = x.p; E.sub = x.c; }
-    }
-    else { E.cat = ''; E.sub = ''; }
-    form();
-    const f = $('#fa');
-    if (p && f && !E.amount) f.focus();
+    const o = e.target.closest('.cbo');
+    if (o) return cbPick(o);
+    const t = e.target.closest('[data-cb]');
+    if (t && t.parentElement.querySelector('.cbl').classList.contains('hide')) cbOpen(t, false);
 });
 $('#ov').addEventListener('click', async (e) => {
     const T = e.target;

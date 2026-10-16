@@ -450,7 +450,7 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 .tb2 .ty{flex:0 1 auto;min-width:0;max-width:100%}
 .tb2 .afl{flex:1 1 100%;flex-wrap:wrap;overflow:visible}
 .chip.fx i{font-style:normal;margin-left:2px;opacity:.8}
-.chips.wrap{flex-wrap:wrap;overflow:visible}
+.chips.fw{flex-wrap:wrap;overflow:visible}
 .fpn{margin-bottom:14px;padding:14px 16px;display:flex;flex-direction:column;gap:14px}
 .fpn .fgl{font:600 12px var(--fd);color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px}
 .fpn .fp2,.fp2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}.fpn .chips+.fp2{margin-top:10px}
@@ -462,13 +462,13 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 .chip.tx{display:inline-flex;align-items:center;gap:6px;padding-right:6px}
 .chip.tx button{width:18px;height:18px;border-radius:50%;background:var(--chi);color:var(--bg);font-size:12px;line-height:1;display:grid;place-items:center;padding:0}
 
-.catpick{display:flex;flex-direction:column;gap:8px}
-.catpick label{display:flex;flex-direction:column;gap:3px}
-.catpick #fcs{width:100%}
-.catsel{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 8px 8px 12px;border-radius:10px;background:var(--accl);font-weight:600;font-size:14px}
-.catsel button{width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--mut);display:grid;place-items:center;font-size:16px;line-height:1}
-.cres{display:flex;flex-direction:column;gap:6px}.cres small{font-size:12px}
-.cres .chips{max-height:132px;overflow-y:auto}
+.cbw{position:relative;display:flex;flex-direction:column;gap:3px;min-width:0}.cbw>.l{font-size:12px;color:var(--mut)}
+.cb{position:relative}.cb input{width:100%;margin-top:0!important}
+.cbl{position:absolute;left:0;top:calc(100% + 4px);z-index:30;min-width:100%;width:max-content;max-width:min(360px,86vw);max-height:260px;overflow-y:auto;background:var(--pop);border:1px solid var(--line2);border-radius:12px;box-shadow:var(--sh2);padding:4px}
+.cbw+.cbw .cbl{left:auto;right:0}
+.cbo{padding:9px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--ink)}
+.cbo.on,.cbo:hover{background:var(--accl);color:var(--acc)}
+.cbe{padding:10px 12px;color:var(--mut);font-size:13px}
 
 /* cân đối laptop / điện thoại */
 @media(min-width:960px){.top{gap:12px}.top .usr{order:2}}
