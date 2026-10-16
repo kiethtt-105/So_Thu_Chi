@@ -1,6 +1,5 @@
 /* ===== core.js ===== */
 const { PASS, API, NAME } = window.CONFIG || {}, POLL_MS = 10000, TTL = 24 * 3600e3;
-/* Phiên đăng nhập chỉ lưu trong sessionStorage: đóng tab/cửa sổ là mất phiên, phải nhập lại mật khẩu. Reload trong cùng tab vẫn giữ. */
 try { localStorage.removeItem('sess'); } catch (e) { }   // dọn phiên cũ từng lưu lâu dài
 const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -104,11 +103,11 @@ async function call(ops, rev) {
         j = await r.json();
     }
     catch (e) {
-        throw Error('Máy chủ chưa phản hồi đúng. Vui lòng kiểm tra lại cấu hình kết nối');
+        throw Error('Lỗi máy chủ. Kiểm tra lại cấu hình kết nối');
     }
     if (!j.ok) {
         if (/Hành động không hợp lệ/i.test(j.err || ''))
-            throw Error('Máy chủ đang chạy phiên bản cũ. Vui lòng cập nhật lên phiên bản mới nhất.');
+            throw Error('Sai phiên làm việc. Vui lòng tải lại trang');
         throw Error(j.err || 'Lỗi máy chủ');
     }
     return j;
@@ -267,7 +266,7 @@ $('#lf').onsubmit = ev => { ev.preventDefault(); if ($('#pw').value === PASS) {
     boot();
 }
 else {
-    $('#lerr').textContent = 'Mật khẩu không đúng';
+    $('#lerr').textContent = 'Sai mật khẩu !!';
     $('#lf').classList.remove('shake');
     void $('#lf').offsetWidth;
     $('#lf').classList.add('shake');
@@ -492,7 +491,7 @@ function balPlan(L) {
 }
 function recon() {
     const D = diffs();
-    return head('Cân đối', 'So số dư thực tế với hệ thống; lệch thì chuyển tiền qua lại giữa các tài khoản, phần còn lại ghi điều chỉnh') +
+    return head('Cân đối','') +
         `<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="card kpi h kfull"><small>Tổng chênh lệch</small><b class="sens" id="r_t">–</b><em id="r_n"></em></div><div class="card kpi"><small>Hệ thống</small><b class="sens" id="r_s">–</b></div><div class="card kpi"><small>Thực tế</small><b class="sens" id="r_a">–</b></div></div>
 <div class="grid c"><div class="card"><div class="ch">Nhập số dư thực tế</div>${D.map((x, i) => `<div class="rr"><span style="display:flex;align-items:center;gap:10px">${aIco(x.a)}<span style="min-width:0"><b style="font-weight:500">${esc(x.a.name)}</b><small class="sens">Hệ thống: ${vnd(x.sys)}</small></span></span>${x.a.type === 'Tiền mặt' ? `<button type="button" class="ib cnt" data-cash="${i}" aria-label="Đếm tiền mặt" title="Đếm số tờ">${ic('cnt')}</button>` : ''}<input class="ba money" data-neg="1" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has ? num(x.act) : ''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('') || empty('Chưa có tài khoản')}</div>
 <div class="card"><div class="ch">Xử lý</div><div id="rbtn"></div></div></div>`;
@@ -509,7 +508,7 @@ function reconUpdate() {
     $('#r_a').textContent = has.length ? vnd(has.reduce((s, x) => s + x.act, 0)) : '–';
     const pos = bad.some(x => x.diff > 0), neg = bad.some(x => x.diff < 0);
     const PL = balPlan(bad), sgn = n => (n > 0 ? '+' : '−') + num(Math.abs(n));
-    $('#rbtn').innerHTML = (bad.length ? `<button class="btn p w" data-bdo="bal" style="margin-top:0">Cân đối ${PL.T.length ? PL.T.length + ' chuyển khoản' : ''}${PL.T.length && PL.A.length ? ' + ' : ''}${PL.A.length ? PL.A.length + ' điều chỉnh' : ''}</button><p class="note">Mỗi tài khoản lệch được ghi <b>1 dòng “Điều chỉnh”</b> đúng số lệch, không tự chuyển khoản giữa các tài khoản${PL.A.length ? ':<br>' + PL.A.map(x => '• ' + esc(x.n) + ': <b>' + sgn(x.d) + '</b>').join('<br>') : ''}</p><button class="btn w" data-bdo="adj">Chỉ ghi điều chỉnh (không chuyển khoản)</button>` : has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px">Nhập số dư thực tế để xem chênh lệch.</p>') + `<button class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`;
+    $('#rbtn').innerHTML = (bad.length ? `<button class="btn p w" data-bdo="bal" style="margin-top:0">Cân đối ${PL.T.length ? PL.T.length + ' chuyển khoản' : ''}${PL.T.length && PL.A.length ? ' + ' : ''}${PL.A.length ? PL.A.length + ' điều chỉnh' : ''}</button><p class="note">Mỗi tài khoản lệch được ghi <b>1 dòng “Điều chỉnh”</b> đúng số lệch, không tự chuyển khoản giữa các tài khoản${PL.A.length ? ':<br>' + PL.A.map(x => '• ' + esc(x.n) + ': <b>' + sgn(x.d) + '</b>').join('<br>') : ''}</p><button class="btn w" data-bdo="adj">Chỉ ghi điều chỉnh (không chuyển khoản)</button>` : has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px"> </p>') + `<button class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`;
 }
 async function doBal(k) {
     if (k === 'form')
@@ -653,7 +652,7 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '
         cur = i;
         cnt = load(a.name);
         try { ED = null; E = null; } catch (e) { }
-        $('#sh').innerHTML = `<h3>Đếm tiền mặt <small class="mut" style="font:500 13px var(--fb,inherit)">${esc(a.name)}</small></h3>
+        $('#sh').innerHTML = `<h3>Bảng Kê Tiền Mặt <small class="mut" style="font:500 13px var(--fb,inherit)">${esc(a.name)}</small></h3>
 <div class="cash" id="cash">${DEN.map(d => `<div class="cr"><b>${num(d)}</b><span class="x">×</span><input class="cin" data-d="${d}" inputmode="numeric" maxlength="5" placeholder="0" value="${cnt[d] ? cnt[d] : ''}" aria-label="Số tờ ${num(d)}"><span class="cs sens" id="cs${d}">–</span></div>`).join('')}</div>
 <div class="ctot"><span>Tổng <small id="cs_n"></small></span><b class="sens" id="cs_t">0 ₫</b></div>
 <button type="button" class="btn p w" data-cfill>Điền vào ô tiền mặt</button>
