@@ -1,5 +1,1 @@
-{
-  "functions": {
-    "api/quick.js": { "includeFiles": "{app.js,config.js}" }
-  }
-}
+{}
