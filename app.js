@@ -97,16 +97,18 @@ const noteTxt = n => splitImg(n).text, hasImg = n => splitImg(n).imgs.length > 0
 const joinImg = (t, a) => [String(t || '').trim(), ...(a || [])].filter(Boolean).join(' ');
 
 /* ===== sync.js ===== */
-async function call(ops, rev) {
+async function call(ops, rev, ms) {
     if (!API)
         throw Error('Thiếu địa chỉ API: file config.js chưa được tải');
-    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 30000);
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 30000);
     let r;
     try {
         r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '' }) });
     }
     catch (e) {
-        throw Error('Không có kết nối mạng');
+        const x = Error(e && e.name === 'AbortError' ? 'Máy chủ Google phản hồi quá chậm, chưa nhận được kết quả' : navigator.onLine === false ? 'Không có kết nối mạng' : 'Không kết nối được tới máy chủ Google');
+        x.net = true;
+        throw x;
     }
     finally {
         clearTimeout(tm);
@@ -116,10 +118,12 @@ async function call(ops, rev) {
         j = await r.json();
     }
     catch (e) {
-        throw Error('Lỗi máy chủ. Kiểm tra lại cấu hình kết nối');
+        const x = Error('Lỗi máy chủ. Kiểm tra lại cấu hình kết nối');
+        x.net = true;
+        throw x;
     }
     if (!j.ok) {
-        if (/Hành động không hợp lệ/i.test(j.err || ''))
+        if (/Thao tác không hợp lệ/i.test(j.err || ''))
             throw Error('Sai phiên làm việc. Vui lòng tải lại trang');
         throw Error(j.err || 'Lỗi máy chủ');
     }
@@ -228,26 +232,49 @@ async function sync(manual) {
         spin(0);
 }
 let chain = Promise.resolve();
+const SAFE_OPS = new Set(['tx.save', 'tx.del', 'tx.purge', 'lim.set']);   // ghi lại nhiều lần vẫn ra cùng kết quả (ID cố định)
+const liveMsg = (s, t) => { const e = $('#live'); if (!e) return; e.dataset.s = s; e.className = 'live ' + s; e.lastChild.textContent = t; const st = $('#st'); if (st) st.textContent = t; };
+async function callRetry(ops, pend) {
+    const max = ops.every(x => SAFE_OPS.has(x.op)) ? 4 : 1;
+    for (let i = 1; ; i++) {
+        try { return await call(ops, '', 45000); }
+        catch (e) {
+            if (!e.net || i >= max) throw e;
+            liveMsg('wait', pend + ' (thử lại ' + i + '/' + (max - 1) + ')');
+            await new Promise(r => setTimeout(r, 1500 * i));
+        }
+    }
+}
 function commit(ops, o = {}) {
+    const had = new Set(S.tx.map(t => t.id)), pend = o.pend || 'Đang lưu…';
     if (o.local)
         o.local();
     render();
     S.busy++;
     spin(1);
+    liveMsg('wait', pend);
     chain = chain.then(async () => {
         let res = { ok: true };
+        const okNote = () => notify(o.ok || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
         try {
-            apply(await call(ops, ''));
-            setLive('ok');
-            notify(o.ok || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
+            apply(await callRetry(ops, pend));
+            if (S.busy <= 1) setLive('ok');
+            okNote();
         }
         catch (e) {
-            res = { ok: false, err: e.message };
-            notify('Chưa lưu được: ' + e.message, { title: 'Lỗi', err: 1 });
-            try {
-                apply(await call([], ''));
+            let fresh = false;
+            try { apply(await call([], '')); fresh = true; } catch (_) { }
+            // hết giờ / rớt mạng nhưng sổ đã nhận giao dịch → coi là thành công
+            const done = e.net && fresh && ops.length && ops.every(x => x.op === 'tx.save' && !had.has(x.row.id) && S.tx.some(t => t.id === x.row.id));
+            if (done) {
+                if (S.busy <= 1) setLive('ok');
+                okNote();
             }
-            catch (_) { }
+            else {
+                res = { ok: false, err: e.message };
+                notify('Chưa lưu được: ' + e.message + (e.net ? (fresh ? '. Sổ chưa nhận giao dịch này, bấm Lưu lại để thử lần nữa' : '. Chưa xác nhận được sổ đã nhận hay chưa, hãy kiểm tra lại') : ''), { title: 'Lỗi', err: 1 });
+                if (S.busy <= 1) setLive(fresh ? 'ok' : 'err');
+            }
         }
         S.busy--;
         if (!S.busy)
@@ -421,7 +448,7 @@ function home() {
     const y = +S.m.slice(0, 4), mo = +S.m.slice(5), dim = new Date(y, mo, 0).getDate(), off = (new Date(y, mo - 1, 1).getDay() + 6) % 7, dc = {};
     chiM(S.m).forEach(t => dc[+t.date.slice(8)] = (dc[+t.date.slice(8)] || 0) + t.amount);
     const cmx = Math.max(1, ...Object.values(dc)), sh = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'tr' : Math.round(n / 1e3) + 'k';
-    const dnum = S.m === ymd(new Date()).slice(0, 7) ? new Date().getDate() : dim, big = chiM(S.m).sort((a, b) => b.amount - a.amount)[0], LC = limCalc(), rec = M.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+    const dnum = S.m === ymd(new Date()).slice(0, 7) ? new Date().getDate() : dim, big = chiM(S.m).sort((a, b) => b.amount - a.amount)[0], LC = limCalc(), rec = M.slice().sort(byTime).slice(0, 6);
     const limHtml = LC.map(x => limBar(x, (x.cat ? emo(x.cat) + ' ' : '') + esc(x.name) + ' · ' + (x.per === 'Ngày' ? 'hôm nay' : 'tháng'))).join(''), ov = LC.filter(x => x.over).length;
     return head('Tổng quan', mlabel(S.m) + ' · ' + M.length + ' giao dịch') + issueBanner() +
         `<div class="kpis">${kpi('Tổng tài sản', vnd(total), '', ownAcc().length + ' tài khoản', 'h')}${kpi('Thu', vnd(thu), 'thu', 'Tháng này')}${kpi('Chi', vnd(chi), 'chi', 'TB ' + vnd(chi / dnum) + '/ngày')}${kpi('Còn lại', vnd(thu - chi), thu - chi < 0 ? 'chi' : '', 'Tiết kiệm ' + (thu ? Math.round((thu - chi) / thu * 100) : 0) + '%')}</div>
@@ -1243,7 +1270,7 @@ const catOk = (t, p, c) => S.cat.some(x => x.t === t && x.p === p && x.c === c);
 function txSave(row, okMsg) {
     const prev = S.tx.find(t => t.id === row.id), old = prev && { ...prev }, isNew = !prev;
     return commit([{ op: 'tx.save', row }], {
-        ok: txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx',
+        pend: isNew ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…', ok: txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx',
         local: () => { S.tx = S.tx.filter(t => t.id !== row.id).concat(row); },
         undo: () => commit(old ? [{ op: 'tx.save', row: old }] : [{ op: 'tx.purge', id: row.id }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(t => t.id !== row.id); if (old)
                 S.tx.push(old); } })
@@ -1253,7 +1280,7 @@ function txSave(row, okMsg) {
 function txDel(id) {
     const old = { ...S.tx.find(x => x.id === id) };
     return commit([{ op: 'tx.del', id }], {
-        ok: 'Mã ' + id + ' đã chuyển vào Thùng rác', title: 'Giao dịch đã được xóa', ico: '🗑️', tag: 'tx-' + id, kind: 'tx', local: () => { S.tx = S.tx.filter(x => x.id !== id); },
+        pend: 'Đang xóa giao dịch…', ok: 'Mã ' + id + ' đã chuyển vào Thùng rác', title: 'Giao dịch đã được xóa', ico: '🗑️', tag: 'tx-' + id, kind: 'tx', local: () => { S.tx = S.tx.filter(x => x.id !== id); },
         undo: () => {
             const tr = S.trash.find(t => t.k === 'gd' && t.id === id);
             return commit(tr ? [{ op: 'restore', at: tr.at, kind: 'gd' }, { op: 'tx.save', row: old }] : [{ op: 'tx.save', row: old }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(x => x.id !== id).concat(old); } });
