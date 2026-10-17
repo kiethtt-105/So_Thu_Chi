@@ -473,3 +473,33 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 /* cân đối laptop / điện thoại */
 @media(min-width:960px){.top{gap:12px}.top .usr{order:2}}
 @media(max-width:480px){.top{gap:5px}.ib{width:33px;height:33px}}
+
+/* ===== Mobile: nút đóng cửa sổ, vuốt xuống để đóng, dễ bấm hơn ===== */
+#sx{position:sticky;top:0;z-index:6;display:grid;place-items:center;width:38px;height:38px;margin:-4px -6px -38px auto;border-radius:50%;background:var(--soft);border:1px solid var(--line2);color:var(--ink);font-size:24px;line-height:1;padding:0;box-shadow:0 2px 8px #0003}
+#sx:active{transform:scale(.92)}
+.sheet h3{padding-right:44px}
+.shh h3{padding-right:0}
+.sheet>.shh{padding-right:46px}
+.sheet:before{height:5px;width:48px}
+.sheet .btn,.sheet .chip,.sheet .seg button{min-height:44px}
+@media(max-width:959px){
+ .sheet{max-height:88dvh;padding-top:12px}
+ .ov{align-items:flex-end}
+ .sheet.drag{transition:none}
+}
+@media(min-width:960px){#sx{margin-top:-10px}}
+
+/* ===== Sửa v2: nút × có hàng riêng (không đè tab), ô ngày/giờ không tràn ===== */
+#sx{position:sticky;top:0;margin:-6px 0 6px auto;flex:none}
+.sheet h3,.sheet>.shh{padding-right:0}
+.f{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.f label,.f .w{min-width:0}
+.sheet input[type=date],.sheet input[type=time],.sheet input[type=month]{display:block;width:100%;min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left;line-height:42px}
+.sheet input[type=date]::-webkit-date-and-time-value,.sheet input[type=time]::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
+@media(max-width:480px){.f{grid-template-columns:minmax(0,1fr)}}
+
+/* ===== Sửa v3: nút × gọn, nằm ngang hàng thanh kéo (không chiếm hàng riêng); máy tính ẩn vì đã có Esc / bấm nền ===== */
+#sx{display:none}
+@media(max-width:959px){
+ #sx{display:grid;position:sticky;top:2px;z-index:6;width:28px;height:28px;margin:-27px 0 -1px auto;font-size:19px;box-shadow:none;background:color-mix(in srgb,var(--ink) 12%,var(--pop));border:0}
+}

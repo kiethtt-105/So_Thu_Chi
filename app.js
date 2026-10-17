@@ -1014,9 +1014,10 @@ $('#ov').addEventListener('keydown', e => {
         if (items[i]) { items[i].classList.add('on'); items[i].scrollIntoView({ block: 'nearest' }); }
     }
     else if (e.key === 'Enter') {
-        e.preventDefault();
+        if (e.isComposing || e.keyCode === 229) return;
         const b = box.querySelector('.cbo.on') || items[0];
-        if (open && b) cbPick(b);
+        // Danh sách đang mở và có kết quả: Enter = chọn. Ngược lại để logic Enter chung xử lý (nhảy ô kế tiếp).
+        if (open && b) { e.preventDefault(); cbPick(b); }
     }
     else if (e.key === 'Escape' && open) {
         e.stopPropagation();
@@ -2995,3 +2996,98 @@ if (typeof notify === 'function') {
 })();
 if (alive())
     boot();
+
+/* ===== Cửa sổ (sheet): nút đóng ×, vuốt xuống để đóng ===== */
+(function () {
+    const sh = $('#sh'), ov = $('#ov');
+    const addX = () => {
+        if (sh.firstElementChild && sh.firstElementChild.id === 'sx') return;
+        const b = document.createElement('button');
+        b.type = 'button'; b.id = 'sx'; b.setAttribute('aria-label', 'Đóng cửa sổ'); b.title = 'Đóng'; b.textContent = '×';
+        sh.insertBefore(b, sh.firstChild);
+    };
+    new MutationObserver(addX).observe(sh, { childList: true });
+    document.addEventListener('click', e => { if (e.target.closest('#sx')) { e.preventDefault(); closeSheet(); } });
+    let y0 = 0, dy = 0, on = false;
+    sh.addEventListener('touchstart', e => {
+        on = sh.scrollTop <= 0 && !e.target.closest('input,select,textarea,.cbl');
+        y0 = e.touches[0].clientY; dy = 0;
+    }, { passive: true });
+    sh.addEventListener('touchmove', e => {
+        if (!on) return;
+        dy = e.touches[0].clientY - y0;
+        if (dy > 0) { sh.classList.add('drag'); sh.style.transform = 'translateY(' + dy + 'px)'; }
+    }, { passive: true });
+    sh.addEventListener('touchend', () => {
+        sh.classList.remove('drag'); sh.style.transform = '';
+        if (on && dy > 90) closeSheet();
+        on = false; dy = 0;
+    });
+})();
+
+/* ===== enter.js: logic phím Enter toàn app =====
+   Quy tắc:
+   1. Đang gõ tiếng Việt (IME) hoặc giữ phím (repeat): bỏ qua, tránh nhảy ô / lưu nhầm.
+   2. Hộp xác nhận (#cf) và màn đăng nhập tự xử lý riêng, không can thiệp.
+   3. Ô chọn Hạng mục/Chi tiết đang mở danh sách: Enter = chọn (xử lý ở forms.js); danh sách đóng thì Enter = ô kế tiếp.
+   4. Trong cửa sổ (sheet): Enter = sang ô kế tiếp; ở ô cuối cùng = bấm nút chính (Lưu / Xác nhận...).
+      Ctrl/Cmd + Enter ở bất kỳ ô nào = bấm nút chính ngay. Sheet không có nút chính (Cài đặt...) thì Enter chỉ thoát ô.
+   5. Ô tìm kiếm giao dịch: Enter = tìm ngay, thu bàn phím.
+   6. Ô số dư thực tế (Cân đối): Enter = sang tài khoản kế tiếp, ô cuối thì thoát ô.
+   7. Các ô lọc / ô nhập khác trong trang: Enter = thoát ô (kích hoạt sự kiện change để áp dụng).
+   Nút, liên kết, ô tích, textarea: giữ hành vi mặc định của trình duyệt. */
+(function () {
+    const PRIMARY = '[data-save],[data-esave],[data-lsave],[data-gsave],[data-rcsave],[data-dbsave],[data-dbpaygo],[data-cdsave],[data-cfill]';
+    const visible = el => el && !el.disabled && el.offsetParent !== null;
+    const fieldsOf = root => [...root.querySelectorAll('input,select')].filter(x =>
+        visible(x) && !['hidden', 'file', 'checkbox', 'radio', 'button', 'submit'].includes(x.type));
+    const focusEl = el => { el.focus(); if (el.select && /^(text|search|number|tel|email|url|)$/.test(el.type || '')) { try { el.select(); } catch (x) { } } };
+    const primaryOf = root => [...root.querySelectorAll(PRIMARY)].find(visible);
+
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || e.defaultPrevented) return;
+        if (e.isComposing || e.keyCode === 229 || e.repeat || e.altKey || e.shiftKey) return;
+        const t = e.target;
+        if (!t || !t.tagName || !/^(INPUT|SELECT)$/.test(t.tagName)) return;
+        if (['button', 'submit', 'checkbox', 'radio', 'file'].includes(t.type)) return;
+        if ($('#cf').classList.contains('open')) return;
+        if (t.closest('#login')) return;
+        const quick = e.ctrlKey || e.metaKey;
+
+        // --- Trong cửa sổ (sheet) ---
+        const sh = t.closest('#sh');
+        if (sh && $('#ov').classList.contains('open')) {
+            e.preventDefault();
+            const btn = primaryOf(sh);
+            if (!btn) return t.blur();                      // Cài đặt, thông báo...: chỉ thoát ô
+            if (quick) return btn.click();
+            const list = fieldsOf(sh), i = list.indexOf(t), next = list[i + 1];
+            if (next) return focusEl(next);
+            t.blur();                                       // chốt giá trị (sự kiện change) rồi lưu
+            return btn.click();
+        }
+
+        // --- Ô tìm kiếm giao dịch ---
+        if (t.id === 'q') {
+            e.preventDefault();
+            clearTimeout(qT);
+            qApply();
+            const q = $('#q');
+            if (q) q.blur();
+            return;
+        }
+
+        // --- Nhập số dư thực tế ở màn Cân đối ---
+        if (t.classList.contains('ba')) {
+            e.preventDefault();
+            const all = $$('.ba'), next = all[all.indexOf(t) + 1];
+            return next ? focusEl(next) : t.blur();
+        }
+
+        // --- Ô khác trong trang (bộ lọc ngày, số tiền, chọn tài khoản...) ---
+        if (t.closest('#v')) {
+            e.preventDefault();
+            t.blur();
+        }
+    });
+})();
