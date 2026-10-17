@@ -507,3 +507,28 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 button,[data-edit],.chip,.row,.btn,.ib{touch-action:manipulation}
 #bn button{font-size:11px}
 .qd{display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}
+
+/* ===== Thêm giao dịch: bố cục cân đối (v22) ===== */
+.sheet .seg{margin-bottom:12px}
+.amtw{position:relative;margin:0}
+.amtw .amt{width:100%;box-sizing:border-box;text-align:center;padding-right:44px;padding-left:44px}
+.amtw .cur{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--mut);pointer-events:none}
+.qk{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 14px}
+.qk small{color:var(--mut);font-size:12px}
+.sheet .qk .chip{min-height:36px;padding:0 14px}
+.f{align-items:end;gap:12px 10px}
+.f>label{display:flex;flex-direction:column;gap:5px;min-width:0}
+.f .w{grid-column:1/-1}
+.f .qd3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:-2px 0 0}
+.sheet .f .qd3 .chip{min-height:38px;width:100%;justify-content:center;padding:0 6px;white-space:nowrap}
+.f .nodata{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px dashed var(--line2);border-radius:12px;font-size:13px;color:var(--mut)}
+.f input,.f select{width:100%;box-sizing:border-box;min-width:0}
+.sfoot{position:sticky;bottom:calc(-20px - env(safe-area-inset-bottom));margin:16px -20px calc(-20px - env(safe-area-inset-bottom));padding:12px 20px calc(14px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);display:grid;gap:8px;z-index:2}
+.sfoot .btn{width:100%;margin:0}
+.sec2{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px}
+.sec2 .btn{margin:0;white-space:nowrap;padding:0 8px}
+@media(min-width:700px){.sfoot{bottom:-24px;margin:18px -24px -24px;padding:14px 24px 20px}}
+
+/* v22b: bỏ footer dính, nút nằm cuối form */
+.sfoot,.sfoot{position:static;bottom:auto;margin:16px 0 0;padding:0;border-top:0;background:none}
+@media(min-width:700px){.sfoot{position:static;bottom:auto;margin:16px 0 0;padding:0}}

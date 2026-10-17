@@ -954,8 +954,8 @@ const cbHtml = (kind, L) => L.length
     ? L.map((o, k) => `<div class="cbo ${k === 0 ? 'on' : ''}" role="option" data-cbo="${kind}" data-p="${esc(o.p)}" data-c="${esc(o.c)}">${emo(o.p)} ${esc(o.lb)}</div>`).join('')
     : '<div class="cbe">Không thấy kết quả. Thử từ khác, hoặc thêm ở mục Hạng mục.</div>';
 function catFields(ty, cat, sub) {
-    return `<div class="cbw"><span class="l">Hạng mục</span><div class="cb"><input id="fp" data-cb="p" autocomplete="off" placeholder="Chọn hoặc gõ để tìm…" value="${esc(cat)}"><div class="cbl hide"></div></div></div>
-<div class="cbw"><span class="l">Chi tiết</span><div class="cb"><input id="fs" data-cb="s" autocomplete="off" placeholder="${cat ? 'Chọn hoặc gõ để tìm…' : 'Gõ để tìm (tự điền hạng mục)…'}" value="${esc(sub)}"><div class="cbl hide"></div></div></div>`;
+    return `<div class="cbw"><span class="l">Hạng mục</span><div class="cb"><input id="fp" data-cb="p" autocomplete="off" placeholder="Chọn hoặc gõ…" value="${esc(cat)}"><div class="cbl hide"></div></div></div>
+<div class="cbw"><span class="l">Chi tiết</span><div class="cb"><input id="fs" data-cb="s" autocomplete="off" placeholder="Chọn hoặc gõ…" value="${esc(sub)}"><div class="cbl hide"></div></div></div>`;
 }
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 function defAcc() { let a = ''; try { a = localStorage.lastAcc || ''; } catch (e) { } return S.acc.some(x => x.name === a) ? a : ((S.acc.find(x => x.type !== HELD) || S.acc[0] || {}).name || ''); }
@@ -969,15 +969,28 @@ $('#ov').addEventListener('click', e => {   // nút ngày nhanh
 });
 function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
 function form() {
-    const ty = E.type, op = (a, v) => a.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const ty = E.type, op = (a, v) => a.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join(''), noAcc = !S.acc.length;
+    // Chưa có danh sách tài khoản (chưa tải được dữ liệu): báo rõ + nút tải lại, không để ô chọn trống trơn
+    const accBox = (id, lb, extra) => noAcc
+        ? `<div class="w nodata"><span>${S.err ? 'Chưa tải được tài khoản: ' + esc(S.err) : 'Đang tải danh sách tài khoản…'}</span><button type="button" class="chip" data-reload>Tải lại</button></div>`
+        : `<label class="w">${lb}<select id="${id}">${extra || ''}${op(S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc), id === 'ft' ? E.accTo : E.acc)}</select></label>`;
     $('#sh').innerHTML = `<div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div>${tplRow()}
-<input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><div class="qd" style="margin:6px 0 10px"><button type="button" class="chip" data-k="000">+000</button><small class="mut" style="align-self:center">hoặc gõ 50k, 1.5tr</small></div><div class="f">
-<label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label><div class="w qd"><button type="button" class="chip" data-qd="0">Hôm nay</button><button type="button" class="chip" data-qd="-1">Hôm qua</button><button type="button" class="chip" data-qd="-2">Hôm kia</button></div><label class="w">${ty === 'Chuyển khoản' ? 'Từ tài khoản' : 'Tài khoản'}<select id="fc">${op(S.acc.map(a => a.name), E.acc)}</select></label>
-${ty === 'Chuyển khoản' ? `<label class="w">Đến tài khoản<select id="ft"><option value="">Chọn…</option>${op(S.acc.map(a => a.name).filter(n => n !== E.acc), E.accTo)}</select></label>` : ty === 'Điều chỉnh' ? '' : catFields(ty, E.cat, E.sub)}
+<div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
+<div class="qk"><button type="button" class="chip" data-k="000">+000</button><small>hoặc gõ 50k, 1.5tr</small></div>
+<div class="f">
+<label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label>
+<div class="w qd3"><button type="button" class="chip" data-qd="0">Hôm nay</button><button type="button" class="chip" data-qd="-1">Hôm qua</button><button type="button" class="chip" data-qd="-2">Hôm kia</button></div>
+${accBox('fc', ty === 'Chuyển khoản' ? 'Từ tài khoản' : 'Tài khoản')}
+${ty === 'Chuyển khoản' ? (noAcc ? '' : accBox('ft', 'Đến tài khoản', '<option value="">Chọn…</option>')) : ty === 'Điều chỉnh' ? '' : catFields(ty, E.cat, E.sub)}
 <label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="w" id="att"></div></div>
-<button class="btn p w" data-save>${E.isNew ? 'Lưu giao dịch' : 'Lưu thay đổi'}</button><button class="btn w" data-tplsave style="margin-top:6px">☆ Lưu thành mẫu</button>${E.isNew ? '' : '<button class="btn w" data-dup>⧉ Nhân đôi giao dịch</button><button class="btn d w" data-del style="margin-top:2px">Xóa giao dịch</button>'}`;
+<div class="sfoot"><button class="btn p w" data-save>${E.isNew ? 'Lưu giao dịch' : 'Lưu thay đổi'}</button>
+<div class="sec2"><button type="button" class="btn" data-tplsave>☆ Lưu mẫu</button>${E.isNew ? '' : '<button type="button" class="btn" data-dup>⧉ Nhân đôi</button><button type="button" class="btn d" data-del>🗑 Xóa</button>'}</div></div>`;
     renderAtt();
 }
+$('#ov').addEventListener('click', e => {   // nút "Tải lại" khi chưa có tài khoản
+    if (!E || !e.target.closest('[data-reload]')) return;
+    sync(true).then(() => { if (E && S.acc.length) { pull(); E.acc = defAcc(); form(); } else if (E) form(); });
+});
 function pull() { const g = i => ($(i) || {}).value; E.date = g('#fd') || E.date; if ($('#fh'))
     E.time = g('#fh'); E.acc = g('#fc') || E.acc; E.note = g('#fn') || ''; if ($('#ft'))
     E.accTo = g('#ft'); E.amount = pm($('#fa').value); }
