@@ -1,4 +1,4 @@
-const V = 'stc-v20';
+const V = 'stc-v21';
 const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -23,7 +23,7 @@ self.addEventListener('fetch', e => {
   const u = new URL(r.url);
   if (u.origin === location.origin) {
     e.respondWith(
-      Promise.race([fetch(r), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))])
+      Promise.race([fetch(r), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500))])
         .then(res => {
           if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put(r, cp)); }
           return res;

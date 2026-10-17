@@ -1,15 +1,28 @@
 /* ===== core.js ===== */
-const { PASS, API, NAME } = window.CONFIG || {}, POLL_MS = 10000, TTL = 24 * 3600e3;
-try { localStorage.removeItem('sess'); } catch (e) { }   // dọn phiên cũ từng lưu lâu dài
-const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
+const { PASS, API, NAME } = window.CONFIG || {}, POLL_MS = 10000, TTL = 7 * 24 * 3600e3;
+const alive = () => { let t = 0; try { t = +localStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { localStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
 const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const newId = i => 'G' + Date.now().toString(36) + (i || 0) + Math.floor(Math.random() * 1296).toString(36);
-const pm = v => { const s = String(v || '').trim(), n = Number(s.replace(/[^\d]/g, '')); return n ? (s.startsWith('-') ? -n : n) : 0; };
+const PM_U = { k: 1e3, nghìn: 1e3, ngàn: 1e3, tr: 1e6, triệu: 1e6, m: 1e6, tỷ: 1e9, ty: 1e9, b: 1e9 };
+const pm = v => {
+    const raw = String(v || '').trim().toLowerCase(), neg = raw.startsWith('-'), s = raw.replace(/^-/, '').replace(/[₫đ\s]/g, '');
+    const m = s.match(/^(\d+)(?:[.,](\d{1,3}))?(k|nghìn|ngàn|tr|triệu|m|tỷ|ty|b)(\d{1,3})?$/);
+    const n = m ? Math.round(parseFloat(m[1] + '.' + (m[2] || m[4] || '0')) * PM_U[m[3]]) : Number(s.replace(/[^\d]/g, ''));
+    return n ? (neg ? -n : n) : 0;
+};
+document.addEventListener('focusout', e => {
+    const t = e.target;
+    if (!t.classList || !t.classList.contains('money') || !/[^\d\s.,\-₫đ]/i.test(t.value)) return;
+    const n = pm(t.value);
+    t.value = n ? num(n) : '';
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+});
 const fm = el => {
+    if (/[^\d\s.,\-₫đ]/i.test(el.value)) return;   // đang gõ dạng rút gọn (50k, 1.5tr) → giữ nguyên, đổi thành số khi rời ô
     const s = el.value.trim(), ng = el.dataset.neg && s.startsWith('-'), d = s.replace(/[^\d]/g, '');
     const cur = document.activeElement === el, left = cur ? el.value.slice(0, el.selectionStart).replace(/\D/g, '').length : 0;
     el.value = (ng ? '-' : '') + (d ? num(+d) : '');
@@ -52,7 +65,7 @@ let E = null, ED = null;
 if (!TABS.some(t => t[0] === S.tab))
     S.tab = 'home';
 try {
-    const c = JSON.parse(sessionStorage.cache || 'null');
+    const c = JSON.parse(localStorage.cache || 'null');
     if (c) {
         ['tx', 'acc', 'cat', 'lim', 'trash', 'issues'].forEach(k => S[k] = c[k] || []);
         S.ready = true;
@@ -121,7 +134,7 @@ function apply(j) {
     S.rev = j.rev;
     S.ready = true;
     try {
-        sessionStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues });
+        localStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues });
     }
     catch (e) { }
     return true;
@@ -260,7 +273,7 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
+function lock() { sessionStorage.clear(); localStorage.removeItem('sess'); localStorage.removeItem('cache'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
 $('#lf').onsubmit = ev => { ev.preventDefault(); if ($('#pw').value === PASS) {
     touch();
     boot();
@@ -272,6 +285,7 @@ else {
     $('#lf').classList.add('shake');
     $('#pw').select();
 } };
+$('#pw').addEventListener('input', () => { const p = String(PASS || ''), f = $('#lf'); if (p && $('#pw').value.length === p.length) f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', { cancelable: true })); });
 function setUser() {
     const n = String(NAME || '').trim(), ini = Array.from(n)[0] || '';
     $$('.usr').forEach(e => e.classList.toggle('hide', !n));
@@ -283,6 +297,7 @@ function setUser() {
 setUser();
 function boot() { setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); sync(true); if (typeof pushInit === 'function')
     pushInit(); }
+let ACT_T = Date.now(), PT = 0;
 document.addEventListener('visibilitychange', () => { if (document.hidden)
     return; if (!alive())
     return lock(); sync(false); });
@@ -290,14 +305,14 @@ setInterval(() => { if (!alive()) {
     if (!$('#app').classList.contains('hide'))
         lock();
     return;
-} sync(false); }, POLL_MS);
+} if (Date.now() - ACT_T > 120000 && ++PT % 6) return; sync(false); }, POLL_MS);
 document.addEventListener('focusout', () => setTimeout(() => { if (S.dirty && !typing()) {
     S.dirty = false;
     render();
 } }, 60));
 addEventListener('offline', () => setLive('err'));
 addEventListener('online', () => { fails = 0; sync(false); });
-['click', 'keydown', 'touchstart'].forEach(t => document.addEventListener(t, () => { if (alive())
+['click', 'keydown', 'touchstart'].forEach(t => document.addEventListener(t, () => { ACT_T = Date.now(); if (alive())
     touch(); }, { passive: true }));
 
 /* ===== data.js ===== */
@@ -349,19 +364,25 @@ const head = (t, sub, btns = '') => `<div class="ph"><div><h1>${t}</h1><p>${sub}
 const kpi = (l, v, c = '', s = '', h = '') => `<div class="card kpi ${h}"><small>${l}</small><b class="sens ${c}">${v}</b><em>${s}</em></div>`;
 let _bk = null;
 function balMap() {
-    if (_bk && _bk.t === S.tx && _bk.a === S.acc && _bk.n === S.tx.length)
+    if (_bk && _bk.t === S.tx && _bk.a === S.acc && _bk.n === S.tx.length && _bk.d === ymd(new Date()))
         return _bk.m;
     const B = {};
     S.acc.forEach(a => B[a.name] = +a.open || 0);
+    const N = Object.assign({}, B), today = ymd(new Date());   // N = số dư hiện tại (chỉ tính giao dịch có ngày <= hôm nay, khớp công thức TaiKhoan trong Gsheet)
     const tm = t => (t.at || '').slice(11) || '23:59:59', m = {};
     S.tx.map((t, i) => [t, i]).sort((x, y) => x[0].date.localeCompare(y[0].date) || tm(x[0]).localeCompare(tm(y[0])) || x[1] - y[1]).forEach(([t]) => {
         const x = t.amount;
         B[t.acc] = (B[t.acc] || 0) + (t.type === 'Thu' || t.type === 'Điều chỉnh' ? x : -x);
         if (t.type === 'Chuyển khoản' && t.accTo)
             B[t.accTo] = (B[t.accTo] || 0) + x;
+        if (t.date <= today) {
+            N[t.acc] = (N[t.acc] || 0) + (t.type === 'Thu' || t.type === 'Điều chỉnh' ? x : -x);
+            if (t.type === 'Chuyển khoản' && t.accTo)
+                N[t.accTo] = (N[t.accTo] || 0) + x;
+        }
         m[t.id] = B[t.acc];
     });
-    _bk = { t: S.tx, a: S.acc, n: S.tx.length, m, B };
+    _bk = { t: S.tx, a: S.acc, n: S.tx.length, d: today, m, B: N };
     return m;
 }
 function txRow(t, v) {
@@ -759,7 +780,7 @@ document.addEventListener('click', e => {
         case 'fx': return fxToggle();
         case 'moretx':
             S.pg += 100;
-            return render();
+            return refreshList() || render();
         case 'csv': return csv();
         case 'lim': return openLim();
         case 'more': return openMore();
@@ -785,12 +806,23 @@ document.addEventListener('click', e => {
     render();
 });
 let qT = 0, qComp = false;
+function refreshList() {
+    if (S.tab !== 'tx' || !S.ready) return false;
+    const tmp = document.createElement('div');
+    try { tmp.innerHTML = txs(); } catch (e) { return false; }
+    let n = 0;
+    ['.sum', '.card.flush'].forEach(sel => { const a = $('#v ' + sel), b = tmp.querySelector(sel); if (a && b) { a.replaceWith(b); n++; } });
+    if (n < 2) return false;
+    if (typeof mdFix === 'function') mdFix();
+    return true;
+}
 function qApply() {
     const t = $('#q');
     if (!t)
         return;
     S.q = t.value;
     S.pg = 100;
+    if (refreshList()) return;
     const p = t.selectionStart;
     render();
     const q = $('#q');
@@ -836,7 +868,7 @@ document.addEventListener('change', e => { const k = { x_rg: 'rg', x_acc: 'xa', 
 } });
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape')
-        return closeSheet();
+        return tryClose();
     if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || '') || !$('#login').classList.contains('hide'))
         return;
     if (e.key === '[') {
@@ -873,6 +905,8 @@ function openSheet() {
     setTimeout(() => { const a = $('#ov.open #fa'); if (a && !ov.contains(document.activeElement))
         a.focus(); }, 60);
 }
+function formDirty() { if (!E || !E.isNew) return false; const a = $('#fa'), n = $('#fn'); return !!((a && pm(a.value)) || (n && n.value.trim()) || (E.imgs && E.imgs.length)); }
+async function tryClose() { if (formDirty() && !await ask('Đóng mà chưa lưu?', 'Số tiền / ghi chú đang nhập sẽ bị mất.', { ok: 'Đóng', cancel: 'Tiếp tục nhập', icon: '✍️' })) return; closeSheet(); }
 function closeSheet() {
     const ov = $('#ov'), was = ov.classList.contains('open');
     ov.classList.remove('open');
@@ -924,12 +958,21 @@ function catFields(ty, cat, sub) {
 <div class="cbw"><span class="l">Chi tiết</span><div class="cb"><input id="fs" data-cb="s" autocomplete="off" placeholder="${cat ? 'Chọn hoặc gõ để tìm…' : 'Gõ để tìm (tự điền hạng mục)…'}" value="${esc(sub)}"><div class="cbl hide"></div></div></div>`;
 }
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: (S.acc[0] || {}).name || '', accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
+function defAcc() { let a = ''; try { a = localStorage.lastAcc || ''; } catch (e) { } return S.acc.some(x => x.name === a) ? a : ((S.acc.find(x => x.type !== HELD) || S.acc[0] || {}).name || ''); }
+$('#ov').addEventListener('click', e => {   // nút ngày nhanh
+    const k = e.target.closest('[data-k]');
+    if (k && E) { const a = $('#fa'); if (a && a.value.replace(/\D/g, '')) { a.value += k.dataset.k; fm(a); a.focus(); } return; }
+    const b = e.target.closest('[data-qd]');
+    if (!b || !E) return;
+    const d = new Date(); d.setDate(d.getDate() + +b.dataset.qd);
+    E.date = ymd(d); const f = $('#fd'); if (f) f.value = E.date;
+});
+function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
 function form() {
     const ty = E.type, op = (a, v) => a.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
     $('#sh').innerHTML = `<div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div>${tplRow()}
-<input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><div class="f">
-<label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label><label class="w">${ty === 'Chuyển khoản' ? 'Từ tài khoản' : 'Tài khoản'}<select id="fc">${op(S.acc.map(a => a.name), E.acc)}</select></label>
+<input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><div class="qd" style="margin:6px 0 10px"><button type="button" class="chip" data-k="000">+000</button><small class="mut" style="align-self:center">hoặc gõ 50k, 1.5tr</small></div><div class="f">
+<label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label><div class="w qd"><button type="button" class="chip" data-qd="0">Hôm nay</button><button type="button" class="chip" data-qd="-1">Hôm qua</button><button type="button" class="chip" data-qd="-2">Hôm kia</button></div><label class="w">${ty === 'Chuyển khoản' ? 'Từ tài khoản' : 'Tài khoản'}<select id="fc">${op(S.acc.map(a => a.name), E.acc)}</select></label>
 ${ty === 'Chuyển khoản' ? `<label class="w">Đến tài khoản<select id="ft"><option value="">Chọn…</option>${op(S.acc.map(a => a.name).filter(n => n !== E.acc), E.accTo)}</select></label>` : ty === 'Điều chỉnh' ? '' : catFields(ty, E.cat, E.sub)}
 <label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="w" id="att"></div></div>
 <button class="btn p w" data-save>${E.isNew ? 'Lưu giao dịch' : 'Lưu thay đổi'}</button><button class="btn w" data-tplsave style="margin-top:6px">☆ Lưu thành mẫu</button>${E.isNew ? '' : '<button class="btn w" data-dup>⧉ Nhân đôi giao dịch</button><button class="btn d w" data-del style="margin-top:2px">Xóa giao dịch</button>'}`;
@@ -962,9 +1005,12 @@ $('#ov').addEventListener('input', e => {
         fm(t);
     if (E && t.dataset.cb) return cbOpen(t, true);
     if (E && t.id === 'fc') {
-        pull();
-        form();
-        $('#fc').focus();
+        if (E.type === 'Chuyển khoản') {
+            pull();
+            form();
+            $('#fc').focus();
+        }
+        else E.acc = t.value;
     }
 });
 function cbOpen(inp, filter) {
@@ -1034,7 +1080,7 @@ $('#ov').addEventListener('click', e => {
 $('#ov').addEventListener('click', async (e) => {
     const T = e.target;
     if (T.id === 'ov')
-        return closeSheet();
+        return tryClose();
     const q = s => T.closest(s);
     if (q('[data-ico]')) {
         const b = q('[data-ico]');
@@ -1159,8 +1205,10 @@ $('#ov').addEventListener('click', async (e) => {
         else if (E.at) {
             row.at = E.at;
         }
+        const wasNew = !S.tx.some(t => t.id === row.id);
+        try { localStorage.lastAcc = E.acc; } catch (x) { }
         closeSheet();
-        txSave(row);
+        txSave(row).then(r => { if (r && !r.ok && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });   // lỗi → trả form lại với dữ liệu đã nhập
     }
 });
 
@@ -1183,8 +1231,8 @@ function txSave(row, okMsg) {
     const prev = S.tx.find(t => t.id === row.id), old = prev && { ...prev }, isNew = !prev;
     return commit([{ op: 'tx.save', row }], {
         ok: txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx',
-        local: () => { S.tx = S.tx.filter(t => t.id !== row.id).concat(row); S.m = row.date.slice(0, 7); },
-        undo: () => commit(old ? [{ op: 'tx.save', row: old }] : [{ op: 'tx.del', id: row.id }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(t => t.id !== row.id); if (old)
+        local: () => { S.tx = S.tx.filter(t => t.id !== row.id).concat(row); },
+        undo: () => commit(old ? [{ op: 'tx.save', row: old }] : [{ op: 'tx.purge', id: row.id }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(t => t.id !== row.id); if (old)
                 S.tx.push(old); } })
     }).then(r => { if (r.ok)
         limWarn(row); return r; });
@@ -1290,7 +1338,7 @@ function qRow(p) {
     return { id: newId(), date: d, type: p.type, amount: p.amount, acc: p.acc, accTo: p.type === 'Chuyển khoản' ? p.accTo : '', cat: x ? '' : p.cat, sub: x ? '' : p.sub, note: p.note || '', at: d + 'T' + tm + ':00' };
 }
 function qOpen(p) {
-    E = { id: newId(), date: p.date || todayS(), time: p.time || hm(new Date()), type: p.type || 'Chi', amount: p.amount || 0, acc: p.acc || (S.acc[0] || {}).name || '', accTo: p.accTo || '', cat: p.cat || '', sub: p.sub || '', note: p.note || '', imgs: [], isNew: true };
+    E = { id: newId(), date: p.date || todayS(), time: p.time || hm(new Date()), type: p.type || 'Chi', amount: p.amount || 0, acc: p.acc || defAcc(), accTo: p.accTo || '', cat: p.cat || '', sub: p.sub || '', note: p.note || '', imgs: [], isNew: true };
     ED = null;
     form();
     openSheet();
@@ -3007,7 +3055,7 @@ if (alive())
         sh.insertBefore(b, sh.firstChild);
     };
     new MutationObserver(addX).observe(sh, { childList: true });
-    document.addEventListener('click', e => { if (e.target.closest('#sx')) { e.preventDefault(); closeSheet(); } });
+    document.addEventListener('click', e => { if (e.target.closest('#sx')) { e.preventDefault(); tryClose(); } });
     let y0 = 0, dy = 0, on = false;
     sh.addEventListener('touchstart', e => {
         on = sh.scrollTop <= 0 && !e.target.closest('input,select,textarea,.cbl');
@@ -3020,7 +3068,7 @@ if (alive())
     }, { passive: true });
     sh.addEventListener('touchend', () => {
         sh.classList.remove('drag'); sh.style.transform = '';
-        if (on && dy > 90) closeSheet();
+        if (on && dy > 90) tryClose();
         on = false; dy = 0;
     });
 })();

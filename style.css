@@ -503,3 +503,7 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 @media(max-width:959px){
  #sx{display:grid;position:sticky;top:2px;z-index:6;width:28px;height:28px;margin:-27px 0 -1px auto;font-size:19px;box-shadow:none;background:color-mix(in srgb,var(--ink) 12%,var(--pop));border:0}
 }
+/* ===== cải tiến UX ===== */
+button,[data-edit],.chip,.row,.btn,.ib{touch-action:manipulation}
+#bn button{font-size:11px}
+.qd{display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}
