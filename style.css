@@ -435,6 +435,15 @@ html:not(.dark) .ph h1{background:none;color:var(--ink);-webkit-background-clip:
 .usr.sdu span{display:flex;flex-direction:column;min-width:0;line-height:1.25}.usr.sdu small{font-size:11px;color:var(--mut)}
 html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc .usr.sdu span{display:none}
 @media(max-width:959px){.usr.sdu{display:none!important}}
+/* Người dùng: thanh bên mở rộng -> thẻ chào ở cuối thanh bên; thanh bên thu gọn -> tên hiện ở thanh trên */
+@media(min-width:960px){
+ .top .usr{display:none!important}
+ html.sbc .top .usr:not(.hide){display:flex!important}
+ html.sbc .top .usr b{display:block}
+ html.sbc .usr.sdu{display:none!important}
+ #sd .usr.sdu{order:8;margin:auto 0 8px}
+ #sbt{order:9;margin-top:0}
+}
 @media(max-width:480px){.usr{padding:3px}.usr b{display:none}}
 
 #toast{padding:10px 8px 10px 12px;gap:10px;cursor:pointer}
@@ -532,3 +541,17 @@ button,[data-edit],.chip,.row,.btn,.ib{touch-action:manipulation}
 /* v22b: bỏ footer dính, nút nằm cuối form */
 .sfoot,.sfoot{position:static;bottom:auto;margin:16px 0 0;padding:0;border-top:0;background:none}
 @media(min-width:700px){.sfoot{position:static;bottom:auto;margin:16px 0 0;padding:0}}
+
+/* ===== In / PDF ===== */
+#phd{display:none}
+@media print{
+ @page{size:A4;margin:12mm}
+ html,body{background:#fff!important;color:#0F1729!important}
+ *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ #phd{display:block;border-bottom:2px solid #2447D6;padding:0 0 8px;margin:0 0 14px}
+ #phd b{display:block;font:700 18px var(--fd);color:#0F1729}
+ #phd small{display:block;color:#586179;font-size:11px;margin-top:3px}
+ .ph h1{background:none!important;-webkit-text-fill-color:currentColor!important;color:#0F1729!important}
+ .card,.kpi,tr,.row{break-inside:avoid}
+ .wrap,main{display:block!important;padding:0!important;max-width:none!important;margin:0!important}
+}

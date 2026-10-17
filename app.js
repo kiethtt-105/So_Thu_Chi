@@ -1,6 +1,6 @@
 /* ===== core.js ===== */
 const { PASS, API, NAME } = window.CONFIG || {}, POLL_MS = 10000, TTL = 7 * 24 * 3600e3;
-const alive = () => { let t = 0; try { t = +localStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { localStorage.sess = n; } catch (e) { } }; })();
+const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -762,6 +762,7 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '
 /* ===== events.js ===== */
 const go = t => { S.tab = t; location.hash = t; scrollTo(0, 0); closeSheet(); render(); };
 document.addEventListener('click', e => {
+    if (e.target.closest('[data-a3="print"]')) { setTimeout(() => window.print(), 150); return; }
     const t = e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-a],[data-bdo],[data-ed],[data-rs]');
     if (!t || t.closest('#ov'))
         return;
@@ -923,8 +924,10 @@ function csv() {
         s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; }).join(',')).join('\n')], { type: 'text/csv' }), a = document.createElement('a');
     a.href = URL.createObjectURL(b);
     a.download = 'so-thu-chi.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 4000);
 }
 let _opener = null;
 function openSheet() {
@@ -1397,6 +1400,8 @@ function delta(x, y, isChi = true) {
     if (p === 0)
         return '<span class="dl mut">±0%</span>';
     const bad = isChi ? p > 0 : p < 0;
+    if (p >= 300 && y > 0)
+        return `<span class="dl ${bad ? 'chi' : 'thu'}">▲ gấp ${(x / y).toFixed(1).replace('.', ',').replace(',0', '')} lần</span>`;
     return `<span class="dl ${bad ? 'chi' : 'thu'}">${p > 0 ? '▲' : '▼'} ${Math.abs(p)}%</span>`;
 }
 const flow = t => t.type === 'Thu' || t.type === 'Điều chỉnh' ? t.amount : t.type === 'Chi' ? -t.amount : 0;
@@ -2852,14 +2857,61 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     const _txs = txs; txs = function () { return _txs().replace('<div class="sum">', () => fltBar() + '<div class="sum">'); };
 
     /* ---------- Xuất Excel, in PDF, sao lưu ---------- */
-    function dl(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+    function dl(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 4000); }
+    /* xlsx thật: tự ghép file zip (không nén) + XML, không cần thư viện, chạy offline */
+    const CRCT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+    const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRCT[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    function zipStore(files) {
+        const te = new TextEncoder(), parts = [], cen = []; let off = 0;
+        const u16 = v => [v & 255, v >> 8 & 255], u32 = v => [v & 255, v >> 8 & 255, v >> 16 & 255, v >>> 24 & 255];
+        files.forEach(([name, text]) => {
+            const nm = te.encode(name), d = te.encode(text), crc = crc32(d);
+            const h = new Uint8Array([0x50, 0x4B, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(d.length), ...u32(d.length), ...u16(nm.length), ...u16(0)]);
+            parts.push(h, nm, d);
+            cen.push(new Uint8Array([0x50, 0x4B, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(d.length), ...u32(d.length), ...u16(nm.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), nm);
+            off += h.length + nm.length + d.length;
+        });
+        const cl = cen.reduce((t, x) => t + x.length, 0);
+        return new Blob([...parts, ...cen, new Uint8Array([0x50, 0x4B, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length), ...u32(cl), ...u32(off), 0, 0])], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+    const xcol = i => { let s = ''; for (i++; i > 0; i = (i - 1) / 26 | 0) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };
+    const xtxt = v => String(v ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    /* ô: số -> number; {n, s} -> style; chữ -> inlineStr. style: 1 đậm+nền, 2 số #,##0, 3 đậm số, 4 phần trăm, 5 đậm */
+    function xsheet(rows, widths, freeze) {
+        const body = rows.map((r, y) => '<row r="' + (y + 1) + '">' + r.map((c, x) => {
+            if (c == null || c === '') return '';
+            let v = c, st = 0; if (typeof c === 'object') { v = c.v; st = c.s; }
+            const ref = xcol(x) + (y + 1);
+            return typeof v === 'number' && isFinite(v)
+                ? '<c r="' + ref + '"' + (st ? ' s="' + st + '"' : '') + '><v>' + v + '</v></c>'
+                : '<c r="' + ref + '" t="inlineStr"' + (st ? ' s="' + st + '"' : '') + '><is><t xml:space="preserve">' + xtxt(v) + '</t></is></c>';
+        }).join('') + '</row>').join('');
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            + (freeze ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' : '')
+            + '<cols>' + widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join('') + '</cols><sheetData>' + body + '</sheetData></worksheet>';
+    }
     function xlsExport() {
         const m = S.m, L = S.tx.filter(t => inM(t, m)).sort((a, b) => a.date.localeCompare(b.date) || (a.at || '').localeCompare(b.at || '')), { thu, chi } = sums(m), cats = group(chiM(m), t => t.cat || 'Chưa phân loại');
-        const td = v => '<td>' + esc(v) + '</td>';
-        const html = `<html><head><meta charset="utf-8"></head><body><h3>Báo cáo ${esc(mlabel(m))}</h3><table border="1"><tr>${td('Thu')}${td(thu)}</tr><tr>${td('Chi')}${td(chi)}</tr><tr>${td('Còn lại')}${td(thu - chi)}</tr></table><br>
-<table border="1"><tr><th>Hạng mục chi</th><th>Số tiền</th><th>Tỷ lệ</th></tr>${cats.map(([k, v]) => '<tr>' + td(k) + td(v) + td(chi ? Math.round(v / chi * 100) + '%' : '') + '</tr>').join('')}</table><br>
-<table border="1"><tr><th>Ngày</th><th>Loại</th><th>Số tiền</th><th>Tài khoản</th><th>Đến tài khoản</th><th>Hạng mục</th><th>Chi tiết</th><th>Ghi chú</th></tr>${L.map(t => '<tr>' + [t.date, t.type, t.amount, t.acc, t.accTo, t.cat, t.sub, noteTxt(t.note)].map(td).join('') + '</tr>').join('')}</table></body></html>`;
-        dl(new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' }), 'so-thu-chi-' + m + '.xls');
+        const H = a => a.map(v => ({ v, s: 1 }));
+        const s1 = [[{ v: 'Báo cáo ' + mlabel(m), s: 5 }], [], [{ v: 'Thu', s: 5 }, { v: thu, s: 2 }], [{ v: 'Chi', s: 5 }, { v: chi, s: 2 }], [{ v: 'Còn lại', s: 5 }, { v: thu - chi, s: 3 }], [],
+            H(['Hạng mục chi', 'Số tiền', 'Tỷ lệ']), ...cats.map(([k, v]) => [k, { v, s: 2 }, { v: chi ? v / chi : 0, s: 4 }])];
+        const s2 = [H(['Ngày', 'Loại', 'Số tiền', 'Tài khoản', 'Đến tài khoản', 'Hạng mục', 'Chi tiết', 'Ghi chú']),
+            ...L.map(t => [t.date, t.type, { v: Number(t.amount) || 0, s: 2 }, t.acc, t.accTo, t.cat, t.sub, noteTxt(t.note)])];
+        const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', RN = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+        const styles = X + '<styleSheet ' + NS + '><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+            + '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3E9FD"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+            + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
+            + '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="9" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+        const blob = zipStore([
+            ['[Content_Types].xml', X + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+            ['_rels/.rels', X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + RN + '/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+            ['xl/workbook.xml', X + '<workbook ' + NS + ' xmlns:r="' + RN + '"><sheets><sheet name="Tổng quan" sheetId="1" r:id="rId1"/><sheet name="Giao dịch" sheetId="2" r:id="rId2"/></sheets></workbook>'],
+            ['xl/_rels/workbook.xml.rels', X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + RN + '/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="' + RN + '/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="' + RN + '/styles" Target="styles.xml"/></Relationships>'],
+            ['xl/styles.xml', styles],
+            ['xl/worksheets/sheet1.xml', xsheet(s1, [24, 16, 10], false)],
+            ['xl/worksheets/sheet2.xml', xsheet(s2, [12, 9, 14, 18, 18, 20, 20, 40], true)]
+        ]);
+        dl(blob, 'so-thu-chi-' + m + '.xlsx');
     }
     const BK = ['goals', 'tpl', 'aicon', 'stcfg', 'stcx', 'theme', 'sbc', 'fx', 'nclr'];
     function bkExport() {
@@ -3181,4 +3233,19 @@ if (alive())
             t.blur();
         }
     });
+})();
+
+/* ===== In / PDF: thêm tiêu đề + ngày in, đặt tên file theo màn hình ===== */
+(function () {
+    let oldT = '';
+    window.addEventListener('beforeprint', () => {
+        const tb = (typeof TABS !== 'undefined' && TABS.find(x => x[0] === S.tab)) || [], name = tb[1] || 'Tổng quan', m = S.m ? mlabel(S.m) : '';
+        const d = new Date(), p2 = n => String(n).padStart(2, '0');
+        let h = document.getElementById('phd');
+        if (!h) { h = document.createElement('div'); h.id = 'phd'; document.body.insertBefore(h, document.body.firstChild); }
+        h.innerHTML = '<b>Sổ Thu Chi – ' + esc(name) + (m ? ' · ' + esc(m) : '') + '</b><small>' + esc(((window.CONFIG || {}).NAME) || '') + ' · In lúc ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ' ngày ' + p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + '</small>';
+        oldT = document.title;
+        document.title = 'so-thu-chi-' + String(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '-') + (S.m ? '-' + S.m : '');
+    });
+    window.addEventListener('afterprint', () => { if (oldT) document.title = oldT; const h = document.getElementById('phd'); if (h) h.remove(); });
 })();
