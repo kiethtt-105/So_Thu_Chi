@@ -97,13 +97,13 @@ const noteTxt = n => splitImg(n).text, hasImg = n => splitImg(n).imgs.length > 0
 const joinImg = (t, a) => [String(t || '').trim(), ...(a || [])].filter(Boolean).join(' ');
 
 /* ===== sync.js ===== */
-async function call(ops, rev, ms) {
+async function call(ops, rev, ms, fast) {
     if (!API)
         throw Error('Thiếu địa chỉ API: file config.js chưa được tải');
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 30000);
     let r;
     try {
-        r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '' }) });
+        r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '', fast: !!fast }) });
     }
     catch (e) {
         const x = Error(e && e.name === 'AbortError' ? 'Máy chủ Google phản hồi quá chậm, chưa nhận được kết quả' : navigator.onLine === false ? 'Không có kết nối mạng' : 'Không kết nối được tới máy chủ Google');
@@ -232,12 +232,13 @@ async function sync(manual) {
         spin(0);
 }
 let chain = Promise.resolve();
-const SAFE_OPS = new Set(['tx.save', 'tx.del', 'tx.purge', 'lim.set']);   // ghi lại nhiều lần vẫn ra cùng kết quả (ID cố định)
+const SAFE_OPS = new Set(['tx.save', 'tx.del', 'tx.purge', 'lim.set']);
+const FAST_OPS = new Set(['tx.save', 'tx.del', 'tx.purge']);   // đã cập nhật tạm trên màn hình → máy chủ khỏi gửi lại cả sổ, web tự tải lại sau   // ghi lại nhiều lần vẫn ra cùng kết quả (ID cố định)
 const liveMsg = (s, t) => { const e = $('#live'); if (!e) return; e.dataset.s = s; e.className = 'live ' + s; e.lastChild.textContent = t; const st = $('#st'); if (st) st.textContent = t; };
 async function callRetry(ops, pend) {
     const max = ops.every(x => SAFE_OPS.has(x.op)) ? 4 : 1;
     for (let i = 1; ; i++) {
-        try { return await call(ops, '', 45000); }
+        try { return await call(ops, '', 45000, ops.every(x => FAST_OPS.has(x.op))); }
         catch (e) {
             if (!e.net || i >= max) throw e;
             liveMsg('wait', pend + ' (thử lại ' + i + '/' + (max - 1) + ')');
@@ -254,10 +255,11 @@ function commit(ops, o = {}) {
     spin(1);
     liveMsg('wait', pend);
     chain = chain.then(async () => {
-        let res = { ok: true };
+        let res = { ok: true }, fast = false;
         const okNote = () => notify(o.ok || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
         try {
-            apply(await callRetry(ops, pend));
+            const j = await callRetry(ops, pend);
+            if (j.fast) { fast = true; stamp(); } else apply(j);
             if (S.busy <= 1) setLive('ok');
             okNote();
         }
@@ -280,6 +282,7 @@ function commit(ops, o = {}) {
         if (!S.busy)
             spin(0);
         render();
+        if (fast && !S.busy) setTimeout(() => sync(false), 400);   // tự làm mới dữ liệu sau khi ghi xong
         return res;
     });
     return chain;
