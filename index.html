@@ -6,11 +6,13 @@
 <link rel="icon" type="image/png" href="icons/icon.png">
 <script>try{if(localStorage.sbc==="1")document.documentElement.classList.add("sbc");if(localStorage.fx==="0")document.documentElement.classList.add("fxoff")}catch(e){}</script>
 <script>try{var t=localStorage.theme||(localStorage.dark==="1"?"dark":localStorage.dark==="0"?"light":"auto");if(t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark");document.querySelector("meta[name=theme-color]").content="#080C16"}}catch(e){}</script>
+<script>(function(){var u=navigator.userAgent||"",tab=/iPad|Tablet/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)||(/Android/i.test(u)&&!/Mobile/i.test(u));var small=false;try{small=matchMedia("(pointer:coarse)").matches&&Math.min(screen.width,screen.height)<600}catch(e){}var ph=!tab&&(/iPhone|iPod|Android.*Mobile|Windows Phone|BlackBerry|IEMobile|Opera Mini/i.test(u)||(navigator.userAgentData&&navigator.userAgentData.mobile===true)||small);window.__PHONE=ph;if(ph){document.documentElement.classList.add("nophone");try{localStorage.removeItem("cache");sessionStorage.clear();navigator.serviceWorker&&navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(x){x.unregister()})});window.caches&&caches.keys().then(function(k){k.forEach(function(x){caches.delete(x)})})}catch(e){}}})()</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Sổ Thu Chi">
 <link rel="stylesheet" href="style.css">
 </head><body>
+<section id="nophone"><div><div class="logo pic"><img src="icons/icon.png" alt="" draggable="false"></div><h1>Sổ Thu Chi</h1><p>Sổ không hỗ trợ điện thoại.<br>Vui lòng mở bằng <b>máy tính (laptop)</b> hoặc <b>máy tính bảng</b>.</p></div></section>
 <section id="login"><form id="lf"><div class="logo pic"><img src="icons/icon.png" alt="" draggable="false"></div>
 <h1>Sổ Thu Chi</h1><p id="lgreet">Nhập mật khẩu để mở sổ</p><input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="Mật khẩu" autofocus><button class="go" id="lb">Mở sổ</button><div id="lerr" role="alert"></div></form></section>
 <div id="app" class="hide">
@@ -28,7 +30,6 @@
 <main id="v"></main></div>
 <nav id="bn"></nav><button class="fab" data-a="new" aria-label="Thêm giao dịch"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M12 5v14M5 12h14"/></svg></button>
 </div>
-<div class="ov" id="ov"><div class="sheet" id="sh" role="dialog" aria-modal="true"></div></div><div id="cf" role="alertdialog" aria-modal="true"><div class="box"><div class="ic" id="cfi"></div><h4 id="cft"></h4><div class="msg" id="cfm"></div><div class="bt"><button id="cfn">Hủy</button><button class="ok" id="cfo">OK</button></div></div></div><div id="toast" role="status"></div>
-<script src="config.js"></script>
-<script src="app.js"></script>
+<div class="ov" id="ov"><div class="sheet" id="sh" role="dialog" aria-modal="true"></div></div><div id="cf" role="alertdialog" aria-modal="true"><div class="box"><div class="ic" id="cfi"></div><h4 id="cft"></h4><div class="msg" id="cfm"></div><div class="bt"><button id="cfn">Hủy</button><button class="ok" id="cfo">OK</button></div></div></div><div id="pg" role="status" aria-live="polite"><div class="pgt"><i class="spn"></i><span id="pgl"></span><em id="pgc"></em></div><div class="pgb"><b id="pgf"></b></div></div><div id="toast" role="status"></div>
+<script>if(!window.__PHONE)document.write('<script src="config.js"><\/script><script src="app.js"><\/script>')</script>
 </body></html>

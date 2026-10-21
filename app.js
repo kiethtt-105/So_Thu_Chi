@@ -185,12 +185,13 @@ async function sync(manual) {
     if (!manual && fails > 3 && ++skip % 5)
         return;
     inflight = true;
+    if (manual || !S.synced) pgSet(!S.synced ? 'Đang tải dữ liệu…' : 'Đang cập nhật…', null, OB.n);
     if (manual)
         spin(1);
     try {
         const first = !S.synced, j = await call([], manual ? '' : S.rev);
         if (S.busy) {
-            inflight = false;
+            inflight = false; if (!OB.n) pgHide(0);
             if (manual)
                 spin(0);
             return;
@@ -227,7 +228,7 @@ async function sync(manual) {
         if (!S.ready)
             render();
     }
-    inflight = false;
+    inflight = false; if (!OB.n) pgHide(0);
     if (manual)
         spin(0);
 }
@@ -235,7 +236,7 @@ let chain = Promise.resolve();
 const SAFE_OPS = new Set(['tx.save', 'tx.del', 'tx.purge', 'lim.set']);
 const FAST_OPS = new Set(['tx.save', 'tx.del', 'tx.purge']);   // đã cập nhật tạm trên màn hình → máy chủ khỏi gửi lại cả sổ, web tự tải lại sau   // ghi lại nhiều lần vẫn ra cùng kết quả (ID cố định)
 const liveMsg = (s, t) => { const e = $('#live'); if (!e) return; e.dataset.s = s; e.className = 'live ' + s; e.lastChild.textContent = t; const st = $('#st'); if (st) st.textContent = t; };
-async function callRetry(ops, pend) {
+async function callRetryOld(ops, pend) {
     const max = ops.every(x => SAFE_OPS.has(x.op)) ? 4 : 1;
     for (let i = 1; ; i++) {
         try { return await call(ops, '', 45000, ops.every(x => FAST_OPS.has(x.op))); }
@@ -246,7 +247,7 @@ async function callRetry(ops, pend) {
         }
     }
 }
-function commit(ops, o = {}) {
+function commitOld(ops, o = {}) {
     const had = new Set(S.tx.map(t => t.id)), pend = o.pend || 'Đang lưu…';
     if (o.local)
         o.local();
@@ -325,7 +326,7 @@ function setUser() {
     if (g) g.textContent = n ? 'Xin chào ' + n + ', nhập mật khẩu để mở sổ' : 'Nhập mật khẩu để mở sổ';
 }
 setUser();
-function boot() { setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); sync(true); if (typeof pushInit === 'function')
+function boot() { setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); resumeOutbox(); sync(true); if (typeof pushInit === 'function')
     pushInit(); }
 let ACT_T = Date.now(), PT = 0;
 document.addEventListener('visibilitychange', () => { if (document.hidden)
@@ -544,7 +545,7 @@ function recon() {
     const D = diffs();
     return head('Cân đối','') +
         `<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="card kpi h kfull"><small>Tổng chênh lệch</small><b class="sens" id="r_t">–</b><em id="r_n"></em></div><div class="card kpi"><small>Hệ thống</small><b class="sens" id="r_s">–</b></div><div class="card kpi"><small>Thực tế</small><b class="sens" id="r_a">–</b></div></div>
-<div class="grid c"><div class="card"><div class="ch">Nhập số dư thực tế</div>${D.map((x, i) => `<div class="rr"><span style="display:flex;align-items:center;gap:10px">${aIco(x.a)}<span style="min-width:0"><b style="font-weight:500">${esc(x.a.name)}</b><small class="sens">Hệ thống: ${vnd(x.sys)}</small></span></span>${x.a.type === 'Tiền mặt' ? `<button type="button" class="ib cnt" data-cash="${i}" aria-label="Đếm tiền mặt" title="Đếm số tờ">${ic('cnt')}</button>` : ''}<input class="ba money" data-neg="1" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has ? num(x.act) : ''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('') || empty('Chưa có tài khoản')}</div>
+<div class="grid c"><div class="card"><div class="ch">Nhập số dư thực tế <small>gõ được phép tính: 500k+200k*2, 3tr-150k</small></div>${D.map((x, i) => `<div class="rr"><span style="display:flex;align-items:center;gap:10px">${aIco(x.a)}<span style="min-width:0"><b style="font-weight:500">${esc(x.a.name)}</b><small class="sens">Hệ thống: ${vnd(x.sys)}</small></span></span>${x.a.type === 'Tiền mặt' ? `<button type="button" class="ib cnt" data-cash="${i}" aria-label="Đếm tiền mặt" title="Đếm số tờ">${ic('cnt')}</button>` : ''}<input class="ba money" data-neg="1" data-i="${i}" inputmode="text" placeholder="${num(x.sys)}" value="${x.has ? num(x.act) : ''}" aria-label="Số dư thực tế ${esc(x.a.name)}"><span class="df" id="df${i}"></span></div>`).join('') || empty('Chưa có tài khoản')}</div>
 <div class="card"><div class="ch">Xử lý</div><div id="rbtn"></div></div></div>`;
 }
 function reconUpdate() {
@@ -1243,7 +1244,7 @@ $('#ov').addEventListener('click', async (e) => {
         if (er)
             return toast(er);
         if (E.up)
-            return toast('Đang tải ảnh lên, vui lòng chờ…');
+            return toast('Đang nén ảnh, vui lòng chờ…');
         const x = ty === 'Chuyển khoản' || ty === 'Điều chỉnh', row = { id: E.id, date: E.date, type: ty, amount: E.amount, acc: E.acc, accTo: ty === 'Chuyển khoản' ? E.accTo : '', cat: x ? '' : E.cat, sub: x ? '' : E.sub, note: joinImg(E.note, E.imgs) };
         if (E.time) {
             row.at = E.date + 'T' + E.time + ':00';
@@ -1253,8 +1254,9 @@ $('#ov').addEventListener('click', async (e) => {
         }
         const wasNew = !S.tx.some(t => t.id === row.id);
         try { localStorage.lastAcc = E.acc; } catch (x) { }
+        const stg = (E.staged || []).map(s => ({ name: s.name, blob: s.blob }));
         closeSheet();
-        txSave(row).then(r => { if (r && !r.ok && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });   // lỗi → trả form lại với dữ liệu đã nhập
+        txSave(row, null, stg).then(r => { if (r && !r.ok && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });   // lỗi → trả form lại với dữ liệu đã nhập
     }
 });
 
@@ -1273,10 +1275,10 @@ const topKey = (o, f) => { let b = null, bv = -1; for (const k in o) {
 } return b; };
 const todayS = () => ymd(new Date());
 const catOk = (t, p, c) => S.cat.some(x => x.t === t && x.p === p && x.c === c);
-function txSave(row, okMsg) {
+function txSave(row, okMsg, files) {
     const prev = S.tx.find(t => t.id === row.id), old = prev && { ...prev }, isNew = !prev;
     return commit([{ op: 'tx.save', row }], {
-        pend: isNew ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…', ok: txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx',
+        pend: isNew ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…', ok: txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx', files: files && files.length ? files : null,
         local: () => { S.tx = S.tx.filter(t => t.id !== row.id).concat(row); },
         undo: () => commit(old ? [{ op: 'tx.save', row: old }] : [{ op: 'tx.purge', id: row.id }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(t => t.id !== row.id); if (old)
                 S.tx.push(old); } })
@@ -2280,7 +2282,7 @@ async function driveUp(blob, name) {
         r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', img: { name, mime: 'image/jpeg', data: await b64(blob) } }) });
     }
     catch (e) {
-        throw Error('Không có kết nối mạng');
+        const x = Error('Không có kết nối mạng'); x.net = true; throw x;
     }
     finally {
         clearTimeout(tm);
@@ -2305,7 +2307,8 @@ function renderAtt() {
     const im = E.imgs || [], pd = E.pend || [];
     a.innerHTML = `<span class="l" style="font-size:12px;color:var(--mut)">Ảnh đính kèm</span><div class="cg" style="margin-top:6px">`
         + im.map((u, i) => `<span class="chip att-i"><a href="${esc(u)}" target="_blank" rel="noopener">📎 Ảnh ${i + 1}</a><button type="button" data-imgdel="${i}" aria-label="Gỡ ảnh">×</button></span>`).join('')
-        + pd.map(p => p.err ? `<span class="chip att-i bad">⚠️ ${esc(p.err)}<button type="button" data-imgx="${p.id}" aria-label="Đóng">×</button></span>` : `<span class="chip att-i"><i class="spn"></i> Đang nén và tải lên…</span>`).join('')
+        + pd.map(p => p.err ? `<span class="chip att-i bad">⚠️ ${esc(p.err)}<button type="button" data-imgx="${p.id}" aria-label="Đóng">×</button></span>` : `<span class="chip att-i"><i class="spn"></i> Đang nén ảnh…</span>`).join('')
+        + (E.staged || []).map(s => `<span class="chip att-i"><a href="${s.url}" target="_blank" rel="noopener">🕓 Ảnh chờ tải (${s.kb} KB)</a><button type="button" data-imgst="${s.id}" aria-label="Gỡ ảnh">×</button></span>`).join('')
         + `<label class="chip att-add">📷 Thêm ảnh<input type="file" id="fimg" accept="image/*" multiple hidden></label></div>`;
 }
 const imgName = () => {
@@ -2314,28 +2317,20 @@ const imgName = () => {
 };
 async function attach(f) {
     const E0 = E;
-    if (!E0)
-        return;
-    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) {
-        toast('Chỉ đính kèm được file ảnh');
-        return;
-    }
+    if (!E0) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) { toast('Chỉ đính kèm được file ảnh'); return; }
     const p = { id: Math.random().toString(36).slice(2) };
     (E0.pend = E0.pend || []).push(p);
     E0.up = (E0.up || 0) + 1;
     renderAtt();
     try {
-        const small = await squeeze(f), j = await driveUp(small, imgName());
-        (E0.imgs = E0.imgs || []).push(j.url);
+        const small = await squeeze(f);
+        (E0.staged = E0.staged || []).push({ id: p.id, blob: small, name: imgName(), url: URL.createObjectURL(small), kb: Math.round(small.size / 1024) });
         E0.pend = E0.pend.filter(x => x !== p);
-        notify('Đã tải ảnh lên Drive (' + Math.round(small.size / 1024) + ' KB, đã nén từ ' + Math.round(f.size / 1024) + ' KB)', { title: 'Ảnh đính kèm', ico: '📷', tag: 'img' });
     }
-    catch (e) {
-        p.err = e.message;
-    }
+    catch (e) { p.err = e.message; }
     E0.up--;
-    if (E === E0)
-        renderAtt();
+    if (E === E0) renderAtt();
 }
 $('#ov').addEventListener('change', e => {
     if (e.target.id !== 'fimg' || !E)
@@ -3137,6 +3132,142 @@ if (typeof notify === 'function') {
     }
     catch (e) { }
 })();
+/* ===== outbox.js: hàng đợi lưu bền (IndexedDB), thanh tiến trình, chặn tắt tab ===== */
+const OB = { n: 0, ids: new Set() };
+let pgT = 0;
+function pgSet(t, p, n) {
+    const e = $('#pg'); if (!e) return; clearTimeout(pgT);
+    e.classList.add('on'); e.classList.toggle('ind', p == null);
+    $('#pgl').textContent = t; $('#pgc').textContent = n > 1 ? n + ' việc đang chờ' : '';
+    $('#pgf').style.width = p == null ? '' : Math.max(4, Math.min(100, p)) + '%';
+}
+function pgHide(d) { clearTimeout(pgT); const e = $('#pg'); if (e) pgT = setTimeout(() => e.classList.remove('on'), d || 0); }
+const idb = (() => {
+    let p;
+    const open = () => p || (p = new Promise((ok, no) => { try { const r = indexedDB.open('stc-outbox', 1); r.onupgradeneeded = () => r.result.createObjectStore('j', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); } catch (e) { no(e); } }).catch(() => null));
+    const run = (m, f) => open().then(db => db && new Promise(ok => { try { const t = db.transaction('j', m), q = f(t.objectStore('j')); t.oncomplete = () => ok(q && q.result); t.onerror = t.onabort = () => ok(null); } catch (e) { ok(null); } }));
+    return { put: j => run('readwrite', s => s.put(j)), del: id => run('readwrite', s => s.delete(id)), all: () => run('readonly', s => s.getAll()).then(r => r || []) };
+})();
+const waitNet = ms => new Promise(r => { let d = 0; const f = () => { if (d) return; d = 1; removeEventListener('online', f); r(); }; addEventListener('online', f); setTimeout(f, navigator.onLine === false ? Math.max(ms, 4000) : ms); });
+function saveCache() { try { localStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues }); } catch (e) { } }
+addEventListener('beforeunload', e => { if (OB.n > 0 || (E && E.up)) { e.preventDefault(); e.returnValue = 'Đang lưu dữ liệu, thoát bây giờ có thể mất thay đổi.'; return e.returnValue; } });
+async function callRetry(ops, pend) {
+    const safe = ops.every(x => SAFE_OPS.has(x.op));
+    for (let i = 1; ; i++) {   // ghi an toàn (ID cố định): thử lại đến khi được
+        try { return await call(ops, '', 45000, ops.every(x => FAST_OPS.has(x.op))); }
+        catch (e) {
+            if (!e.net || !safe) throw e;
+            liveMsg('wait', pend + ' (mất kết nối, thử lại lần ' + i + ')');
+            pgSet(pend.replace(/…$/, '') + ' · mất kết nối, đang thử lại (lần ' + i + ')', null, OB.n);
+            await waitNet(Math.min(1500 * i, 20000));
+        }
+    }
+}
+async function upStaged(job) {   // ảnh chỉ được tải lên Drive khi người dùng đã bấm Lưu
+    const n = job.files.length;
+    for (let i = job.urls.length; i < n; i++) {
+        for (let k = 1; ; k++) {
+            try { pgSet('Đang tải ảnh ' + (i + 1) + '/' + n + '…', (i / n) * 100, OB.n); const j = await driveUp(job.files[i].blob, job.files[i].name); job.urls.push(j.url); idb.put(job); break; }
+            catch (e) {
+                if (!e.net) { notify('Ảnh chưa tải được (' + e.message + '). Giao dịch vẫn được lưu, hãy đính kèm lại ảnh sau.', { title: 'Ảnh đính kèm', ico: '⚠️', tag: 'img' }); return job.urls; }
+                pgSet('Mất kết nối, đang thử tải ảnh lại…', null, OB.n);
+                await waitNet(Math.min(2000 * k, 20000));
+            }
+        }
+    }
+    return job.urls;
+}
+function commit(ops, o = {}) {
+    const had = new Set(S.tx.map(t => t.id)), pend = o.pend || 'Đang lưu…', safe = ops.every(x => SAFE_OPS.has(x.op));
+    const job = { id: o.jid || 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ops, pend, files: o.files || null, urls: o.urls || [], t: Date.now() };
+    if (o.local) o.local();
+    saveCache(); render();
+    S.busy++; OB.n++; OB.ids.add(job.id); spin(1); liveMsg('wait', pend); pgSet(pend, null, OB.n);
+    const stored = safe && !o.noPersist ? idb.put(job) : Promise.resolve();
+    chain = chain.then(async () => {
+        await stored;
+        let res = { ok: true }, fast = false, ops2 = ops;
+        const okNote = () => notify(o.ok || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
+        try {
+            if (job.files && job.files.length) await upStaged(job);
+            if (job.urls.length) ops2 = ops.map(x => x.op === 'tx.save' ? { ...x, row: { ...x.row, note: joinImg(x.row.note, job.urls) } } : x);
+            pgSet(pend, null, OB.n);
+            const j = await callRetry(ops2, pend);
+            if (j.fast) { fast = true; stamp(); } else apply(j);
+            if (S.busy <= 1) setLive('ok');
+            okNote();
+        }
+        catch (e) {
+            let fresh = false;
+            try { apply(await call([], '')); fresh = true; } catch (_) { }
+            const done = e.net && fresh && ops2.length && ops2.every(x => x.op === 'tx.save' && !had.has(x.row.id) && S.tx.some(t => t.id === x.row.id));
+            if (done) { if (S.busy <= 1) setLive('ok'); okNote(); }
+            else {
+                res = { ok: false, err: e.message };
+                notify('Chưa lưu được: ' + e.message + (e.net ? (fresh ? '. Sổ chưa nhận giao dịch này, bấm Lưu lại để thử lần nữa' : '. Chưa xác nhận được sổ đã nhận hay chưa, hãy kiểm tra lại') : ''), { title: 'Chưa lưu được', ico: '⚠️', tag: o.tag, kind: 'err' });
+                if (S.busy <= 1) setLive(fresh ? 'ok' : 'err');
+            }
+        }
+        if (safe) await idb.del(job.id);
+        OB.ids.delete(job.id); S.busy--; OB.n--;
+        saveCache();
+        if (!S.busy) spin(0);
+        render();
+        if (OB.n) pgSet('Đang xử lý việc kế tiếp…', null, OB.n);
+        else { pgSet(res.ok ? 'Đã lưu xong' : 'Chưa lưu được', 100, 0); pgHide(res.ok ? 700 : 2500); }
+        if (fast && !S.busy) setTimeout(() => sync(false), 400);
+        return res;
+    });
+    return chain;
+}
+async function resumeOutbox() {   // mở lại web: gửi tiếp những thay đổi còn dang dở
+    const js = (await idb.all()).filter(j => !OB.ids.has(j.id)).sort((a, b) => a.t - b.t);
+    js.forEach(j => commit(j.ops, {
+        jid: j.id, pend: 'Đang gửi lại thay đổi chưa lưu…', ok: 'Đã gửi xong thay đổi đang chờ', files: j.files, urls: j.urls, noPersist: true,
+        local: () => j.ops.forEach(x => { if (x.op === 'tx.save') S.tx = S.tx.filter(t => t.id !== x.row.id).concat(x.row); else if (x.op === 'tx.del' || x.op === 'tx.purge') S.tx = S.tx.filter(t => t.id !== x.id); })
+    }));
+}
+/* ===== calc.js: nhập phép tính ở ô số dư thực tế (Cân đối) ===== */
+const CALC_RE = /[+*\/×÷()]|[\d\w)]\s*-|\d\s*x\s*[\d(]/i;
+function calcEval(s) {
+    s = String(s).toLowerCase().replace(/[₫đ]/g, '').replace(/(\d)\s*x\s*(?=[\d(])/g, '$1*').replace(/×/g, '*').replace(/÷/g, '/');
+    const tk = s.match(/\d[\d.,]*\s*(?:nghìn|ngàn|triệu|tr|tỷ|ty|k|m|b)?\d{0,3}|[-+*\/()]/g) || [];
+    if (tk.join('').replace(/\s/g, '') !== s.replace(/\s/g, '')) return null;
+    let i = 0;
+    const pk = () => tk[i], expr = () => { let v = term(); while (pk() === '+' || pk() === '-') { const o = tk[i++], r = term(); v = o === '+' ? v + r : v - r; } return v; },
+        term = () => { let v = un(); while (pk() === '*' || pk() === '/') { const o = tk[i++], r = un(); if (o === '/' && r === 0) throw 0; v = o === '*' ? v * r : v / r; } return v; },
+        un = () => { if (pk() === '-') { i++; return -un(); } if (pk() === '+') { i++; return un(); } return atom(); },
+        atom = () => { const t = tk[i++]; if (t === '(') { const v = expr(); if (tk[i++] !== ')') throw 0; return v; } if (!t || !/^\d/.test(t)) throw 0; return pm(t); };
+    try { const v = expr(); return i === tk.length && isFinite(v) ? Math.round(v) : null; } catch (e) { return null; }
+}
+const calcFmt = v => (v < 0 ? '−' : '') + num(Math.abs(v));
+function calcShow(t, txt) {
+    let p = $('#cpv'); if (!p) { p = document.createElement('div'); p.id = 'cpv'; document.body.appendChild(p); }
+    p.classList.toggle('on', !!txt); if (!txt) return;
+    const r = t.getBoundingClientRect(); p.textContent = txt; p.style.top = r.bottom + 6 + 'px'; p.style.right = Math.max(8, innerWidth - r.right) + 'px';
+}
+const isBa = t => t && t.classList && t.classList.contains('ba');
+document.addEventListener('input', e => {
+    const t = e.target; if (!isBa(t)) return;
+    if (!CALC_RE.test(t.value)) { calcShow(t, ''); return; }
+    e.stopImmediatePropagation();
+    const a = S.acc[+t.dataset.i], v = calcEval(t.value);
+    if (v == null) return calcShow(t, 'Phép tính chưa hợp lệ…');
+    calcShow(t, '= ' + calcFmt(v)); if (a) { S.act[a.name] = v; reconUpdate(); }
+}, true);
+function calcDone(t) {
+    if (!CALC_RE.test(t.value)) { calcShow(t, ''); return false; }
+    const a = S.acc[+t.dataset.i], v = calcEval(t.value); calcShow(t, '');
+    if (v == null) { toast('Phép tính chưa hợp lệ'); return true; }
+    t.value = (v < 0 ? '-' : '') + num(Math.abs(v)); if (a) S.act[a.name] = v; reconUpdate(); return true;
+}
+document.addEventListener('focusout', e => { if (isBa(e.target) && calcDone(e.target)) e.stopImmediatePropagation(); }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && isBa(e.target)) calcDone(e.target); }, true);
+$('#ov').addEventListener('click', e => {   // gỡ ảnh đang chờ tải
+    const x = e.target.closest('[data-imgst]'); if (!x || !E) return;
+    E.staged = (E.staged || []).filter(s => s.id !== x.dataset.imgst); renderAtt();
+});
+
 if (alive())
     boot();
 
