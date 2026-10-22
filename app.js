@@ -985,7 +985,7 @@ function form() {
     const accBox = (id, lb, extra) => noAcc
         ? `<div class="w nodata"><span>${S.err ? 'Chưa tải được tài khoản: ' + esc(S.err) : 'Đang tải danh sách tài khoản…'}</span><button type="button" class="chip" data-reload>Tải lại</button></div>`
         : `<label class="w">${lb}<select id="${id}">${extra || ''}${op(S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc), id === 'ft' ? E.accTo : E.acc)}</select></label>`;
-    $('#sh').innerHTML = `<div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div>${tplRow()}
+    $('#sh').innerHTML = `<div id="scanrow"></div><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div>${tplRow()}
 <div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
 <div class="qk"><button type="button" class="chip" data-k="000">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div>
 <div class="f">
@@ -2310,6 +2310,7 @@ function renderAtt() {
         + (E.staged || []).map(s => th(s.url, s.url, 'Ảnh chờ tải', { tag: `<small>${s.kb} KB · chờ tải</small>`, attr: `data-imgst="${s.id}"` })).join('')
         + pd.map(p => p.err ? `<span class="chip att-i bad">⚠️ ${esc(p.err)}<button type="button" data-imgx="${p.id}" aria-label="Đóng">×</button></span>` : `<span class="th wait"><i class="spn"></i><small>Đang xử lý…</small></span>`).join('')
         + `<label class="th add" title="Thêm ảnh (JPG, PNG, WebP, HEIC)"><b>＋</b><small>Thêm ảnh</small><input type="file" id="fimg" accept="image/*,.heic,.heif" multiple hidden></label></div>`;
+    renderScan();
 }
 /* Xem ảnh lớn ngay trong trang */
 document.addEventListener('click', e => {
@@ -3419,3 +3420,139 @@ document.addEventListener('click', e => {
     if (e.target === document.body || e.target.closest('#tb [data-tab],#tb [data-nt]')) h.classList.remove('sdo');
 });
 addEventListener('resize', () => { if (innerWidth >= 700) document.documentElement.classList.remove('sdo'); });
+
+
+/* ===== scan.js: chọn / chụp ảnh hóa đơn, biên lai chuyển khoản → tự điền giao dịch (OCR chạy ngay trên máy, ảnh không gửi đi đâu để đọc) ===== */
+const fold = s => String(s || '').normalize('NFC').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+let _tess, _ow, _owT, _ocrLog;
+function tessLib() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    return _tess || (_tess = new Promise((ok, no) => {
+        const sc = document.createElement('script');
+        sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+        sc.onload = () => window.Tesseract ? ok(window.Tesseract) : no(Error('Không tải được bộ đọc chữ'));
+        sc.onerror = () => { _tess = null; no(Error('Cần có mạng để quét ảnh (lần đầu tải bộ đọc chữ)')); };
+        document.head.appendChild(sc);
+    }));
+}
+async function ocrWorker() {
+    const T = await tessLib();
+    if (!_ow) _ow = T.createWorker('vie+eng', 1, { logger: m => _ocrLog && _ocrLog(m) }).catch(e => { _ow = null; throw e; });
+    clearTimeout(_owT);
+    const w = await _ow;
+    _owT = setTimeout(() => { const p = _ow; _ow = null; p && p.then(x => x.terminate()).catch(() => { }); }, 120000);   // rảnh 2 phút thì giải phóng bộ nhớ (điện thoại)
+    return w;
+}
+async function ocrPrep(blob) {
+    const im = await loadBmp(blob), w0 = im.width || im.naturalWidth, h0 = im.height || im.naturalHeight;
+    const k = Math.min(2.5, Math.max(1, 1200 / w0));
+    const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
+    const x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+    if (im.close) im.close();
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data; let sum = 0;
+    for (let i = 0; i < p.length; i += 4) { const g = (p[i] * .299 + p[i + 1] * .587 + p[i + 2] * .114); p[i] = p[i + 1] = p[i + 2] = g; sum += g; }
+    if (sum / (p.length / 4) < 110) for (let i = 0; i < p.length; i += 4) { p[i] = p[i + 1] = p[i + 2] = 255 - p[i]; }   // ảnh nền tối (app ngân hàng chế độ tối) → đảo màu cho dễ đọc
+    x.putImageData(d, 0, 0);
+    return c;
+}
+const OCR_HINT = [
+    [/an uong|com |pho |bun |banh|lau |tra sua|cafe|ca phe|coffee|quan an|nha hang|restaurant|grabfood|shopeefood|highlands|starbucks|kfc|lotteria|phuc long/, /an|uong|food|thuc pham/],
+    [/grab|xang|petrol|taxi|xe om|gui xe|ve xe|xanh sm|gojek|vietjet|bamboo|vietnam airlines|toll|bot /, /di chuyen|xe|giao thong|xang|travel/],
+    [/tien dien|tien nuoc|internet|wifi|viettel|vnpt|fpt|vinaphone|mobifone|cuoc |tien nha|thue nha|phong tro/, /hoa don|tien ich|nha|dien|nuoc|vien thong/],
+    [/sieu thi|coopmart|winmart|bach hoa|circle k|ministop|7-eleven|family ?mart|mua sam|shopee|lazada|tiki/, /mua sam|sieu thi|cho|tap hoa|shopping/],
+    [/thuoc|nha thuoc|benh vien|phong kham|pharmacy|bao hiem/, /suc khoe|y te|thuoc/],
+    [/netflix|spotify|youtube|cgv|phim|karaoke|du lich|khach san|hotel|resort/, /giai tri|du lich|vui choi|entertainment/],
+    [/hoc phi|khoa hoc|sach |school|udemy|giao duc/, /hoc|giao duc|education/],
+    [/luong|salary|payroll/, /luong|salary/],
+    [/thuong|bonus/, /thuong/],
+    [/hoan tien|refund|cashback/, /hoan|khac/]
+];
+function ocrCat(ty, tx) {
+    const L = (S.cat || []).filter(c => c.t === ty); if (!L.length) return null;
+    let best = null, bs = 0;
+    L.forEach(c => { const cc = fold(c.c), pp = fold(c.p); let s = 0; if (cc.length >= 3 && tx.includes(cc)) s += 5; if (pp.length >= 3 && tx.includes(pp)) s += 2; if (s > bs) { bs = s; best = c; } });
+    if (best) return best;
+    for (const [re, pr] of OCR_HINT) if (re.test(tx)) { const hit = L.find(c => pr.test(fold(c.p + ' ' + c.c))); if (hit) return hit; }
+    return null;
+}
+function ocrParse(text) {
+    const lines = String(text || '').normalize('NFC').split(/\r?\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const fl = lines.map(fold), all = fl.join('\n');
+    const pad = n => String(n).padStart(2, '0');
+    const dOk = (d, m, y) => { if (y < 100) y += 2000; if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return ''; const t = new Date(y, m - 1, d); return t.getMonth() === m - 1 ? y + '-' + pad(m) + '-' + pad(d) : ''; };
+    let date = '', time = '', m;
+    const reA = /(?:^|[^\d])(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4}|\d{2})(?!\d)/g, reB = /(?:^|[^\d])(\d{4})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{1,2})(?!\d)/g,
+        reC = /(\d{1,2})\s*(?:thang|th)\s*(\d{1,2})[\s,]*(?:nam\s*)?(\d{4})/g, reT = /(?:^|[^\d])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)/g;
+    while (!date && (m = reA.exec(all))) date = dOk(+m[1], +m[2], +m[3]);
+    while (!date && (m = reB.exec(all))) date = dOk(+m[3], +m[2], +m[1]);
+    while (!date && (m = reC.exec(all))) date = dOk(+m[1], +m[2], +m[3]);
+    while (!time && (m = reT.exec(all))) if (+m[1] < 24 && +m[2] < 60) time = pad(+m[1]) + ':' + m[2];
+    // Số tiền: chấm điểm từng con số theo ngữ cảnh (từ khóa "tổng cộng / số tiền…", đơn vị đ/VND, dấu +/-), loại số dư, phí, mã giao dịch, STK…
+    const KEY = /tong cong|tong tien|tong thanh toan|thanh tien|so tien|gia tri|thanh toan|total|amount|grand|can thanh toan|tien hang/;
+    const BAD = /so du|balance|phi |fee|vat|thue|giam gia|discount|tien thua|tien khach|ma giao dich|ma tham chieu|so tai khoan|stk|so the|sdt|so dien thoai|hotline|ma so thue|mst|so hoa don|ma don|order|ref/;
+    let best = null;
+    fl.forEach((ln0, i) => {
+        const ln = ln0.replace(reA, ' ').replace(reB, ' ').replace(reT, ' '), key = KEY.test(ln), prevKey = i > 0 && KEY.test(fl[i - 1]) && !key, bad = BAD.test(ln);
+        const re = /([+\-−–]?)(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{1,2}(?!\d))?/g; let n;
+        while ((n = re.exec(ln))) {
+            const digits = n[2].replace(/[.,]/g, ''), v = +digits, sep = /[.,]/.test(n[2]);
+            if (v < 1000 || v >= 1e11) continue;
+            const cur = /^\s*(vnd|vn d|d\b|₫|dong)/.test(ln.slice(n.index + n[0].length));
+            if (!sep && !cur && !key) continue;
+            const sc = (key ? 10 : 0) + (prevKey ? 6 : 0) + (cur ? 6 : 0) + (n[1] ? 3 : 0) + (sep ? 2 : 0) - (bad ? 12 : 0) - (v >= 1e10 ? 5 : 0);
+            if (sc >= 0 && (!best || sc > best.sc || (sc === best.sc && v > best.v))) best = { v, sc, sign: n[1] };
+        }
+    });
+    let type = 'Chi';
+    if (best && best.sign === '+') type = 'Thu';
+    else if (!(best && best.sign)) {
+        const IN = /nhan duoc|da nhan|tien vao|ghi co|credit|received|nhan tien|hoan tien|refund|cashback|luong/, OUT = /chuyen tien thanh cong|chuyen khoan thanh cong|ghi no|debit|da chuyen|tien ra|thanh toan|hoa don|payment|nguoi nhan|ben nhan/;
+        if (IN.test(all) && !OUT.test(all)) type = 'Thu';
+    }
+    const lab = re => { for (let i = 0; i < fl.length; i++) { const k = re.exec(fl[i]); if (k) { let v = lines[i].slice(k.index + k[0].length).replace(/^[\s:.\-]+/, '').trim(); if (!v && lines[i + 1]) v = lines[i + 1]; if (v && /[a-zà-ỹ]{2}/i.test(v)) return v; } } return ''; };
+    const content = lab(/(noi dung(?: chuyen (?:tien|khoan))?|loi nhan|message|dien giai|mo ta|description)\s*[:\-]?/), who = lab(/(ten nguoi nhan|nguoi nhan|nguoi huong|ben nhan|nha cung cap|cua hang|merchant|beneficiary)\s*[:\-]?/);
+    let note = [who, content].filter(Boolean).join(' · ');
+    if (!note) { const i = lines.findIndex(l => (l.match(/[A-Za-zÀ-ỹ]/g) || []).length >= 4 && (l.match(/\d/g) || []).length <= 3); if (i >= 0) note = lines[i]; }   // hóa đơn: dòng đầu thường là tên cửa hàng
+    return { amount: best ? best.v : 0, date, time, type, note: note.slice(0, 120), tx: fold(note + ' ' + all) };
+}
+function renderScan() {
+    const r = $('#scanrow'); if (!r || !E) return;
+    if (!E.isNew) { r.innerHTML = ''; return; }
+    r.innerHTML = `<label class="scanb${E.scan ? ' busy' : ''}">${E.scan ? '<i class="spn"></i>' : '<span>📷</span>'}<span><b>${E.scan ? esc(E.scan) : 'Quét ảnh để tự điền giao dịch'}</b><small>${E.scan ? 'Vui lòng đợi vài giây…' : 'Chụp hoặc chọn hóa đơn, biên lai chuyển khoản, ảnh chụp màn hình ngân hàng'}</small></span><input type="file" id="fscan" accept="image/*,.heic,.heif" hidden ${E.scan ? 'disabled' : ''}></label>`;
+}
+async function scanImg(f) {
+    const E0 = E; if (!E0) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) { toast('Chỉ quét được file ảnh (JPG, PNG, WebP, HEIC)'); return; }
+    const msg = m => { E0.scan = m; if (E === E0) renderScan(); };
+    try {
+        msg('Đang xử lý ảnh…');
+        const small = await squeeze(f), st = { id: Math.random().toString(36).slice(2), blob: small, name: imgName(), url: URL.createObjectURL(small), kb: Math.round(small.size / 1024) };
+        (E0.staged = E0.staged || []).push(st);   // ảnh cũng được đính kèm vào giao dịch
+        if (E === E0) renderAtt();
+        msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
+        const w = await ocrWorker();
+        _ocrLog = p => { if (p && p.status === 'recognizing text') msg('Đang đọc chữ ' + Math.round((p.progress || 0) * 100) + '%'); };
+        msg('Đang đọc chữ…');
+        const res = await w.recognize(await ocrPrep(small));
+        _ocrLog = null;
+        const r = ocrParse((res.data && res.data.text) || '');
+        E0.scan = '';
+        if (E !== E0) { toast(r.amount ? 'Đã đọc ảnh: ' + num(r.amount) + ' ₫' : 'Đã đọc ảnh nhưng form đã đóng'); return; }
+        pull();
+        if ((E.type === 'Chi' || E.type === 'Thu') && r.type !== E.type) { E.type = r.type; E.cat = E.sub = ''; }
+        if (r.amount) E.amount = r.amount;
+        if (r.date) E.date = r.date;
+        if (r.time) E.time = r.time;
+        if (r.note && !E.note) E.note = r.note;
+        if ((E.type === 'Chi' || E.type === 'Thu') && !E.cat) { const g = ocrCat(E.type, r.tx); if (g) { E.cat = g.p; E.sub = g.c; } }
+        st.name = imgName();
+        form();
+        toast(r.amount ? 'Đã tự điền ' + num(r.amount) + ' ₫' + (r.date ? ' · ' + r.date.split('-').reverse().join('/') : '') + ' — kiểm tra lại rồi bấm Lưu' : 'Không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)');
+    }
+    catch (e) { _ocrLog = null; E0.scan = ''; if (E === E0) renderScan(); toast('Không quét được: ' + e.message); }
+}
+$('#ov').addEventListener('change', e => {
+    if (e.target.id !== 'fscan' || !E) return;
+    const f = e.target.files[0]; e.target.value = '';
+    if (f) scanImg(f);
+});
