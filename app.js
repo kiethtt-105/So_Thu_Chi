@@ -2309,7 +2309,7 @@ function renderAtt() {
         + im.map((u, i) => th(driveThumb(u), driveThumb(u, 1600), 'Ảnh ' + (i + 1), { open: u, tag: '', attr: `data-imgdel="${i}"` })).join('')
         + (E.staged || []).map(s => th(s.url, s.url, 'Ảnh chờ tải', { tag: `<small>${s.kb} KB · chờ tải</small>`, attr: `data-imgst="${s.id}"` })).join('')
         + pd.map(p => p.err ? `<span class="chip att-i bad">⚠️ ${esc(p.err)}<button type="button" data-imgx="${p.id}" aria-label="Đóng">×</button></span>` : `<span class="th wait"><i class="spn"></i><small>Đang xử lý…</small></span>`).join('')
-        + `<label class="th add" title="Thêm ảnh (JPG, PNG, WebP, HEIC)"><b>＋</b><small>Thêm ảnh</small><input type="file" id="fimg" accept="image/*,.heic,.heif" multiple hidden></label></div>`;
+        + `<label class="th add" title="Thêm ảnh (JPG, PNG, WebP, HEIC)"><b>＋</b><small>Thêm / dán ảnh</small><input type="file" id="fimg" accept="image/*,.heic,.heif" multiple hidden></label></div>`;
     renderScan();
 }
 /* Xem ảnh lớn ngay trong trang */
@@ -3143,6 +3143,7 @@ function pgSet(t, p, n) {
     const e = $('#pg'); if (!e) return; clearTimeout(pgT);
     e.classList.add('on'); e.classList.toggle('ind', p == null);
     $('#pgl').textContent = t; $('#pgc').textContent = n > 1 ? n + ' việc đang chờ' : '';
+    const x = $('#pgx'); if (x) x.classList.toggle('hide', !(n > 0));   // nút Hủy chỉ hiện khi thật sự có thay đổi đang chờ gửi (không hiện khi chỉ tải dữ liệu)
     $('#pgf').style.width = p == null ? '' : Math.max(4, Math.min(100, p)) + '%';
 }
 function oflSet() {
@@ -3158,8 +3159,17 @@ const idb = (() => {
     let p;
     const open = () => p || (p = new Promise((ok, no) => { try { const r = indexedDB.open('stc-outbox', 1); r.onupgradeneeded = () => r.result.createObjectStore('j', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); } catch (e) { no(e); } }).catch(() => null));
     const run = (m, f) => open().then(db => db && new Promise(ok => { try { const t = db.transaction('j', m), q = f(t.objectStore('j')); t.oncomplete = () => ok(q && q.result); t.onerror = t.onabort = () => ok(null); } catch (e) { ok(null); } }));
-    return { put: j => run('readwrite', s => s.put(j)), del: id => run('readwrite', s => s.delete(id)), all: () => run('readonly', s => s.getAll()).then(r => r || []) };
+    /* Bản ghi "hb:<id>" là nhịp tim: trang (hoặc service worker) đang gửi việc <id> thì ghi dấu thời gian mỗi 3 giây.
+       Ai thấy nhịp tim cũ hơn 9 giây thì hiểu bên kia đã đóng tab / bị đóng băng và nhận gửi nốt việc đó. */
+    const isHb = x => String(x.id).startsWith('hb:');
+    return {
+        put: j => run('readwrite', s => s.put(j)), del: id => run('readwrite', s => s.delete(id)), get: id => run('readonly', s => s.get(id)),
+        all: () => run('readonly', s => s.getAll()).then(r => (r || []).filter(x => !isHb(x))),
+        beat: id => run('readwrite', s => s.put({ id: 'hb:' + id, hb: Date.now() })), unbeat: id => run('readwrite', s => s.delete('hb:' + id)),
+        beats: () => run('readonly', s => s.getAll()).then(r => { const m = {}; (r || []).forEach(x => { if (isHb(x)) m[x.id.slice(3)] = x.hb; }); return m; })
+    };
 })();
+const HB_STALE = 9000;
 const waitNet = ms => new Promise(r => { let d = 0; const f = () => { if (d) return; d = 1; removeEventListener('online', f); OB.wk.delete(f); r(); }; OB.wk.add(f); addEventListener('online', f); setTimeout(f, navigator.onLine === false ? Math.max(ms, 4000) : ms); });
 function bgSync() { try { navigator.serviceWorker && navigator.serviceWorker.ready.then(r => r.sync && r.sync.register('stc-outbox')).catch(() => { }); } catch (e) { } }
 function obCancel() {
@@ -3175,7 +3185,15 @@ document.addEventListener('click', async e => {
     if (await ask('Hủy các thay đổi chưa lưu?', OB.n + ' việc đang chờ sẽ bị bỏ, dữ liệu trở về như trên sổ.', { ok: 'Hủy thay đổi', cancel: 'Tiếp tục gửi', icon: '↩️', danger: 1 })) obCancel();
 });
 function saveCache() { try { localStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues }); } catch (e) { } }
-addEventListener('beforeunload', e => { if (OB.n > 0 || (E && E.up)) { e.preventDefault(); e.returnValue = 'Đang lưu dữ liệu, thoát bây giờ có thể mất thay đổi.'; return e.returnValue; } });
+// Việc đã được lưu bền vào IndexedDB thì đóng tab thoải mái: service worker sẽ gửi nốt ở nền. Chỉ chặn khi còn việc chưa kịp lưu bền.
+addEventListener('beforeunload', e => { if (Object.values(OB.jobs).some(j => !j.persisted) || (E && E.up)) { e.preventDefault(); e.returnValue = 'Đang lưu dữ liệu, thoát bây giờ có thể mất thay đổi.'; return e.returnValue; } });
+function handOff() {   // tab sắp đóng / chuyển sang nền: đánh thức service worker gửi nốt hàng đợi
+    if (!OB.n) return;
+    bgSync();
+    try { const c = navigator.serviceWorker && navigator.serviceWorker.controller; if (c) c.postMessage({ type: 'flush' }); } catch (e) { }
+}
+addEventListener('pagehide', handOff);
+document.addEventListener('visibilitychange', () => { if (document.hidden) handOff(); });
 const cancelErr = () => { const x = Error('Đã hủy'); x.cancel = true; return x; };
 async function callRetry(ops, pend, job) {
     const safe = ops.every(x => SAFE_OPS.has(x.op));
@@ -3194,20 +3212,36 @@ async function callRetry(ops, pend, job) {
     }
 }
 async function upStaged(job) {   // ảnh chỉ được tải lên Drive khi người dùng đã bấm Lưu
-    const n = job.files.length;
-    for (let i = job.urls.length; i < n; i++) {
+    const n = job.files.length, start = job.urls.length;
+    if (start >= n) return job.urls;
+    const res = job.urls.slice();
+    let done = start, warned = false;
+    // Tải song song tất cả ảnh còn lại (nhanh hơn nhiều so với từng ảnh một); giữ đúng thứ tự ảnh
+    await Promise.all(job.files.map(async (f, i) => {
+        if (i < start) return;
         for (let k = 1; ; k++) {
             if (job.x) throw cancelErr();
-            try { pgSet('Đang tải ảnh ' + (i + 1) + '/' + n + '…', (i / n) * 100, OB.n); const j = await driveUp(job.files[i].blob, job.files[i].name); job.urls.push(j.url); idb.put(job); break; }
+            try {
+                const j = await driveUp(f.blob, f.name);
+                res[i] = j.url; done++;
+                pgSet('Đang tải ảnh ' + done + '/' + n + '…', (done / n) * 100, OB.n);
+                return;
+            }
             catch (e) {
-                if (!e.net) { notify('Ảnh chưa tải được (' + e.message + '). Giao dịch vẫn được lưu, hãy đính kèm lại ảnh sau.', { title: 'Ảnh đính kèm', ico: '⚠️', tag: 'img' }); return job.urls; }
+                if (!e.net) {
+                    if (!warned) { warned = true; notify('Ảnh chưa tải được (' + e.message + '). Giao dịch vẫn được lưu, hãy đính kèm lại ảnh sau.', { title: 'Ảnh đính kèm', ico: '⚠️', tag: 'img' }); }
+                    return;
+                }
                 OB.net = true; oflSet();
                 pgSet('Mất kết nối, đang thử tải ảnh lại…', null, OB.n);
                 await waitNet(Math.min(2000 * k, 20000));
                 if (job.x) throw cancelErr();
             }
         }
-    }
+    }));
+    pgSet('Đang tải ' + n + ' ảnh song song…', null, OB.n);
+    job.urls = res.filter(Boolean);
+    idb.put(job);
     return job.urls;
 }
 function commit(ops, o = {}) {
@@ -3218,20 +3252,31 @@ function commit(ops, o = {}) {
     if (o.local) o.local();
     saveCache(); render();
     S.busy++; OB.n++; OB.ids.add(job.id); spin(1); liveMsg('wait', pend); pgSet(pend, null, OB.n);
-    const stored = safe && !o.noPersist ? idb.put(job).then(bgSync) : Promise.resolve();
+    // Lưu bền vào IndexedDB rồi mới báo "đã nhận"; từ lúc đó dù đóng tab, service worker vẫn gửi nốt được
+    let hbT = 0;
+    const endHb = () => { clearInterval(hbT); if (safe) idb.unbeat(job.id); };
+    if (safe) { hbT = setInterval(() => idb.beat(job.id), 3000); }
+    const stored = safe
+        ? (o.noPersist ? Promise.resolve(job.id) : idb.put(job)).then(r => { job.persisted = !!r; return idb.beat(job.id); }).then(bgSync)
+        : Promise.resolve();
     chain = chain.then(async () => {
         await stored;
-        let res = { ok: true }, fast = false, ops2 = ops;
-        if (job.x) { delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; if (!S.busy) spin(0); if (!OB.n) { pgHide(0); oflSet(); } return { ok: false, err: 'Đã hủy', cancel: true }; }
+        let res = { ok: true }, fast = false, ops2 = ops, taken = false;
+        if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; if (!S.busy) spin(0); if (!OB.n) { pgHide(0); oflSet(); } return { ok: false, err: 'Đã hủy', cancel: true }; }
+        // Trang bị đóng băng ở nền thì service worker có thể đã gửi xong việc này: kiểm tra để khỏi gửi trùng
+        if (safe && job.persisted && !(await idb.get(job.id))) taken = true;
         const okNote = () => notify(o.ok || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
         try {
-            if (job.files && job.files.length) await upStaged(job);
-            if (job.urls.length) ops2 = ops.map(x => x.op === 'tx.save' ? { ...x, row: { ...x.row, note: joinImg(x.row.note, job.urls) } } : x);
-            pgSet(pend, null, OB.n);
-            const j = await callRetry(ops2, pend, job);
-            if (j.fast) { fast = true; stamp(); } else apply(j);
-            if (S.busy <= 1) setLive('ok');
-            okNote();
+            if (taken) { fast = true; stamp(); okNote(); }
+            else {
+                if (job.files && job.files.length) await upStaged(job);
+                if (job.urls.length) ops2 = ops.map(x => x.op === 'tx.save' ? { ...x, row: { ...x.row, note: joinImg(x.row.note, job.urls) } } : x);
+                pgSet(pend, null, OB.n);
+                const j = await callRetry(ops2, pend, job);
+                if (j.fast) { fast = true; stamp(); } else apply(j);
+                if (S.busy <= 1) setLive('ok');
+                okNote();
+            }
         }
         catch (e) {
             if (e.cancel) { res = { ok: false, err: 'Đã hủy', cancel: true }; }
@@ -3248,6 +3293,7 @@ function commit(ops, o = {}) {
             }
         }
         if (safe) await idb.del(job.id);
+        endHb();
         delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--;
         if (!OB.n) { OB.net = false; } oflSet();
         saveCache();
@@ -3261,8 +3307,12 @@ function commit(ops, o = {}) {
     });
     return chain;
 }
-async function resumeOutbox() {   // mở lại web: gửi tiếp những thay đổi còn dang dở
-    const js = (await idb.all()).filter(j => !OB.ids.has(j.id)).sort((a, b) => a.t - b.t);
+async function resumeOutbox(tries) {   // mở lại web: gửi tiếp những thay đổi còn dang dở
+    tries = tries || 0;
+    const [all, beats] = await Promise.all([idb.all(), idb.beats()]);
+    const mine = all.filter(j => !OB.ids.has(j.id)), busy = mine.filter(j => Date.now() - (beats[j.id] || 0) < HB_STALE);   // việc service worker đang gửi dở thì để nó làm
+    if (busy.length && tries < 8) setTimeout(() => resumeOutbox(tries + 1), 5000);
+    const js = mine.filter(j => !busy.includes(j)).sort((a, b) => a.t - b.t);
     js.forEach(j => commit(j.ops, {
         jid: j.id, pend: 'Đang gửi lại thay đổi chưa lưu…', ok: 'Đã gửi xong thay đổi đang chờ', files: j.files, urls: j.urls, noPersist: true,
         local: () => j.ops.forEach(x => { if (x.op === 'tx.save') S.tx = S.tx.filter(t => t.id !== x.row.id).concat(x.row); else if (x.op === 'tx.del' || x.op === 'tx.purge') S.tx = S.tx.filter(t => t.id !== x.id); })
@@ -3506,19 +3556,45 @@ function ocrParse(text) {
     let type = 'Chi';
     if (best && best.sign === '+') type = 'Thu';
     else if (!(best && best.sign)) {
-        const IN = /nhan duoc|da nhan|tien vao|ghi co|credit|received|nhan tien|hoan tien|refund|cashback|luong/, OUT = /chuyen tien thanh cong|chuyen khoan thanh cong|ghi no|debit|da chuyen|tien ra|thanh toan|hoa don|payment|nguoi nhan|ben nhan/;
-        if (IN.test(all) && !OUT.test(all)) type = 'Thu';
+        const IN = /nhan duoc|da nhan|tien vao|ghi co|credit|received|nhan tien|hoan tien|refund|cashback|luong|bien dong so du \+|so tien nhan|nguoi gui|ben gui|tu tai khoan|tai khoan nhan|nap tien|thu nhap|tra no|loi nhuan|lai suat|co tien|\+\s?\d/,
+            OUT = /chuyen tien thanh cong|chuyen khoan thanh cong|ghi no|debit|da chuyen|tien ra|thanh toan|hoa don|payment|nguoi nhan|ben nhan|nguoi huong|den tai khoan|toi tai khoan|rut tien/;
+        const hasIn = IN.test(all), hasOut = OUT.test(all);
+        if (hasIn && !hasOut) type = 'Thu';
+        else if (hasIn && hasOut && /(nguoi gui|ben gui|nhan duoc|da nhan|ghi co|received)/.test(all) && !/(da chuyen|chuyen tien thanh cong|chuyen khoan thanh cong|ghi no)/.test(all)) type = 'Thu';
     }
+    // Nhận diện ngân hàng / ví để chọn đúng tài khoản (bill ngân hàng KHÔNG được ghi vào Tiền mặt)
+    const alias = OCR_ALIAS.find(a => a[0].test(all)) || null;
+    const isBank = !!alias || /ngan hang|napas|so tai khoan|\bstk\b|chuyen (tien|khoan)|ma giao dich|ma tham chieu|internet banking|mobile banking|vietqr|qr pay|bien lai|so du/.test(all);
     const lab = re => { for (let i = 0; i < fl.length; i++) { const k = re.exec(fl[i]); if (k) { let v = lines[i].slice(k.index + k[0].length).replace(/^[\s:.\-]+/, '').trim(); if (!v && lines[i + 1]) v = lines[i + 1]; if (v && /[a-zà-ỹ]{2}/i.test(v)) return v; } } return ''; };
     const content = lab(/(noi dung(?: chuyen (?:tien|khoan))?|loi nhan|message|dien giai|mo ta|description)\s*[:\-]?/), who = lab(/(ten nguoi nhan|nguoi nhan|nguoi huong|ben nhan|nha cung cap|cua hang|merchant|beneficiary)\s*[:\-]?/);
     let note = [who, content].filter(Boolean).join(' · ');
     if (!note) { const i = lines.findIndex(l => (l.match(/[A-Za-zÀ-ỹ]/g) || []).length >= 4 && (l.match(/\d/g) || []).length <= 3); if (i >= 0) note = lines[i]; }   // hóa đơn: dòng đầu thường là tên cửa hàng
-    return { amount: best ? best.v : 0, date, time, type, note: note.slice(0, 120), tx: fold(note + ' ' + all) };
+    return { amount: best ? best.v : 0, date, time, type, note: note.slice(0, 120), tx: fold(note + ' ' + all), alias, isBank };
+}
+/* Bảng tên ngân hàng / ví: cùng một regex dùng để khớp chữ trong ảnh và tên tài khoản của bạn (đã bỏ dấu, chữ thường) */
+const OCR_ALIAS = [
+    [/vietcombank|\bvcb\b/, 'bank'], [/techcombank|\btcb\b/, 'bank'], [/\bmb ?bank\b|\bmbb\b|quan doi/, 'bank'], [/\bbidv\b/, 'bank'], [/vietinbank|\bctg\b/, 'bank'],
+    [/agribank/, 'bank'], [/\bacb\b/, 'bank'], [/vpbank/, 'bank'], [/tpbank/, 'bank'], [/sacombank|\bstb\b/, 'bank'], [/\bocb\b/, 'bank'], [/\bshb\b/, 'bank'],
+    [/hdbank/, 'bank'], [/\bmsb\b|maritime/, 'bank'], [/\bvib\b/, 'bank'], [/seabank/, 'bank'], [/eximbank/, 'bank'], [/lpbank|lienviet/, 'bank'], [/cake/, 'bank'], [/timo/, 'bank'],
+    [/momo/, 'wallet'], [/zalo ?pay/, 'wallet'], [/shopee ?pay|airpay/, 'wallet'], [/viettel ?money/, 'wallet'], [/vnpay/, 'wallet']
+];
+function ocrAcc(r) {
+    if (!r || !(r.isBank || r.alias)) return null;
+    const own = S.acc.filter(a => a.type !== HELD), nm = a => fold(a.name);
+    let hit = null;
+    if (r.alias) hit = own.find(a => r.alias[0].test(nm(a)));                               // đúng tên ngân hàng / ví trong ảnh
+    if (!hit && r.alias && r.alias[1] === 'wallet') hit = own.find(a => a.type === 'Ví điện tử');
+    if (!hit) {                                                                              // bill ngân hàng nhưng không rõ ngân hàng nào: lấy tài khoản ngân hàng hay dùng nhất
+        const banks = own.filter(a => a.type === 'Ngân hàng');
+        let last = ''; try { last = localStorage.lastAcc || ''; } catch (e) { }
+        hit = banks.find(a => a.name === last) || banks[0] || null;
+    }
+    return hit ? hit.name : null;
 }
 function renderScan() {
     const r = $('#scanrow'); if (!r || !E) return;
     if (!E.isNew) { r.innerHTML = ''; return; }
-    r.innerHTML = `<label class="scanb${E.scan ? ' busy' : ''}">${E.scan ? '<i class="spn"></i>' : '<span>📷</span>'}<span><b>${E.scan ? esc(E.scan) : 'Quét ảnh để tự điền giao dịch'}</b><small>${E.scan ? 'Vui lòng đợi vài giây…' : 'Chụp hoặc chọn hóa đơn, biên lai chuyển khoản, ảnh chụp màn hình ngân hàng'}</small></span><input type="file" id="fscan" accept="image/*,.heic,.heif" hidden ${E.scan ? 'disabled' : ''}></label>`;
+    r.innerHTML = `<label class="scanb${E.scan ? ' busy' : ''}">${E.scan ? '<i class="spn"></i>' : '<span>📷</span>'}<span><b>${E.scan ? esc(E.scan) : 'Quét ảnh để tự điền giao dịch'}</b><small>${E.scan ? 'Vui lòng đợi vài giây…' : 'Chụp, chọn hoặc dán (Ctrl+V) hóa đơn, bill ngân hàng, biên lai nhận / chuyển tiền'}</small></span><input type="file" id="fscan" accept="image/*,.heic,.heif" hidden ${E.scan ? 'disabled' : ''}></label>`;
 }
 async function scanImg(f) {
     const E0 = E; if (!E0) return;
@@ -3545,9 +3621,11 @@ async function scanImg(f) {
         if (r.time) E.time = r.time;
         if (r.note && !E.note) E.note = r.note;
         if ((E.type === 'Chi' || E.type === 'Thu') && !E.cat) { const g = ocrCat(E.type, r.tx); if (g) { E.cat = g.p; E.sub = g.c; } }
+        const accN = ocrAcc(r);
+        if (accN) E.acc = accN;
         st.name = imgName();
         form();
-        toast(r.amount ? 'Đã tự điền ' + num(r.amount) + ' ₫' + (r.date ? ' · ' + r.date.split('-').reverse().join('/') : '') + ' — kiểm tra lại rồi bấm Lưu' : 'Không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)');
+        toast(r.amount ? 'Đã tự điền ' + r.type + ' ' + num(r.amount) + ' ₫' + (accN ? ' · ' + accN : '') + (r.date ? ' · ' + r.date.split('-').reverse().join('/') : '') + ' — kiểm tra lại rồi bấm Lưu' : 'Không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)');
     }
     catch (e) { _ocrLog = null; E0.scan = ''; if (E === E0) renderScan(); toast('Không quét được: ' + e.message); }
 }
@@ -3556,3 +3634,26 @@ $('#ov').addEventListener('change', e => {
     const f = e.target.files[0]; e.target.value = '';
     if (f) scanImg(f);
 });
+
+/* Dán ảnh (Ctrl+V) và kéo thả ảnh vào cửa sổ giao dịch.
+   Form mới, chưa nhập số tiền: ảnh đầu tiên được quét tự điền, các ảnh còn lại đính kèm song song.
+   Còn lại: tất cả ảnh chỉ đính kèm. Việc nén ảnh chạy song song, ảnh chỉ tải lên Drive khi bấm Lưu. */
+function takeImages(fs) {
+    if (!E || !fs.length) return;
+    const empty = E.isNew && !E.scan && !amtVal((($('#fa') || {}).value) || '');
+    if (empty) { scanImg(fs[0]); fs.slice(1).forEach(attach); }
+    else fs.forEach(attach);
+    if (fs.length > 1) toast('Đang xử lý ' + fs.length + ' ảnh song song…');
+}
+document.addEventListener('paste', e => {
+    if (!E || !$('#ov').classList.contains('open') || $('#cf').classList.contains('open')) return;
+    const fs = [...((e.clipboardData && e.clipboardData.items) || [])].filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean);
+    if (!fs.length) return;
+    e.preventDefault();
+    takeImages(fs);
+});
+['dragover', 'drop'].forEach(t => $('#ov').addEventListener(t, e => {
+    if (!E || !e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return;
+    e.preventDefault();
+    if (t === 'drop') takeImages([...e.dataTransfer.files].filter(f => /^image\//.test(f.type) || /\.(heic|heif)$/i.test(f.name)));
+}));

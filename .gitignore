@@ -1,4 +1,13 @@
-SO_THU_CHI_MOI.xlsx
-*.xlsx
+# Bí mật và cấu hình cục bộ
+.env
+.env.*
+!.env.example
+
+# Sinh ra khi build (từ biến môi trường)
+config.js
+public/
+
+# Khác
+node_modules/
+.vercel/
 .DS_Store
-Thumbs.db

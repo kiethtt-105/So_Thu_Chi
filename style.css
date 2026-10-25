@@ -660,3 +660,46 @@ body:has(#cpv.on) .sheet .qk small{visibility:hidden}
 .scanb small{display:block;color:var(--mut);font-size:12px;margin-top:2px;line-height:1.35}
 .scanb.busy{cursor:progress;opacity:.9}
 .scanb .spn{flex:none}
+
+/* ===== v4: chống tràn màn hình trên điện thoại ===== */
+html{overflow-x:hidden}
+.wrap{overflow-x:clip;min-width:0;max-width:100%}
+main,#v,.card,.col,.mdd{min-width:0;max-width:100%}
+svg{max-width:100%}
+.tw{max-width:100%;overflow-x:auto}
+/* cột lưới không được phình theo nội dung (nguyên nhân chính gây tràn ngang) */
+.grid{grid-template-columns:minmax(0,1fr)}
+.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+.fp,.fp2,.f{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cal{grid-template-columns:repeat(7,minmax(0,1fr))}
+@media(min-width:700px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:960px){
+ .grid.a{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+ .grid.b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .grid.c{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
+}
+@media(min-width:1680px){.grid.a{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}}
+.kpis.sm{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.pa{max-width:100%;min-width:0}.pa .chips,.ph>div{min-width:0}
+.rpt-tabs{max-width:100%;overflow-x:auto;scrollbar-width:none}.rpt-tabs::-webkit-scrollbar{display:none}
+#pg .pgt{min-width:0}#pgl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top>*{min-width:0}.top .ib,.top .pri,.top .live{flex:none}
+@media(max-width:699px){
+ /* thanh trên: bớt nút ít dùng trên điện thoại cho vừa một hàng */
+ #fxb,.top [data-a="keys"],.top .usr{display:none!important}
+ .top{gap:6px;padding-inline:10px}
+ .top .brand small{display:none}
+ .mn b{min-width:96px}
+ .ph h1{font-size:23px}
+}
+@media(max-width:480px){
+ .top .brand>span:last-child{display:none}
+ .f,.fp,.fp2{grid-template-columns:minmax(0,1fr)}
+ .sheet{width:calc(100vw - 16px);padding:18px 14px}
+ .seg button{font-size:12px;padding:8px 0}
+ .amtw .amt{font-size:30px}
+ main{padding:12px 12px 24px}
+ .card{padding:14px}
+ .dtop{gap:10px}.dbal b{font-size:19px}
+ .row{gap:10px}
+}
