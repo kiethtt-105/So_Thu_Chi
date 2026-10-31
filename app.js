@@ -1,4 +1,4 @@
-/* ===== core.js ===== */
+
 const { PASS, API, NAME } = window.CONFIG || {}, POLL_MS = 10000, TTL = 7 * 24 * 3600e3;
 const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -14,7 +14,7 @@ const pm = v => {
     const n = m ? Math.round(parseFloat(m[1] + '.' + (m[2] || m[4] || '0')) * PM_U[m[3]]) : Number(s.replace(/[^\d]/g, ''));
     return n ? (neg ? -n : n) : 0;
 };
-// Ô tiền hiểu cả dạng rút gọn (50k, 1.5tr) lẫn phép tính (45k*3+20k, 3tr-150k)
+
 const amtVal = v => (CALC_RE.test(String(v)) ? calcEval(v) : pm(v));
 const isShort = v => /[^\d\s.,\-₫đ]/i.test(v) || CALC_RE.test(v);
 function amtHint(el) {
@@ -33,7 +33,7 @@ document.addEventListener('focusout', e => {
 });
 const fm = el => {
     amtHint(el);
-    if (isShort(el.value)) return;   // đang gõ dạng rút gọn / phép tính → giữ nguyên, đổi thành số khi rời ô
+    if (isShort(el.value)) return;
     const s = el.value.trim(), ng = el.dataset.neg && s.startsWith('-'), d = s.replace(/[^\d]/g, '');
     const cur = document.activeElement === el, left = cur ? el.value.slice(0, el.selectionStart).replace(/\D/g, '').length : 0;
     el.value = (ng ? '-' : '') + (d ? num(+d) : '');
@@ -107,7 +107,6 @@ const splitImg = n => { n = String(n || ''); return { text: n.replace(IMG_RE, ''
 const noteTxt = n => splitImg(n).text, hasImg = n => splitImg(n).imgs.length > 0;
 const joinImg = (t, a) => [String(t || '').trim(), ...(a || [])].filter(Boolean).join(' ');
 
-/* ===== sync.js ===== */
 async function call(ops, rev, ms, fast) {
     if (!API)
         throw Error('Thiếu địa chỉ API: file config.js chưa được tải');
@@ -245,7 +244,7 @@ async function sync(manual) {
 }
 let chain = Promise.resolve();
 const SAFE_OPS = new Set(['tx.save', 'tx.del', 'tx.purge', 'lim.set']);
-const FAST_OPS = new Set(['tx.save', 'tx.del', 'tx.purge']);   // đã cập nhật tạm trên màn hình → máy chủ khỏi gửi lại cả sổ, web tự tải lại sau   // ghi lại nhiều lần vẫn ra cùng kết quả (ID cố định)
+const FAST_OPS = new Set(['tx.save', 'tx.del', 'tx.purge']);
 const liveMsg = (s, t) => { const e = $('#live'); if (!e) return; e.dataset.s = s; e.className = 'live ' + s; e.lastChild.textContent = t; const st = $('#st'); if (st) st.textContent = t; };
 async function act(ops, msg) { const r = await commit(ops, { ok: msg }); if (r.ok)
     closeSheet();
@@ -305,7 +304,6 @@ addEventListener('online', () => { fails = 0; sync(false); });
 ['click', 'keydown', 'touchstart'].forEach(t => document.addEventListener(t, () => { ACT_T = Date.now(); if (alive())
     touch(); }, { passive: true }));
 
-/* ===== data.js ===== */
 const mOf = t => t.date.slice(0, 7), inM = (t, m) => mOf(t) === m;
 let _own = null;
 const heldSet = () => new Set(S.acc.filter(a => a.type === HELD).map(a => a.name));
@@ -358,7 +356,7 @@ function balMap() {
         return _bk.m;
     const B = {};
     S.acc.forEach(a => B[a.name] = +a.open || 0);
-    const N = Object.assign({}, B), today = ymd(new Date());   // N = số dư hiện tại (chỉ tính giao dịch có ngày <= hôm nay, khớp công thức TaiKhoan trong Gsheet)
+    const N = Object.assign({}, B), today = ymd(new Date());
     const tm = t => (t.at || '').slice(11) || '23:59:59', m = {};
     S.tx.map((t, i) => [t, i]).sort((x, y) => x[0].date.localeCompare(y[0].date) || tm(x[0]).localeCompare(tm(y[0])) || x[1] - y[1]).forEach(([t]) => {
         const x = t.amount;
@@ -400,7 +398,6 @@ function issueBanner() {
     return `<div class="warn ${e ? 'err' : ''}">⚠️ ${e ? e + ' dòng dữ liệu bị lỗi (chưa được tính vào số liệu)' : ''}${e && w ? ' · ' : ''}${w ? w + ' dòng cần lưu ý' : ''}. <button data-a="issues">Xem chi tiết</button></div>`;
 }
 
-/* ===== screens.js ===== */
 function home() {
     const { thu, chi } = sums(S.m), total = ownAcc().reduce((s, a) => s + bal(a), 0), M = stx().filter(t => inM(t, S.m)), rows = group(chiM(S.m), t => t.cat || 'Chưa phân loại'), mx = rows[0] ? rows[0][1] : 1;
     const months = [];
@@ -497,7 +494,7 @@ function limPage() {
 }
 const diffs = () => S.acc.map(a => { const sys = bal(a), v = S.act[a.name], has = v !== undefined; return { a, sys, has, act: v, diff: has ? v - sys : 0 }; });
 function balPlan(L) {
-    // Không tự bịa chuyển khoản giữa các tài khoản: mỗi tài khoản lệch chỉ ghi đúng 1 dòng điều chỉnh bằng đúng số lệch.
+
     return { T: [], A: L.map(x => ({ n: x.a.name, d: x.diff })).filter(x => x.d !== 0) };
 }
 function recon() {
@@ -589,7 +586,7 @@ function nav() {
     const tb = $('#tb');
     let h = '', pend = '';
     TABS.forEach(([k, l, gr]) => {
-        if (gr) pend = gr;                         // nhãn nhóm chuyển sang mục hiện đầu tiên của nhóm; nhóm ẩn hết thì không hiện nhãn
+        if (gr) pend = gr;
         if (!tabOn(k) && S.tab !== k) return;
         if (pend) { h += '<i class="sep">' + pend + '</i>'; pend = ''; }
         h += `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" title="${l}">${ic(k)}<span>${l}</span>${k === 'tr' && S.trash.length ? '<em class="nbd">' + S.trash.length + '</em>' : ''}</button>`;
@@ -601,7 +598,7 @@ function nav() {
     if (typeof nbUpdate === 'function')
         nbUpdate();
 }
-// Cài đặt → Menu hiển thị: bật/tắt từng mục, lưu trên máy này
+
 document.addEventListener('change', e => {
     const t = e.target;
     if (!t.dataset || t.dataset.vis === undefined) return;
@@ -632,14 +629,13 @@ function drawView() {
 function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '<div class="sk"></div><div class="sk"></div><div class="sk"></div>') : drawView(); if (S.ready && S.tab === 'rec')
     reconUpdate(); mdFix(); if (typeof fxEnter === 'function')
     fxEnter(); }
-/* ===== cash.js ===== */
-/* Đếm tiền mặt: nhập số tờ theo mệnh giá -> tính tổng -> điền vào ô Tiền mặt ở màn Cân đối */
+
 (function () {
-    IC.cnt = 'M4 4h16v16H4zM4 9h16M4 14h16M9 4v16M15 4v16';  // biểu tượng bảng tính
+    IC.cnt = 'M4 4h16v16H4zM4 9h16M4 14h16M9 4v16M15 4v16';
     const DEN = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500];
     const KEY = 'stcash';
-    let cur = -1;          // chỉ số tài khoản (trong S.acc) đang đếm
-    let cnt = {};          // { mệnh giá: số tờ }
+    let cur = -1;
+    let cnt = {};
 
     const load = name => { try { return (JSON.parse(localStorage[KEY] || '{}'))[name] || {}; } catch (e) { return {}; } };
     const save = name => { try { const all = JSON.parse(localStorage[KEY] || '{}'); all[name] = cnt; localStorage[KEY] = JSON.stringify(all); } catch (e) { } };
@@ -681,7 +677,6 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '
         if (typeof reconUpdate === 'function') reconUpdate();
     }
 
-    // mở sheet từ nút cạnh ô Tiền mặt
     document.addEventListener('click', e => {
         const b = e.target.closest('[data-cash]');
         if (b && !b.closest('#ov')) { e.preventDefault(); return openCash(+b.dataset.cash); }
@@ -704,7 +699,6 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '
         refresh();
     });
 
-    // Enter: nhảy sang mệnh giá kế tiếp; ở ô cuối thì điền luôn
     document.addEventListener('keydown', e => {
         const t = e.target;
         if (e.key !== 'Enter' || !t.classList || !t.classList.contains('cin')) return;
@@ -715,7 +709,6 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '
     document.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('cin')) setTimeout(() => { try { e.target.select(); } catch (x) { } }, 0); });
 })();
 
-/* ===== events.js ===== */
 const go = t => { S.tab = t; location.hash = t; scrollTo(0, 0); closeSheet(); render(); };
 document.addEventListener('click', e => {
     if (e.target.closest('[data-a3="print"]')) { setTimeout(() => window.print(), 150); return; }
@@ -888,7 +881,7 @@ function openKeys() {
     $('#sh').innerHTML = `<h3>Phím tắt</h3>` + KEYS.map(([g, L]) => `<div class="kg"><h4>${g}</h4>${L.map(([a, b]) => `<div class="kr"><span class="kk">${/^[\w\[\]/?…+ ]+$/.test(a) && a.length < 16 ? k(a) : `<code>${esc(a)}</code>`}</span><span>${esc(b)}</span></div>`).join('')}</div>`).join('');
     openSheet();
 }
-document.addEventListener('keydown', e => {   // Alt + 1…4 chọn loại giao dịch khi form đang mở
+document.addEventListener('keydown', e => {
     if (!e.altKey || e.ctrlKey || e.metaKey || !/^[1-4]$/.test(e.key) || !E || !$('#ov').classList.contains('open')) return;
     const b = $('#sh [data-ty="' + TYPES[+e.key - 1] + '"]');
     if (!b) return;
@@ -896,7 +889,6 @@ document.addEventListener('keydown', e => {   // Alt + 1…4 chọn loại giao 
     setTimeout(() => { const a = $('#fa'); a && a.focus(); }, 0);
 });
 
-/* ===== forms.js ===== */
 function csv() {
     const r = [['ID', 'Ngày', 'Loại', 'Số tiền', 'Tài khoản', 'Tài khoản đến', 'Hạng mục cha', 'Hạng mục con', 'Ghi chú'], ...S.tx.map(t => [t.id, t.date, t.type, t.amount, t.acc, t.accTo, t.cat, t.sub, t.note])];
     const b = new Blob(['\ufeff' + r.map(x => x.map(v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s) && !(typeof v === 'number'))
@@ -948,7 +940,7 @@ document.addEventListener('keydown', e => {
 });
 function openIssues() { const L = S.issues; ED = null; E = null; $('#sh').innerHTML = `<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0, 80).map(i => `<div class="iss ${i.lv}"><b>${esc(SN[i.sheet] || i.sheet)} · dòng ${i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length > 80 ? `<p class="mut" style="margin-top:8px">… và ${L.length - 80} mục nữa</p>` : ''}`; openSheet(); }
 const catNorm = s => nz(String(s || '')).replace(/\s+/g, ' ').trim();
-/* Hạng mục / Chi tiết: ô chọn có tìm kiếm ngay trong ô (gõ không dấu cũng được) */
+
 function cbOpts(kind, ty, cat, q) {
     const all = S.cat.filter(c => c.t === ty);
     let L;
@@ -970,7 +962,7 @@ function catFields(ty, cat, sub) {
 }
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 function defAcc() { let a = ''; try { a = localStorage.lastAcc || ''; } catch (e) { } return S.acc.some(x => x.name === a) ? a : ((S.acc.find(x => x.type !== HELD) || S.acc[0] || {}).name || ''); }
-$('#ov').addEventListener('click', e => {   // nút ngày nhanh
+$('#ov').addEventListener('click', e => {
     const k = e.target.closest('[data-k]');
     if (k && E) { const a = $('#fa'); if (a && a.value.replace(/\D/g, '')) { a.value += k.dataset.k; fm(a); a.focus(); } return; }
     const b = e.target.closest('[data-qd]');
@@ -981,7 +973,7 @@ $('#ov').addEventListener('click', e => {   // nút ngày nhanh
 function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
 function form() {
     const ty = E.type, op = (a, v) => a.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join(''), noAcc = !S.acc.length;
-    // Chưa có danh sách tài khoản (chưa tải được dữ liệu): báo rõ + nút tải lại, không để ô chọn trống trơn
+
     const accBox = (id, lb, extra) => noAcc
         ? `<div class="w nodata"><span>${S.err ? 'Chưa tải được tài khoản: ' + esc(S.err) : 'Đang tải danh sách tài khoản…'}</span><button type="button" class="chip" data-reload>Tải lại</button></div>`
         : `<label class="w">${lb}<select id="${id}">${extra || ''}${op(S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc), id === 'ft' ? E.accTo : E.acc)}</select></label>`;
@@ -998,7 +990,7 @@ ${ty === 'Chuyển khoản' ? (noAcc ? '' : accBox('ft', 'Đến tài khoản', 
 <div class="sec2"><button type="button" class="btn" data-tplsave>☆ Lưu mẫu</button>${E.isNew ? '' : '<button type="button" class="btn" data-dup>⧉ Nhân đôi</button><button type="button" class="btn d" data-del>🗑 Xóa</button>'}</div></div>`;
     renderAtt();
 }
-$('#ov').addEventListener('click', e => {   // nút "Tải lại" khi chưa có tài khoản
+$('#ov').addEventListener('click', e => {
     if (!E || !e.target.closest('[data-reload]')) return;
     sync(true).then(() => { if (E && S.acc.length) { pull(); E.acc = defAcc(); form(); } else if (E) form(); });
 });
@@ -1086,7 +1078,7 @@ $('#ov').addEventListener('keydown', e => {
     else if (e.key === 'Enter') {
         if (e.isComposing || e.keyCode === 229) return;
         const b = box.querySelector('.cbo.on') || items[0];
-        // Danh sách đang mở và có kết quả: Enter = chọn. Ngược lại để logic Enter chung xử lý (nhảy ô kế tiếp).
+
         if (open && b) { e.preventDefault(); cbPick(b); }
     }
     else if (e.key === 'Escape' && open) {
@@ -1235,11 +1227,10 @@ $('#ov').addEventListener('click', async (e) => {
         try { localStorage.lastAcc = E.acc; } catch (x) { }
         const stg = (E.staged || []).map(s => ({ name: s.name, blob: s.blob }));
         closeSheet();
-        txSave(row, null, stg).then(r => { if (r && !r.ok && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });   // lỗi → trả form lại với dữ liệu đã nhập
+        txSave(row, null, stg).then(r => { if (r && !r.ok && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });
     }
 });
 
-/* ===== txform.js ===== */
 const nzc = c => { if (c === 'đ')
     return 'd'; if (c === 'Đ')
     return 'D'; const r = c.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); return r.length === 1 ? r : (r ? c : ' '); };
@@ -1351,7 +1342,6 @@ $('#ov').addEventListener('click', e => {
     }
 });
 
-/* ===== quick.js: đã bỏ ô gõ nhanh; chỉ giữ hàm ghi giao dịch cho Mẫu / Công nợ ===== */
 function qMissing(p) {
     const m = [];
     if (!p.amount) m.push('số tiền');
@@ -1371,7 +1361,6 @@ function qOpen(p) {
     openSheet();
 }
 
-/* ===== report.js ===== */
 S.rpv = S.rpv || 'm';
 const pct = (x, y) => y ? Math.round((x - y) / y * 100) : null;
 function delta(x, y, isChi = true) {
@@ -1523,7 +1512,6 @@ document.addEventListener('click', e => {
 });
 Object.assign(S, { sa: '', sc: '', ss: '', ct: 'Chi', sl: '', lo: false, vf: 'all' });
 
-/* ===== lists.js ===== */
 const TXV = [['tx', 'Tất cả'], ['ba', 'Theo tài khoản'], ['bc', 'Theo danh mục'], ['bl', 'Theo hạn mức']];
 const txSwitch = () => `<div class="tabs vsw" role="tablist">${TXV.map(([k, l]) => `<button type="button" role="tab" class="${S.tab === k ? 'on' : ''}" data-tab="${k}">${ic(k)}${l}</button>`).join('')}</div>`;
 const keyOr = (keys, cur, def) => keys.includes(cur) ? cur : def;
@@ -1727,7 +1715,6 @@ document.addEventListener('click', e => {
     }
 });
 
-/* ===== notify.js ===== */
 IC.bell = 'M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0';
 IC.set = 'M4 7h9M17 7h3M4 17h3M11 17h9M15 4v6M9 14v6';
 const CAN_SYS = 'Notification' in window;
@@ -1771,8 +1758,7 @@ const nsave = a => { try {
 }
 catch (e) { } };
 const ago = t => { const s = (Date.now() - t) / 1e3; return s < 60 ? 'vừa xong' : s < 3600 ? Math.floor(s / 60) + ' phút trước' : s < 86400 ? Math.floor(s / 3600) + ' giờ trước' : new Date(t).toLocaleDateString('vi-VN'); };
-/* Nhật ký thông báo dùng chung giữa các thiết bị: ngoài nhật ký cục bộ, dựng thêm
-   "Giao dịch đã được tạo" từ chính dữ liệu đồng bộ (mã giao dịch chứa mốc thời gian tạo). */
+
 const idTs = id => { const m = /^G([0-9a-z]{8})/.exec(String(id || '')); if (!m)
     return 0; const t = parseInt(m[1], 36); return t > 1.4e12 && t < 4.1e12 ? t : 0; };
 let _fd = null;
@@ -1835,7 +1821,7 @@ function toast(t, u, o) {
 (() => {
     const e = $('#toast');
     if (!e) return;
-    e.addEventListener('click', toastHide);   // chạm vào đâu trên thông báo cũng ẩn (trừ nút Hoàn tác)
+    e.addEventListener('click', toastHide);
 })();
 async function swReg() {
     if (SWREG)
@@ -1955,7 +1941,7 @@ function reportOf(date) {
     lines.push('Tháng này đã chi ' + vnd(mo.chi));
     return lines.join('\n');
 }
-/* Giờ gửi trước 12:00 -> báo cáo hôm qua; từ 12:00 trở đi -> báo cáo hôm nay */
+
 const rpToday = () => { const m = toMin(cfg().rp.at); return m >= 12 * 60; };
 function dailyReport(preview) {
     const y = new Date(), td = rpToday();
@@ -2008,7 +1994,7 @@ function schedTick() {
         const m = toMin(c.rp.at);
         if (m >= 0 && cur >= m && !fired(k)) {
             markFired(k);
-            if (cur - m <= 240)   // mở app quá trễ so với giờ hẹn thì bỏ qua, không báo bù lệch giờ
+            if (cur - m <= 240)
                 dailyReport(false);
         }
     }
@@ -2216,7 +2202,6 @@ function pushInit() {
 }
 schedStart();
 
-/* ===== upload.js ===== */
 const IMG_MAX = 1600, IMG_KB = 300;
 function viaImg(f) {
     return new Promise((ok, no) => { const u = URL.createObjectURL(f), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); ok(i); }; i.onerror = () => { URL.revokeObjectURL(u); no(Error('Không đọc được ảnh này')); }; i.src = u; });
@@ -2243,7 +2228,7 @@ async function heicToJpg(f) {
 async function squeeze(f) {
     let im;
     try { im = await loadBmp(f); }
-    catch (e) { if (!isHeic(f)) throw e; im = await loadBmp(await heicToJpg(f)); }   // Chrome / Firefox chưa đọc được HEIC → đổi sang JPEG
+    catch (e) { if (!isHeic(f)) throw e; im = await loadBmp(await heicToJpg(f)); }
     const w = im.width || im.naturalWidth, h = im.height || im.naturalHeight;
     let k = Math.min(1, IMG_MAX / Math.max(w, h)), q = .82, b;
     for (let i = 0; i < 10; i++) {
@@ -2312,7 +2297,7 @@ function renderAtt() {
         + `<label class="th add" title="Thêm ảnh (JPG, PNG, WebP, HEIC)"><b>＋</b><small>Thêm / dán ảnh</small><input type="file" id="fimg" accept="image/*,.heic,.heif" multiple hidden></label></div>`;
     renderScan();
 }
-/* Xem ảnh lớn ngay trong trang */
+
 document.addEventListener('click', e => {
     const a = e.target.closest('[data-lb]'); if (!a) return;
     e.preventDefault();
@@ -2366,7 +2351,6 @@ $('#ov').addEventListener('click', e => {
     }
 });
 
-/* ===== trend.js ===== */
 S.tn = S.tn || 12;
 
 function rpTrend() {
@@ -2434,7 +2418,6 @@ document.addEventListener('click', e => {
     render();
 });
 
-/* ===== goals.js ===== */
 let GOALS = [], GE = { i: null };
 try { GOALS = JSON.parse(localStorage.goals || '[]'); } catch (e) { }
 const goalsSave = () => { try { localStorage.goals = JSON.stringify(GOALS); } catch (e) { } };
@@ -2551,8 +2534,6 @@ document.addEventListener('click', e => {
     if (d.gdel !== undefined) return goalDel(+d.gdel);
 });
 
-/* ===== trash.js ===== */
-/* Thùng rác: định dạng thời gian, nhóm theo ngày, lọc theo loại, khôi phục an toàn (kiểm tra trùng / thiếu tài khoản), khôi phục hàng loạt */
 let TF = 'all';
 const TRK = { gd: 'Giao dịch', tk: 'Tài khoản', dm: 'Hạng mục' };
 const trTime = x => { const t = Date.parse(x.at); return isNaN(t) ? 0 : t; };
@@ -2657,10 +2638,6 @@ document.addEventListener('click', e => {
     if (a) return trRestoreAll();
 });
 
-/* ===== extras.js ===== */
-/* Tính năng bổ sung (lưu cục bộ trên máy):
-   giao dịch định kỳ, sổ nợ, thẻ tín dụng, nhịp chi theo hạn mức, dự báo cuối tháng,
-   bộ lọc đã lưu, nhập giọng nói, xuất Excel, in PDF. */
 (function () {
     const DAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
     let XD = { rec: [], debt: [], card: {}, flt: [] };
@@ -2675,7 +2652,6 @@ document.addEventListener('click', e => {
     const val = id => ($('#' + id) || {}).value;
     const dayHit = (d, day) => d.getDate() === Math.min(+day, dimOf(d.getFullYear(), d.getMonth()));
 
-    /* ---------- Giao dịch định kỳ ---------- */
     const rcMatch = (r, d) => { const s = parseD(r.start); if (s && d < s) return false; return r.freq === 'w' ? d.getDay() === +r.day : dayHit(d, r.day); };
     function rcNext(r) { const t = dayOf(new Date()); for (let i = 0; i < 400; i++) { const d = addD(t, i); if (rcMatch(r, d)) return d; } return null; }
     function rcValid(r) {
@@ -2755,7 +2731,6 @@ document.addEventListener('click', e => {
         XD.rec.splice(RC.i, 1); xsave(); closeSheet(); render();
     }
 
-    /* ---------- Sổ nợ ---------- */
     const dbLeft = d => Math.max(0, d.amount - (d.paid || 0));
     function dbPage() {
         const L = XD.debt.map((d, i) => ({ d, i })).sort((a, b) => (dbLeft(a.d) === 0) - (dbLeft(b.d) === 0) || (a.d.due || '9999').localeCompare(b.d.due || '9999'));
@@ -2805,7 +2780,6 @@ ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu
             qOpen({ type: d.dir === 'owe' ? 'Chi' : 'Thu', amount: a, date: todayS(), time: hm(new Date()), note: (d.dir === 'owe' ? 'Trả nợ ' : 'Thu nợ ') + d.who, cat: '', sub: '', acc: '', accTo: '' });
     }
 
-    /* ---------- Thẻ tín dụng ---------- */
     const cdLast = (day, t) => { let d = new Date(t.getFullYear(), t.getMonth(), Math.min(day, dimOf(t.getFullYear(), t.getMonth()))); if (d > t) { const p = new Date(t.getFullYear(), t.getMonth() - 1, 1); d = new Date(p.getFullYear(), p.getMonth(), Math.min(day, dimOf(p.getFullYear(), p.getMonth()))); } return d; };
     const cdNext = (day, t) => { let d = new Date(t.getFullYear(), t.getMonth(), Math.min(day, dimOf(t.getFullYear(), t.getMonth()))); if (d < t) { const n = new Date(t.getFullYear(), t.getMonth() + 1, 1); d = new Date(n.getFullYear(), n.getMonth(), Math.min(day, dimOf(n.getFullYear(), n.getMonth()))); } return d; };
     function cdInfo(a) {
@@ -2840,7 +2814,6 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
         xsave(); closeSheet(); render(); toast('Đã lưu');
     }
 
-    /* ---------- Nhịp chi theo hạn mức + dự báo cuối tháng ---------- */
     const curMonth = () => S.m === ymd(new Date()).slice(0, 7);
     function pace() {
         const n = new Date(), D = dimOf(n.getFullYear(), n.getMonth()), d = n.getDate();
@@ -2861,7 +2834,6 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     const _home = home; home = function () { const h = _home(); return curMonth() ? h.replace('<div class="grid a">', () => forecastCard() + '<div class="grid a">') : h; };
     const _limPage = limPage; limPage = function () { return _limPage() + paceCard(); };
 
-    /* ---------- Bộ lọc đã lưu ---------- */
     const FK = ['f', 'xa', 'xc', 'mn', 'mx', 'rg', 'd1', 'd2', 'so', 'q'], FD = { f: 'all', xa: '', xc: '', mn: '', mx: '', rg: 'm', d1: '', d2: '', so: 'dn', q: '' };
     let fltMg = false;
     const fltDirty = () => FK.some(k => S[k] !== FD[k]);
@@ -2873,9 +2845,8 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     }
     const _txs = txs; txs = function () { return _txs().replace('<div class="sum">', () => fltBar() + '<div class="sum">'); };
 
-    /* ---------- Xuất Excel, in PDF ---------- */
     function dl(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 4000); }
-    /* xlsx thật: tự ghép file zip (không nén) + XML, không cần thư viện, chạy offline */
+
     const CRCT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
     const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRCT[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
     function zipStore(files) {
@@ -2893,7 +2864,7 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     }
     const xcol = i => { let s = ''; for (i++; i > 0; i = (i - 1) / 26 | 0) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };
     const xtxt = v => String(v ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    /* ô: số -> number; {n, s} -> style; chữ -> inlineStr. style: 1 đậm+nền, 2 số #,##0, 3 đậm số, 4 phần trăm, 5 đậm */
+
     function xsheet(rows, widths, freeze) {
         const body = rows.map((r, y) => '<row r="' + (y + 1) + '">' + r.map((c, x) => {
             if (c == null || c === '') return '';
@@ -2932,7 +2903,6 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     }
     window.extraMenu = () => [['dl', 'Xuất báo cáo tháng (Excel)', 'xls'], ['dl', 'In / lưu PDF trang đang xem', 'pdf']].map(([i, t, k]) => `<button class="row" data-x="${k}">${ic(i)}<span class="m"><b>${t}</b></span></button>`).join('');
 
-    /* ---------- Nhắc nhở nền ---------- */
     function xTick() {
         if (!S.ready || !alive()) return;
         rcRun();
@@ -2960,7 +2930,6 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     setInterval(xTick, 30000);
     setTimeout(xTick, 4000);
 
-    /* ---------- Đăng ký tab + sự kiện ---------- */
     IC.rc = 'M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3';
     IC.debt = 'M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6';
     IC.card = IC.ba;
@@ -3004,8 +2973,6 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     });
 })();
 
-/* ===== fx.js ===== */
-/* Hiệu ứng vào trang + đếm số + thu gọn thanh bên */
 const reduceMotion = () => matchMedia('(prefers-reduced-motion:reduce)').matches;
 function sbToggle() {
     const on = document.documentElement.classList.toggle('sbc');
@@ -3047,7 +3014,6 @@ function fxEnter() {
     fxEnter._t = setTimeout(() => v.classList.remove('pgin'), 1400);
 }
 
-/* ===== Âm thanh (WebAudio, không cần file) + rung + ripple + spotlight ===== */
 const fxOn = () => !document.documentElement.classList.contains('fxoff');
 let _ac = null, _lastTap = 0;
 function audio() {
@@ -3111,18 +3077,23 @@ document.addEventListener('pointermove', e => {
         c.style.setProperty('--my', e.clientY - r.top + 'px');
     });
 }, { passive: true });
+function tgPush(kind, title, text) {
+    if (!/^https?:$/.test(location.protocol) || !kindOn(kind)) return;
+    try {
+        fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', text: title + '\n' + String(text || '') }) }).catch(() => { });
+    } catch (e) { }
+}
 if (typeof notify === 'function') {
     const _notify = notify;
     notify = function (body, o) {
         o = o || {};
         if (fxOn() && !o.bg) { o.err ? sfx.err() : sfx.ok(); }
-        return _notify.apply(this, arguments);
+        const r = _notify.apply(this, arguments);
+        if (!o.bg && !o.err && (o.kind === 'tx' || o.kind === 'limit')) tgPush(o.kind, o.title || 'Sổ Thu Chi', body);
+        return r;
     };
 }
 
-/* ===== main.js ===== */
-// Đăng nhập nhanh bằng GET: mở app với ?key=<KEY trong config.js> thì khỏi nhập mật khẩu.
-// Key được xóa khỏi thanh địa chỉ ngay sau khi đọc. 
 (function () {
     try {
         const u = new URL(location.href), kn = [...u.searchParams.keys()].find(x => x.toLowerCase() === 'key'), k = kn === undefined ? null : u.searchParams.get(kn);
@@ -3136,14 +3107,14 @@ if (typeof notify === 'function') {
     }
     catch (e) { }
 })();
-/* ===== outbox.js: hàng đợi lưu bền (IndexedDB), thanh tiến trình, chặn tắt tab ===== */
+
 const OB = { n: 0, ids: new Set(), jobs: {}, wk: new Set(), base: null, net: false };
 let pgT = 0;
 function pgSet(t, p, n) {
     const e = $('#pg'); if (!e) return; clearTimeout(pgT);
     e.classList.add('on'); e.classList.toggle('ind', p == null);
     $('#pgl').textContent = t; $('#pgc').textContent = n > 1 ? n + ' việc đang chờ' : '';
-    const x = $('#pgx'); if (x) x.classList.toggle('hide', !(n > 0));   // nút Hủy chỉ hiện khi thật sự có thay đổi đang chờ gửi (không hiện khi chỉ tải dữ liệu)
+    const x = $('#pgx'); if (x) x.classList.toggle('hide', !(n > 0));
     $('#pgf').style.width = p == null ? '' : Math.max(4, Math.min(100, p)) + '%';
 }
 function oflSet() {
@@ -3159,8 +3130,7 @@ const idb = (() => {
     let p;
     const open = () => p || (p = new Promise((ok, no) => { try { const r = indexedDB.open('stc-outbox', 1); r.onupgradeneeded = () => r.result.createObjectStore('j', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); } catch (e) { no(e); } }).catch(() => null));
     const run = (m, f) => open().then(db => db && new Promise(ok => { try { const t = db.transaction('j', m), q = f(t.objectStore('j')); t.oncomplete = () => ok(q && q.result); t.onerror = t.onabort = () => ok(null); } catch (e) { ok(null); } }));
-    /* Bản ghi "hb:<id>" là nhịp tim: trang (hoặc service worker) đang gửi việc <id> thì ghi dấu thời gian mỗi 3 giây.
-       Ai thấy nhịp tim cũ hơn 9 giây thì hiểu bên kia đã đóng tab / bị đóng băng và nhận gửi nốt việc đó. */
+
     const isHb = x => String(x.id).startsWith('hb:');
     return {
         put: j => run('readwrite', s => s.put(j)), del: id => run('readwrite', s => s.delete(id)), get: id => run('readonly', s => s.get(id)),
@@ -3185,9 +3155,9 @@ document.addEventListener('click', async e => {
     if (await ask('Hủy các thay đổi chưa lưu?', OB.n + ' việc đang chờ sẽ bị bỏ, dữ liệu trở về như trên sổ.', { ok: 'Hủy thay đổi', cancel: 'Tiếp tục gửi', icon: '↩️', danger: 1 })) obCancel();
 });
 function saveCache() { try { localStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues }); } catch (e) { } }
-// Việc đã được lưu bền vào IndexedDB thì đóng tab thoải mái: service worker sẽ gửi nốt ở nền. Chỉ chặn khi còn việc chưa kịp lưu bền.
+
 addEventListener('beforeunload', e => { if (Object.values(OB.jobs).some(j => !j.persisted) || (E && E.up)) { e.preventDefault(); e.returnValue = 'Đang lưu dữ liệu, thoát bây giờ có thể mất thay đổi.'; return e.returnValue; } });
-function handOff() {   // tab sắp đóng / chuyển sang nền: đánh thức service worker gửi nốt hàng đợi
+function handOff() {
     if (!OB.n) return;
     bgSync();
     try { const c = navigator.serviceWorker && navigator.serviceWorker.controller; if (c) c.postMessage({ type: 'flush' }); } catch (e) { }
@@ -3197,7 +3167,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) handO
 const cancelErr = () => { const x = Error('Đã hủy'); x.cancel = true; return x; };
 async function callRetry(ops, pend, job) {
     const safe = ops.every(x => SAFE_OPS.has(x.op));
-    for (let i = 1; ; i++) {   // ghi an toàn (ID cố định): thử lại đến khi được
+    for (let i = 1; ; i++) {
         if (job && job.x) throw cancelErr();
         try { const r = await call(ops, '', 45000, ops.every(x => FAST_OPS.has(x.op))); OB.net = false; oflSet(); return r; }
         catch (e) {
@@ -3211,12 +3181,12 @@ async function callRetry(ops, pend, job) {
         }
     }
 }
-async function upStaged(job) {   // ảnh chỉ được tải lên Drive khi người dùng đã bấm Lưu
+async function upStaged(job) {
     const n = job.files.length, start = job.urls.length;
     if (start >= n) return job.urls;
     const res = job.urls.slice();
     let done = start, warned = false;
-    // Tải song song tất cả ảnh còn lại (nhanh hơn nhiều so với từng ảnh một); giữ đúng thứ tự ảnh
+
     await Promise.all(job.files.map(async (f, i) => {
         if (i < start) return;
         for (let k = 1; ; k++) {
@@ -3252,18 +3222,18 @@ function commit(ops, o = {}) {
     if (o.local) o.local();
     saveCache(); render();
     S.busy++; OB.n++; OB.ids.add(job.id); spin(1); liveMsg('wait', pend); pgSet(pend, null, OB.n);
-    // Lưu bền vào IndexedDB rồi mới báo "đã nhận"; từ lúc đó dù đóng tab, service worker vẫn gửi nốt được
+
     let hbT = 0;
     const endHb = () => { clearInterval(hbT); if (safe) idb.unbeat(job.id); };
     if (safe) { hbT = setInterval(() => idb.beat(job.id), 3000); }
     const stored = safe
         ? (o.noPersist ? Promise.resolve(job.id) : idb.put(job)).then(r => { job.persisted = !!r; return idb.beat(job.id); }).then(bgSync)
         : Promise.resolve();
-    chain = chain.then(async () => {
+    chain = chain.catch(() => { }).then(async () => {
         await stored;
         let res = { ok: true }, fast = false, ops2 = ops, taken = false;
         if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; if (!S.busy) spin(0); if (!OB.n) { pgHide(0); oflSet(); } return { ok: false, err: 'Đã hủy', cancel: true }; }
-        // Trang bị đóng băng ở nền thì service worker có thể đã gửi xong việc này: kiểm tra để khỏi gửi trùng
+
         if (safe && job.persisted && !(await idb.get(job.id))) taken = true;
         const okNote = () => notify(o.ok || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
         try {
@@ -3307,10 +3277,10 @@ function commit(ops, o = {}) {
     });
     return chain;
 }
-async function resumeOutbox(tries) {   // mở lại web: gửi tiếp những thay đổi còn dang dở
+async function resumeOutbox(tries) {
     tries = tries || 0;
     const [all, beats] = await Promise.all([idb.all(), idb.beats()]);
-    const mine = all.filter(j => !OB.ids.has(j.id)), busy = mine.filter(j => Date.now() - (beats[j.id] || 0) < HB_STALE);   // việc service worker đang gửi dở thì để nó làm
+    const mine = all.filter(j => !OB.ids.has(j.id)), busy = mine.filter(j => Date.now() - (beats[j.id] || 0) < HB_STALE);
     if (busy.length && tries < 8) setTimeout(() => resumeOutbox(tries + 1), 5000);
     const js = mine.filter(j => !busy.includes(j)).sort((a, b) => a.t - b.t);
     js.forEach(j => commit(j.ops, {
@@ -3318,7 +3288,7 @@ async function resumeOutbox(tries) {   // mở lại web: gửi tiếp những t
         local: () => j.ops.forEach(x => { if (x.op === 'tx.save') S.tx = S.tx.filter(t => t.id !== x.row.id).concat(x.row); else if (x.op === 'tx.del' || x.op === 'tx.purge') S.tx = S.tx.filter(t => t.id !== x.id); })
     }));
 }
-/* ===== calc.js: nhập phép tính ở ô số dư thực tế (Cân đối) ===== */
+
 const CALC_RE = /[+*\/×÷()]|[\d\w)]\s*-|[\d)]\s*x\s*[\d(]/i;
 function calcEval(s) {
     s = String(s).toLowerCase().replace(/[₫đ]/g, '').replace(/([\d)])\s*x\s*(?=[\d(])/g, '$1*').replace(/×/g, '*').replace(/÷/g, '/');
@@ -3354,7 +3324,7 @@ function calcDone(t) {
 }
 document.addEventListener('focusout', e => { if (isBa(e.target) && calcDone(e.target)) e.stopImmediatePropagation(); }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && isBa(e.target)) calcDone(e.target); }, true);
-$('#ov').addEventListener('click', e => {   // gỡ ảnh đang chờ tải
+$('#ov').addEventListener('click', e => {
     const x = e.target.closest('[data-imgst]'); if (!x || !E) return;
     E.staged = (E.staged || []).filter(s => s.id !== x.dataset.imgst); renderAtt();
 });
@@ -3362,7 +3332,6 @@ $('#ov').addEventListener('click', e => {   // gỡ ảnh đang chờ tải
 if (alive())
     boot();
 
-/* ===== Cửa sổ (sheet): nút đóng × ===== */
 (function () {
     const sh = $('#sh'), ov = $('#ov');
     const addX = () => {
@@ -3375,17 +3344,6 @@ if (alive())
     document.addEventListener('click', e => { if (e.target.closest('#sx')) { e.preventDefault(); tryClose(); } });
 })();
 
-/* ===== enter.js: logic phím Enter toàn app =====
-   Quy tắc:
-   1. Đang gõ tiếng Việt (IME) hoặc giữ phím (repeat): bỏ qua, tránh nhảy ô / lưu nhầm.
-   2. Hộp xác nhận (#cf) và màn đăng nhập tự xử lý riêng, không can thiệp.
-   3. Ô chọn Hạng mục/Chi tiết đang mở danh sách: Enter = chọn (xử lý ở forms.js); danh sách đóng thì Enter = ô kế tiếp.
-   4. Trong cửa sổ (sheet): Enter = sang ô kế tiếp; ở ô cuối cùng = bấm nút chính (Lưu / Xác nhận...).
-      Ctrl/Cmd + Enter ở bất kỳ ô nào = bấm nút chính ngay. Sheet không có nút chính (Cài đặt...) thì Enter chỉ thoát ô.
-   5. Ô tìm kiếm giao dịch: Enter = tìm ngay, thu bàn phím.
-   6. Ô số dư thực tế (Cân đối): Enter = sang tài khoản kế tiếp, ô cuối thì thoát ô.
-   7. Các ô lọc / ô nhập khác trong trang: Enter = thoát ô (kích hoạt sự kiện change để áp dụng).
-   Nút, liên kết, ô tích, textarea: giữ hành vi mặc định của trình duyệt. */
 (function () {
     const PRIMARY = '[data-save],[data-esave],[data-lsave],[data-gsave],[data-rcsave],[data-dbsave],[data-dbpaygo],[data-cdsave],[data-cfill]';
     const visible = el => el && !el.disabled && el.offsetParent !== null;
@@ -3408,20 +3366,18 @@ if (alive())
         if (t.closest('#login')) return;
         const quick = e.ctrlKey || e.metaKey;
 
-        // --- Trong cửa sổ (sheet) ---
         const sh = t.closest('#sh');
         if (sh && $('#ov').classList.contains('open')) {
             e.preventDefault();
             const btn = primaryOf(sh);
-            if (!btn) return t.blur();                      // Cài đặt, thông báo...: chỉ thoát ô
+            if (!btn) return t.blur();
             if (quick) return btn.click();
             const list = fieldsOf(sh), i = list.indexOf(t), next = list[i + 1];
             if (next) return focusEl(next);
-            t.blur();                                       // chốt giá trị (sự kiện change) rồi lưu
+            t.blur();
             return btn.click();
         }
 
-        // --- Ô tìm kiếm giao dịch ---
         if (t.id === 'q') {
             e.preventDefault();
             clearTimeout(qT);
@@ -3431,14 +3387,12 @@ if (alive())
             return;
         }
 
-        // --- Nhập số dư thực tế ở màn Cân đối ---
         if (t.classList.contains('ba')) {
             e.preventDefault();
             const all = $$('.ba'), next = all[all.indexOf(t) + 1];
             return next ? focusEl(next) : t.blur();
         }
 
-        // --- Ô khác trong trang (bộ lọc ngày, số tiền, chọn tài khoản...) ---
         if (t.closest('#v')) {
             e.preventDefault();
             t.blur();
@@ -3446,7 +3400,6 @@ if (alive())
     });
 })();
 
-/* ===== In / PDF: thêm tiêu đề + ngày in, đặt tên file theo màn hình ===== */
 (function () {
     let oldT = '';
     window.addEventListener('beforeprint', () => {
@@ -3463,7 +3416,6 @@ if (alive())
 
 oflSet();
 
-/* Ngăn kéo điều hướng cho cửa sổ hẹp (< 700px): chọn mục hoặc bấm ra ngoài là đóng */
 document.addEventListener('click', e => {
     const h = document.documentElement;
     if (!h.classList.contains('sdo')) return;
@@ -3471,8 +3423,6 @@ document.addEventListener('click', e => {
 });
 addEventListener('resize', () => { if (innerWidth >= 700) document.documentElement.classList.remove('sdo'); });
 
-
-/* ===== scan.js: chọn / chụp ảnh hóa đơn, biên lai chuyển khoản → tự điền giao dịch (OCR chạy ngay trên máy, ảnh không gửi đi đâu để đọc) ===== */
 const fold = s => String(s || '').normalize('NFC').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 let _tess, _ow, _owT, _ocrLog;
 function tessLib() {
@@ -3490,7 +3440,7 @@ async function ocrWorker() {
     if (!_ow) _ow = T.createWorker('vie+eng', 1, { logger: m => _ocrLog && _ocrLog(m) }).catch(e => { _ow = null; throw e; });
     clearTimeout(_owT);
     const w = await _ow;
-    _owT = setTimeout(() => { const p = _ow; _ow = null; p && p.then(x => x.terminate()).catch(() => { }); }, 120000);   // rảnh 2 phút thì giải phóng bộ nhớ (điện thoại)
+    _owT = setTimeout(() => { const p = _ow; _ow = null; p && p.then(x => x.terminate()).catch(() => { }); }, 120000);
     return w;
 }
 async function ocrPrep(blob) {
@@ -3501,7 +3451,7 @@ async function ocrPrep(blob) {
     if (im.close) im.close();
     const d = x.getImageData(0, 0, c.width, c.height), p = d.data; let sum = 0;
     for (let i = 0; i < p.length; i += 4) { const g = (p[i] * .299 + p[i + 1] * .587 + p[i + 2] * .114); p[i] = p[i + 1] = p[i + 2] = g; sum += g; }
-    if (sum / (p.length / 4) < 110) for (let i = 0; i < p.length; i += 4) { p[i] = p[i + 1] = p[i + 2] = 255 - p[i]; }   // ảnh nền tối (app ngân hàng chế độ tối) → đảo màu cho dễ đọc
+    if (sum / (p.length / 4) < 110) for (let i = 0; i < p.length; i += 4) { p[i] = p[i + 1] = p[i + 2] = 255 - p[i]; }
     x.putImageData(d, 0, 0);
     return c;
 }
@@ -3537,7 +3487,7 @@ function ocrParse(text) {
     while (!date && (m = reB.exec(all))) date = dOk(+m[3], +m[2], +m[1]);
     while (!date && (m = reC.exec(all))) date = dOk(+m[1], +m[2], +m[3]);
     while (!time && (m = reT.exec(all))) if (+m[1] < 24 && +m[2] < 60) time = pad(+m[1]) + ':' + m[2];
-    // Số tiền: chấm điểm từng con số theo ngữ cảnh (từ khóa "tổng cộng / số tiền…", đơn vị đ/VND, dấu +/-), loại số dư, phí, mã giao dịch, STK…
+
     const KEY = /tong cong|tong tien|tong thanh toan|thanh tien|so tien|gia tri|thanh toan|total|amount|grand|can thanh toan|tien hang/;
     const BAD = /so du|balance|phi |fee|vat|thue|giam gia|discount|tien thua|tien khach|ma giao dich|ma tham chieu|so tai khoan|stk|so the|sdt|so dien thoai|hotline|ma so thue|mst|so hoa don|ma don|order|ref/;
     let best = null;
@@ -3562,16 +3512,16 @@ function ocrParse(text) {
         if (hasIn && !hasOut) type = 'Thu';
         else if (hasIn && hasOut && /(nguoi gui|ben gui|nhan duoc|da nhan|ghi co|received)/.test(all) && !/(da chuyen|chuyen tien thanh cong|chuyen khoan thanh cong|ghi no)/.test(all)) type = 'Thu';
     }
-    // Nhận diện ngân hàng / ví để chọn đúng tài khoản (bill ngân hàng KHÔNG được ghi vào Tiền mặt)
+
     const alias = OCR_ALIAS.find(a => a[0].test(all)) || null;
     const isBank = !!alias || /ngan hang|napas|so tai khoan|\bstk\b|chuyen (tien|khoan)|ma giao dich|ma tham chieu|internet banking|mobile banking|vietqr|qr pay|bien lai|so du/.test(all);
     const lab = re => { for (let i = 0; i < fl.length; i++) { const k = re.exec(fl[i]); if (k) { let v = lines[i].slice(k.index + k[0].length).replace(/^[\s:.\-]+/, '').trim(); if (!v && lines[i + 1]) v = lines[i + 1]; if (v && /[a-zà-ỹ]{2}/i.test(v)) return v; } } return ''; };
     const content = lab(/(noi dung(?: chuyen (?:tien|khoan))?|loi nhan|message|dien giai|mo ta|description)\s*[:\-]?/), who = lab(/(ten nguoi nhan|nguoi nhan|nguoi huong|ben nhan|nha cung cap|cua hang|merchant|beneficiary)\s*[:\-]?/);
     let note = [who, content].filter(Boolean).join(' · ');
-    if (!note) { const i = lines.findIndex(l => (l.match(/[A-Za-zÀ-ỹ]/g) || []).length >= 4 && (l.match(/\d/g) || []).length <= 3); if (i >= 0) note = lines[i]; }   // hóa đơn: dòng đầu thường là tên cửa hàng
+    if (!note) { const i = lines.findIndex(l => (l.match(/[A-Za-zÀ-ỹ]/g) || []).length >= 4 && (l.match(/\d/g) || []).length <= 3); if (i >= 0) note = lines[i]; }
     return { amount: best ? best.v : 0, date, time, type, note: note.slice(0, 120), tx: fold(note + ' ' + all), alias, isBank };
 }
-/* Bảng tên ngân hàng / ví: cùng một regex dùng để khớp chữ trong ảnh và tên tài khoản của bạn (đã bỏ dấu, chữ thường) */
+
 const OCR_ALIAS = [
     [/vietcombank|\bvcb\b/, 'bank'], [/techcombank|\btcb\b/, 'bank'], [/\bmb ?bank\b|\bmbb\b|quan doi/, 'bank'], [/\bbidv\b/, 'bank'], [/vietinbank|\bctg\b/, 'bank'],
     [/agribank/, 'bank'], [/\bacb\b/, 'bank'], [/vpbank/, 'bank'], [/tpbank/, 'bank'], [/sacombank|\bstb\b/, 'bank'], [/\bocb\b/, 'bank'], [/\bshb\b/, 'bank'],
@@ -3582,9 +3532,9 @@ function ocrAcc(r) {
     if (!r || !(r.isBank || r.alias)) return null;
     const own = S.acc.filter(a => a.type !== HELD), nm = a => fold(a.name);
     let hit = null;
-    if (r.alias) hit = own.find(a => r.alias[0].test(nm(a)));                               // đúng tên ngân hàng / ví trong ảnh
+    if (r.alias) hit = own.find(a => r.alias[0].test(nm(a)));
     if (!hit && r.alias && r.alias[1] === 'wallet') hit = own.find(a => a.type === 'Ví điện tử');
-    if (!hit) {                                                                              // bill ngân hàng nhưng không rõ ngân hàng nào: lấy tài khoản ngân hàng hay dùng nhất
+    if (!hit) {
         const banks = own.filter(a => a.type === 'Ngân hàng');
         let last = ''; try { last = localStorage.lastAcc || ''; } catch (e) { }
         hit = banks.find(a => a.name === last) || banks[0] || null;
@@ -3603,7 +3553,7 @@ async function scanImg(f) {
     try {
         msg('Đang xử lý ảnh…');
         const small = await squeeze(f), st = { id: Math.random().toString(36).slice(2), blob: small, name: imgName(), url: URL.createObjectURL(small), kb: Math.round(small.size / 1024) };
-        (E0.staged = E0.staged || []).push(st);   // ảnh cũng được đính kèm vào giao dịch
+        (E0.staged = E0.staged || []).push(st);
         if (E === E0) renderAtt();
         msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
         const w = await ocrWorker();
@@ -3635,9 +3585,6 @@ $('#ov').addEventListener('change', e => {
     if (f) scanImg(f);
 });
 
-/* Dán ảnh (Ctrl+V) và kéo thả ảnh vào cửa sổ giao dịch.
-   Form mới, chưa nhập số tiền: ảnh đầu tiên được quét tự điền, các ảnh còn lại đính kèm song song.
-   Còn lại: tất cả ảnh chỉ đính kèm. Việc nén ảnh chạy song song, ảnh chỉ tải lên Drive khi bấm Lưu. */
 function takeImages(fs) {
     if (!E || !fs.length) return;
     const empty = E.isNew && !E.scan && !amtVal((($('#fa') || {}).value) || '');

@@ -1,4 +1,4 @@
-/* config.js đặt self.CONFIG → service worker đọc được địa chỉ API + KEY để gửi hàng đợi khi tab đã đóng */
+
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
 const V = 'stc-v33';
@@ -25,7 +25,7 @@ self.addEventListener('fetch', e => {
   if (r.method !== 'GET') return;
   const u = new URL(r.url);
   if (u.origin === location.origin) {
-    // Cache trước, cập nhật ngầm (stale-while-revalidate): mạng yếu vẫn mở tức thì
+
     e.respondWith(caches.open(V).then(c => c.match(r, { ignoreSearch: true }).then(hit => {
       const net = fetch(r)
         .then(res => { if (res && res.ok && res.type === 'basic') c.put(r, res.clone()); return res; })
@@ -70,9 +70,6 @@ self.addEventListener('push', e => {
   }));
 });
 
-/* ===== Background Sync: gửi nốt hàng đợi (IndexedDB "stc-outbox") kể cả khi đã đóng tab =====
- * Trang đăng ký tag "stc-outbox" mỗi khi lưu một việc. Khi có mạng lại, trình duyệt (Chrome / Edge) đánh thức
- * service worker ở đây. Nếu còn tab đang mở thì để tab tự gửi (tránh gửi hai lần). */
 const OB_FAST = ['tx.save', 'tx.del', 'tx.purge'];
 const idbRun = (mode, fn) => new Promise(ok => {
   try {
@@ -88,8 +85,7 @@ const idbRun = (mode, fn) => new Promise(ok => {
 });
 const obPut = j => idbRun('readwrite', s => s.put(j));
 const obDel = id => idbRun('readwrite', s => s.delete(id));
-/* Nhịp tim: bản ghi "hb:<id>" do trang hoặc service worker ghi mỗi 3 giây khi đang gửi việc <id>.
- * Nhịp tim cũ hơn 9 giây nghĩa là trang đã đóng / bị đóng băng, service worker nhận gửi nốt. */
+
 const HB = 9000;
 const obBeat = id => idbRun('readwrite', s => s.put({ id: 'hb:' + id, hb: Date.now() }));
 const obUnbeat = id => idbRun('readwrite', s => s.delete('hb:' + id));
@@ -117,11 +113,11 @@ async function obSend(job) {
   const files = job.files || [];
   job.urls = job.urls || [];
   const start = job.urls.length, res = job.urls.slice();
-  if (start < files.length) {                                // ảnh chờ tải lên Drive: tải song song cho nhanh
+  if (start < files.length) {
     await Promise.all(files.map(async (f, i) => {
       if (i < start) return;
       try { const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }); res[i] = j.url; }
-      catch (e) { if (e.net) throw e; }                      // máy chủ từ chối ảnh: bỏ ảnh, vẫn lưu giao dịch
+      catch (e) { if (e.net) throw e; }
     }));
     job.urls = res.filter(Boolean);
     await obPut(job);
@@ -143,15 +139,15 @@ async function obRun() {
   for (let round = 0; round < 10; round++) {
     const { jobs, beats } = await obLoad();
     if (!jobs.length) break;
-    const ready = jobs.filter(j => Date.now() - (beats[j.id] || 0) > HB);   // việc nào trang còn đang gửi (nhịp tim mới) thì để trang làm
-    if (!ready.length) { await new Promise(r => setTimeout(r, 3000)); continue; }   // chờ xem trang đóng hẳn chưa
+    const ready = jobs.filter(j => Date.now() - (beats[j.id] || 0) > HB);
+    if (!ready.length) { await new Promise(r => setTimeout(r, 3000)); continue; }
     for (const job of ready) {
       await obBeat(job.id);
       const t = setInterval(() => obBeat(job.id), 3000);
       try { await obSend(job); await obDel(job.id); sent++; }
       catch (err) {
-        if (err.net) { clearInterval(t); await obUnbeat(job.id); throw err; }   // mất mạng: để trình duyệt thử lại sau
-        await obDel(job.id);                                   // máy chủ từ chối: báo rồi bỏ, tránh lặp mãi
+        if (err.net) { clearInterval(t); await obUnbeat(job.id); throw err; }
+        await obDel(job.id);
         await obNote('Chưa lưu được một thay đổi: ' + err.message);
       }
       clearInterval(t);

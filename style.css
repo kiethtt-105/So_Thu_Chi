@@ -242,7 +242,7 @@ html.dark .kpi b.chi{text-shadow:0 0 14px color-mix(in srgb,var(--chi) 40%,trans
 }
 @media print{body:before{display:none!important}*{box-shadow:none!important;text-shadow:none!important}}
 .kpi.h b{color:#fff;font-size:clamp(22px,2.1vw,28px)}
-/* ===== UX polish: collapsible sidebar, motion, micro-interactions ===== */
+
 *{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
 html{scroll-behavior:smooth}
 html.tt *,html.tt *:before,html.tt *:after{transition:background-color .28s,color .28s,border-color .28s,box-shadow .28s,fill .28s,stroke .28s!important}
@@ -266,7 +266,6 @@ button.row:hover{transform:translateX(2px)}
 .card.flush .row{content-visibility:auto;contain-intrinsic-size:auto 64px}
 @media(min-width:960px){.ov.open .sheet{animation:sheetin .3s cubic-bezier(.2,.9,.3,1.05)}}
 
-/* collapsible sidebar (desktop only) */
 #sbt{display:none}
 @media(min-width:960px){
  .wrap,#sd{transition:padding-left .28s cubic-bezier(.4,0,.2,1),width .28s cubic-bezier(.4,0,.2,1)}
@@ -284,7 +283,6 @@ button.row:hover{transform:translateX(2px)}
  #tb button>span,#sd .brand>span:last-child,#sbt>span{white-space:nowrap}
 }
 
-/* ===== hover effects + ripple + sound toggle ===== */
 @keyframes rp{to{transform:scale(1);opacity:0}}
 .rp{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.22;transform:scale(0);animation:rp .55s ease-out forwards}
 .btn:hover,.chip:hover{transform:translateY(-1px)}
@@ -308,7 +306,6 @@ html.sbc .nbd{display:none}
 @keyframes recp{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--chi) 25%,transparent)}}
 #qmic.rec{background:var(--chi);color:#fff;animation:recp 1s infinite}
 
-/* ---- Đếm tiền mặt (màn Cân đối) ---- */
 .rr .cnt{flex:none;width:42px;height:42px}
 .rr .cnt:hover{color:var(--acc);border-color:var(--acc)}
 .cash{display:grid;gap:8px;margin-bottom:12px}
@@ -322,9 +319,6 @@ html.sbc .nbd{display:none}
 .ctot b{font-size:22px;font-variant-numeric:tabular-nums}
 @media(max-width:480px){.rr .cnt{width:38px;height:38px}.cr{grid-template-columns:76px 12px 74px 1fr;gap:6px}}
 
-/* ---- Màn hình rất rộng / trình duyệt thu nhỏ (zoom 50%, 2K, 4K, TV):
-   phóng giao diện theo bậc để chữ và các khối không bị nhỏ li ti, không còn khoảng trống hai bên.
-   Media query tính theo chiều rộng thật của cửa sổ nên không bị lặp vòng. ---- */
 html{--z:1}
 @media(min-width:2200px){html{--z:1.25;zoom:var(--z)}}
 @media(min-width:2700px){html{--z:1.5;zoom:var(--z)}}
@@ -332,7 +326,7 @@ html{--z:1}
 @media(min-width:3700px){html{--z:2;zoom:var(--z)}}
 @media(min-width:4600px){html{--z:2.5;zoom:var(--z)}}
 @media(min-width:7000px){html{--z:3.5;zoom:var(--z)}}
-/* các đơn vị vh/vw không tự co theo zoom nên chia lại cho --z */
+
 .wrap{min-height:calc(100vh / var(--z))}
 .sheet{max-height:calc(92dvh / var(--z))}
 #cf .msg{max-height:calc(40dvh / var(--z))}
@@ -343,12 +337,10 @@ html{--z:1}
 }
 @media print{html{zoom:1!important}}
 
-/* ---- Logo dùng icons/icon.png ---- */
 .logo.pic{background:none;box-shadow:none;overflow:hidden}
 .logo.pic img{width:100%;height:100%;object-fit:contain;display:block;border-radius:inherit;pointer-events:none}
 #login .logo.pic{width:64px;height:64px;border-radius:16px}
 
-/* ===== Sửa giao diện: số bị cắt, hàng Cân đối chật, nút + đè nội dung ===== */
 @media(max-width:699px){
  .kpis>.kpi.h{grid-column:1/-1}
 }
@@ -372,7 +364,6 @@ html{--z:1}
 .rr>span:first-child{flex:1 1 180px;min-width:0}
 .rr .ba{flex:1 1 130px;width:auto;min-width:0}
 
-/* ===== GIAO DIỆN SÁNG: làm lại cho có chiều sâu như giao diện tối ===== */
 html:not(.dark){
  --bg:#EDEFFB;--card:#fff;--soft:#EEF0FC;--field:#F5F6FE;--line:#E2E5F6;--line2:#CBD0EC;--mut:#5E6490;--accl:#E6E9FF;
  --hero:#3B3FD8;
@@ -392,7 +383,7 @@ html:not(.dark) .tabs .on,html:not(.dark) .seg .on{background:linear-gradient(13
 html:not(.dark) #tb button.on{background:linear-gradient(135deg,#E6E9FF,#F0E8FF);color:#4a3fd8;box-shadow:inset 0 0 0 1px #8b7bff44}
 html:not(.dark) #tb button:hover{background:#F0F2FE}
 html:not(.dark) #qb .qrow{background:#fff;box-shadow:var(--shc);border-color:#E3E6F7}
-/* KPI */
+
 html:not(.dark) .kpi.h{background:linear-gradient(135deg,#4F5BFF 0%,#7B5CFF 55%,#A35BFF 100%);box-shadow:0 18px 36px -14px #5b4bff99}
 html:not(.dark) .kpi.h::before{content:"";position:absolute;right:-30px;top:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,#ffffff38,transparent 70%);pointer-events:none}
 html:not(.dark) .kpi:not(.h){border-top:3px solid var(--line2)}
@@ -400,7 +391,7 @@ html:not(.dark) .kpi:not(.h):has(b.thu){border-top-color:var(--thu);background:l
 html:not(.dark) .kpi:not(.h):has(b.chi){border-top-color:var(--chi);background:linear-gradient(180deg,color-mix(in srgb,var(--chi) 8%,#fff),#fff 70%)}
 html:not(.dark) .kpi:not(.h):not(:has(b.thu)):not(:has(b.chi)){border-top-color:var(--acc);background:linear-gradient(180deg,color-mix(in srgb,var(--acc) 8%,#fff),#fff 70%)}
 html:not(.dark) .kpi small{color:var(--mut)}
-/* rows, bars, dots */
+
 html:not(.dark) button.row:hover{background:linear-gradient(90deg,#F0F2FF,transparent)}
 html:not(.dark) .dot{box-shadow:inset 0 0 0 1px #4f5bff14}
 html:not(.dark) .bar i,html:not(.dark) .mbar{background:#E9ECFA}
@@ -418,7 +409,6 @@ html:not(.dark) .kpi.h>*{position:relative}
 html:not(.dark) .kpi.h small{color:#ffffffd9}
 html:not(.dark) .ph h1{background:none;color:var(--ink);-webkit-background-clip:border-box;background-clip:border-box}
 
-/* ===== v19: tên người dùng, thông báo có nút ẩn, bộ lọc gọn, ô tìm hạng mục ===== */
 .usr{display:flex;align-items:center;gap:8px;flex:none;padding:3px 12px 3px 3px;border-radius:20px;background:var(--card);border:1px solid var(--line);max-width:180px}
 .usr.hide{display:none!important}
 .usr i{font-style:normal;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#B05BFF));color:var(--on-acc);font:700 13px var(--fd);flex:none}
@@ -427,7 +417,7 @@ html:not(.dark) .ph h1{background:none;color:var(--ink);-webkit-background-clip:
 .usr.sdu span{display:flex;flex-direction:column;min-width:0;line-height:1.25}.usr.sdu small{font-size:11px;color:var(--mut)}
 html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc .usr.sdu span{display:none}
 @media(max-width:959px){.usr.sdu{display:none!important}}
-/* Người dùng: thanh bên mở rộng -> thẻ chào ở cuối thanh bên; thanh bên thu gọn -> tên hiện ở thanh trên */
+
 @media(min-width:960px){
  .top .usr{display:none!important}
  html.sbc .top .usr:not(.hide){display:flex!important}
@@ -471,11 +461,9 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 .cbo.on,.cbo:hover{background:var(--accl);color:var(--acc)}
 .cbe{padding:10px 12px;color:var(--mut);font-size:13px}
 
-/* cân đối laptop / điện thoại */
 @media(min-width:960px){.top{gap:12px}.top .usr{order:2}}
 @media(max-width:480px){.top{gap:5px}.ib{width:33px;height:33px}}
 
-/* ===== Mobile: nút đóng cửa sổ, vuốt xuống để đóng, dễ bấm hơn ===== */
 #sx{position:sticky;top:0;z-index:6;display:grid;place-items:center;width:38px;height:38px;margin:-4px -6px -38px auto;border-radius:50%;background:var(--soft);border:1px solid var(--line2);color:var(--ink);font-size:24px;line-height:1;padding:0;box-shadow:0 2px 8px #0003}
 #sx:active{transform:scale(.92)}
 .sheet h3{padding-right:44px}
@@ -490,7 +478,6 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 }
 @media(min-width:960px){#sx{margin-top:-10px}}
 
-/* ===== Sửa v2: nút × có hàng riêng (không đè tab), ô ngày/giờ không tràn ===== */
 #sx{position:sticky;top:0;margin:-6px 0 6px auto;flex:none}
 .sheet h3,.sheet>.shh{padding-right:0}
 .f{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
@@ -499,16 +486,14 @@ html.sbc .usr.sdu{justify-content:center;padding:6px;margin-inline:8px}html.sbc 
 .sheet input[type=date]::-webkit-date-and-time-value,.sheet input[type=time]::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
 @media(max-width:480px){.f{grid-template-columns:minmax(0,1fr)}}
 
-/* ===== Sửa v3: nút × gọn, nằm ngang hàng thanh kéo (không chiếm hàng riêng); máy tính ẩn vì đã có Esc / bấm nền ===== */
 #sx{display:none}
 @media(max-width:959px){
  #sx{display:grid;position:sticky;top:2px;z-index:6;width:28px;height:28px;margin:-27px 0 -1px auto;font-size:19px;box-shadow:none;background:color-mix(in srgb,var(--ink) 12%,var(--pop));border:0}
 }
-/* ===== cải tiến UX ===== */
+
 button,[data-edit],.chip,.row,.btn,.ib{touch-action:manipulation}
 .qd{display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}
 
-/* ===== Thêm giao dịch: bố cục cân đối (v22) ===== */
 .sheet .seg{margin-bottom:12px}
 .amtw{position:relative;margin:0}
 .amtw .amt{width:100%;box-sizing:border-box;text-align:center;padding-right:44px;padding-left:44px}
@@ -529,11 +514,9 @@ button,[data-edit],.chip,.row,.btn,.ib{touch-action:manipulation}
 .sec2 .btn{margin:0;white-space:nowrap;padding:0 8px}
 @media(min-width:700px){.sfoot{bottom:-24px;margin:18px -24px -24px;padding:14px 24px 20px}}
 
-/* v22b: bỏ footer dính, nút nằm cuối form */
 .sfoot,.sfoot{position:static;bottom:auto;margin:16px 0 0;padding:0;border-top:0;background:none}
 @media(min-width:700px){.sfoot{position:static;bottom:auto;margin:16px 0 0;padding:0}}
 
-/* ===== In / PDF ===== */
 #phd{display:none}
 @media print{
  @page{size:A4;margin:12mm}
@@ -557,9 +540,6 @@ button,[data-edit],.chip,.row,.btn,.ib{touch-action:manipulation}
 @keyframes pgs{to{transform:rotate(360deg)}}@keyframes pgi{0%{margin-left:-35%}100%{margin-left:100%}}
 #cpv{position:fixed;z-index:80;padding:5px 10px;border-radius:10px;font-size:13px;font-weight:700;background:var(--pop,#fff);color:var(--ink,#111);border:1px solid var(--line2,#ddd);box-shadow:var(--sh2,0 4px 16px #0002);opacity:0;pointer-events:none;transition:opacity .12s}#cpv.on{opacity:1}
 
-
-/* ================= v2 · Ưu tiên laptop / máy tính bảng ================= */
-/* Điều hướng bên trái ở mọi cỡ ≥ 700px; hẹp hơn dùng ngăn kéo. Không còn thanh dưới, nút nổi, kéo-để-đóng. */
 .pri{display:inline-flex}
 #mnu{display:none}
 #tb{display:flex;flex-direction:column;gap:2px;padding:0}
@@ -594,14 +574,13 @@ button,[data-edit],.chip,.row,.btn,.ib{touch-action:manipulation}
  .pri span{display:none}
  #ofl{left:0!important}
 }
-/* Cửa sổ nhập liệu: hộp thoại giữa màn hình ở mọi cỡ */
+
 .ov{align-items:center}
 .sheet{width:min(560px,94vw);max-height:90dvh;border:1px solid var(--line);border-radius:18px;padding:24px;transform:scale(.97);box-shadow:var(--sh2)}
 .ov.open .sheet{transform:none}
 .sheet:before{display:none}
 .sfoot{position:static;bottom:auto;margin:16px 0 0;padding:0}
 
-/* Phím tắt */
 .kg{margin-bottom:14px}
 .kg h4{font:600 13px var(--fd);color:var(--mut);margin-bottom:6px}
 .kr{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
@@ -611,7 +590,6 @@ kbd{display:inline-block;min-width:26px;padding:3px 8px;border-radius:7px;border
 .kp{color:var(--mut);font-size:12px}
 .kk code{font:600 12.5px var(--fb);color:var(--acc)}
 
-/* Ảnh đính kèm dạng thu nhỏ */
 .thg{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
 .th{position:relative;width:84px;display:grid;gap:4px;justify-items:center;align-content:start}
 .th>a{position:relative;display:block;width:84px;height:84px;border-radius:12px;overflow:hidden;background:var(--soft);border:1px solid var(--line);cursor:zoom-in}
@@ -631,18 +609,15 @@ kbd{display:inline-block;min-width:26px;padding:3px 8px;border-radius:7px;border
 #lbx .lo{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:20px;background:var(--pop);color:var(--ink);font-weight:700;font-size:13px;text-decoration:none}
 #lbx button{position:absolute;top:16px;right:20px;width:40px;height:40px;border-radius:50%;background:var(--pop);color:var(--ink);font-size:24px}
 
-/* Thùng rác: nút xóa hẳn */
 .chip.dgr{color:var(--chi);border-color:color-mix(in srgb,var(--chi) 45%,var(--line))}
 .chip.dgr:hover{background:var(--chi);border-color:var(--chi);color:#fff}
 .row .chip+.chip{margin-left:6px}
 
-/* Banner offline cố định */
 #ofl{position:fixed;left:var(--sw);right:0;bottom:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;background:var(--dc);color:#fff;font-size:13px;font-weight:700;transform:translateY(105%);transition:transform .22s;pointer-events:none}
 html.dark #ofl{color:#1a1200}
 #ofl.on{transform:none}
 #ofl i{width:9px;height:9px;border-radius:50%;background:currentColor;animation:pl 1.4s infinite}
 
-/* Nút Hủy trên thanh tiến trình */
 #pgx{pointer-events:auto;margin-left:10px;padding:4px 12px;border-radius:14px;border:1px solid var(--line2);background:var(--soft);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer}
 #pgx:hover{background:var(--chi);border-color:var(--chi);color:#fff}
 #pg .pgt em:empty{display:none}
@@ -652,7 +627,6 @@ html.dark #ofl{color:#1a1200}
 @media print{#ofl,#pgx,#lbx{display:none!important}}
 body:has(#cpv.on) .sheet .qk small{visibility:hidden}
 
-/* ===== Quét ảnh tự điền ===== */
 #scanrow:empty{display:none}
 .scanb{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 12px;border:1.5px dashed var(--acc);border-radius:var(--r);cursor:pointer;background:var(--accl);color:var(--ink);-webkit-tap-highlight-color:transparent}
 .scanb>span:first-child{font-size:24px;line-height:1}
@@ -661,13 +635,12 @@ body:has(#cpv.on) .sheet .qk small{visibility:hidden}
 .scanb.busy{cursor:progress;opacity:.9}
 .scanb .spn{flex:none}
 
-/* ===== v4: chống tràn màn hình trên điện thoại ===== */
 html{overflow-x:hidden}
 .wrap{overflow-x:clip;min-width:0;max-width:100%}
 main,#v,.card,.col,.mdd{min-width:0;max-width:100%}
 svg{max-width:100%}
 .tw{max-width:100%;overflow-x:auto}
-/* cột lưới không được phình theo nội dung (nguyên nhân chính gây tràn ngang) */
+
 .grid{grid-template-columns:minmax(0,1fr)}
 .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 .fp,.fp2,.f{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -685,7 +658,7 @@ svg{max-width:100%}
 #pg .pgt{min-width:0}#pgl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .top>*{min-width:0}.top .ib,.top .pri,.top .live{flex:none}
 @media(max-width:699px){
- /* thanh trên: bớt nút ít dùng trên điện thoại cho vừa một hàng */
+
  #fxb,.top [data-a="keys"],.top .usr{display:none!important}
  .top{gap:6px;padding-inline:10px}
  .top .brand small{display:none}
