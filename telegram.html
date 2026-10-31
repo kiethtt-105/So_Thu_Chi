@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F2F3FA"><meta name="color-scheme" content="light dark">
+<title>Thông báo Telegram · Sổ Thu Chi</title>
+<link rel="icon" type="image/png" href="icons/icon.png">
+<script>try{var t=localStorage.theme||(localStorage.dark==="1"?"dark":localStorage.dark==="0"?"light":"auto");if(t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark");document.querySelector("meta[name=theme-color]").content="#0A0C1C"}}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;--bg:#F2F3FA;--card:#fff;--soft:#ECEEF8;--field:#F7F8FD;--ink:#171A33;--mut:#646A8C;--line:#E0E3F2;--line2:#C9CEE6;--acc:#4F5BFF;--on-acc:#fff;--accl:#E8EAFF;--ok:#00A26B;--bad:#E5365B;--warn:#C77700;--sh:0 14px 36px #2a2f7a26;--fd:'Bricolage Grotesque','Be Vietnam Pro',system-ui,sans-serif;--fb:'Manrope','Be Vietnam Pro',system-ui,sans-serif}
+html.dark{color-scheme:dark;--bg:#0A0C1C;--card:#11142B;--soft:#161A38;--field:#0D1024;--ink:#ECEEFF;--mut:#9AA1CF;--line:#242955;--line2:#353C78;--acc:#8C9BFF;--on-acc:#0A0C1C;--accl:#1F2559;--ok:#35E3A5;--bad:#FF6F8E;--warn:#FFC566;--sh:0 16px 44px #000a}
+*{box-sizing:border-box;margin:0}
+html{background:var(--bg);-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+body{font:400 14.5px/1.5 var(--fb);background:var(--bg);color:var(--ink);padding:0 16px calc(110px + env(safe-area-inset-bottom));padding-top:env(safe-area-inset-top)}
+button,input{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none}
+input{font-size:16px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.hide{display:none!important}
+.t-wrap{max-width:640px;margin:0 auto}
+.t-top{display:flex;align-items:center;gap:12px;padding:18px 0 14px}
+.t-back{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--card);border:1px solid var(--line);color:var(--ink);text-decoration:none}
+.t-back svg,.t-ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+h1{font:700 24px/1.2 var(--fd);letter-spacing:-.01em}
+.t-sub{color:var(--mut);font-size:13px}
+.t-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+h2{font:600 16px/1.3 var(--fd);margin-bottom:4px}
+.t-hint{color:var(--mut);font-size:13px}
+.t-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.t-row:first-of-type{border-top:0}
+.t-row .m{flex:1;min-width:0}.t-row .m b{display:block;font-weight:600}.t-row .m small{display:block;color:var(--mut);font-size:12.5px;line-height:1.4}
+.t-ico{font-size:20px;width:34px;text-align:center;flex:none}
+.sw{width:46px;height:28px;border-radius:99px;background:var(--line2);position:relative;flex:none;transition:background .18s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 3px #0004}
+.sw[aria-checked=true]{background:var(--acc)}.sw[aria-checked=true]::after{transform:translateX(18px)}
+.sw:disabled{opacity:.45;cursor:default}
+.t-btn{padding:9px 14px;border-radius:11px;border:1px solid var(--line2);background:var(--card);font-weight:600;font-size:13.5px}
+.t-btn:hover{background:var(--soft)}
+.t-btn.p{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+.t-btn.s{padding:6px 10px;font-size:12.5px;color:var(--mut)}
+.t-btn:disabled{opacity:.5;cursor:default}
+.t-st{display:flex;flex-direction:column;gap:2px}
+.t-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--line2)}
+.t-dot.ok{background:var(--ok)}.t-dot.bad{background:var(--bad)}.t-dot.warn{background:var(--warn)}
+.t-help{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--accl);font-size:13px}
+.t-help ol{margin:6px 0 0 18px;padding:0}.t-help li{margin:2px 0}
+.t-help code{font:600 12px ui-monospace,Menlo,Consolas,monospace;background:var(--card);padding:1px 6px;border-radius:6px}
+input.t-in{height:42px;padding:0 12px;border-radius:11px;border:1px solid var(--line2);background:var(--field);width:100%;min-width:0}
+input.t-time{width:116px;flex:none;font-variant-numeric:tabular-nums}
+.t-rm{padding:14px 0;border-top:1px solid var(--line)}
+.t-rm:first-of-type{border-top:0}
+.t-rm .l1{display:flex;gap:8px;align-items:center}
+.t-rm .l2{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.t-day{min-width:38px;height:32px;padding:0 8px;border-radius:9px;border:1px solid var(--line2);font-weight:600;font-size:12.5px;color:var(--mut)}
+.t-day[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.t-del{margin-left:auto;color:var(--bad);font-size:13px;font-weight:600;padding:6px 8px}
+.t-empty{padding:14px 0 4px;color:var(--mut)}
+.t-bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line);transform:translateY(110%);transition:transform .22s}
+.t-bar.on{transform:none}
+.t-bar div{max-width:640px;margin:auto;display:flex;gap:10px;align-items:center}
+.t-bar span{flex:1;font-weight:600}
+#toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;max-width:calc(100% - 32px);padding:11px 16px;border-radius:12px;background:var(--ink);color:var(--bg);font-weight:600;font-size:13.5px;transition:.2s}
+#toast.on{opacity:1;transform:translate(-50%,0)}#toast.err{background:var(--bad);color:#fff}
+#gate{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:24px;background:var(--bg)}
+#gate form{width:min(360px,100%);background:var(--card);border:1px solid var(--line);border-radius:20px;padding:30px 24px;text-align:center;box-shadow:var(--sh)}
+#gate input{margin:16px 0 10px;text-align:center;letter-spacing:.3em}
+#gate .e{color:var(--bad);font-size:13px;min-height:20px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:420px){input.t-time{width:104px}}
+</style></head><body>
+
+<section id="gate" class="hide"><form id="gf"><h1>Thông báo Telegram</h1><p class="t-sub" style="margin-top:6px">Nhập mật khẩu của sổ để tiếp tục</p>
+<input class="t-in" id="gp" type="password" inputmode="numeric" placeholder="••••" aria-label="Mật khẩu" autocomplete="current-password">
+<button class="t-btn p" style="width:100%">Mở</button><div class="e" id="ge" role="alert"></div></form></section>
+
+<div class="t-wrap" id="app">
+<header class="t-top">
+<a class="t-back" href="index.html" aria-label="Về sổ thu chi" title="Về sổ thu chi"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></a>
+<div><h1>Thông báo Telegram</h1><p class="t-sub">Bot gửi tin cho bạn kể cả khi đã đóng ứng dụng</p></div>
+</header>
+
+<section class="t-card" id="conn"><h2>Kết nối</h2><p class="t-hint" id="connMsg">Đang kiểm tra…</p></section>
+
+<section class="t-card hide" id="main">
+<div class="t-row"><div class="m"><b>Gửi thông báo qua Telegram</b><small>Tắt ở đây là bot ngừng gửi mọi loại tin</small></div><button class="sw" role="switch" id="on" aria-label="Bật thông báo Telegram"></button></div>
+</section>
+
+<section class="t-card hide" id="kinds"><h2>Loại thông báo</h2><p class="t-hint">Chọn loại tin bạn muốn nhận. Bấm Gửi thử để xem tin trông thế nào.</p><div id="kl"></div></section>
+
+<section class="t-card hide" id="rp"><h2>Báo cáo thu chi mỗi ngày</h2><p class="t-hint" id="rpHint"></p>
+<div class="t-row" style="border:0;padding-bottom:0"><div class="m"><b>Gửi báo cáo</b></div><input class="t-in t-time" id="rpAt" type="time" aria-label="Giờ gửi báo cáo"><button class="sw" role="switch" id="rpOn" aria-label="Bật báo cáo ngày"></button></div></section>
+
+<section class="t-card hide" id="rm"><h2>Nhắc nhở</h2><p class="t-hint">Bot nhắn đúng giờ để bạn nhớ ghi chép. Không chọn ngày nào thì nhắc mọi ngày.</p><div id="rml"></div>
+<button class="t-btn" id="rmAdd" style="margin-top:8px">Thêm nhắc nhở</button></section>
+</div>
+
+<div class="t-bar" id="bar" role="region" aria-label="Lưu thay đổi"><div><span>Có thay đổi chưa lưu</span><button class="t-btn" id="undo">Hoàn lại</button><button class="t-btn p" id="save">Lưu thay đổi</button></div></div>
+<div id="toast" role="status"></div>
+
+<script src="config.js"></script>
+<script>
+const C = self.CONFIG || {}, $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const DAYS = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [0, 'CN']];
+let S = null, D = null, KINDS = {}, STATUS = {}, busy = false;
+
+async function call(tg) {
+  if (!C.API) throw new Error('Thiếu file config.js');
+  let r; try { r = await fetch(C.API, { method: 'POST', body: JSON.stringify({ key: C.KEY || '', tg }) }); } catch (e) { throw new Error('Không có kết nối mạng'); }
+  let j; try { j = await r.json(); } catch (e) { throw new Error('Máy chủ trả về dữ liệu lạ'); }
+  if (!j.ok) throw new Error(j.err || 'Lỗi máy chủ');
+  return j;
+}
+function toast(m, err) { const t = $('#toast'); t.textContent = m; t.className = 'on' + (err ? ' err' : ''); clearTimeout(toast.i); toast.i = setTimeout(() => t.className = '', 3200); }
+
+/* ---- cổng mật khẩu (cùng mật khẩu với sổ) ---- */
+function gate() {
+  const ok = () => { $('#gate').classList.add('hide'); load(); };
+  if (!C.PASS || sessionStorage.tgok === '1') return ok();
+  $('#gate').classList.remove('hide'); $('#gp').focus();
+  $('#gf').onsubmit = e => { e.preventDefault(); if ($('#gp').value === String(C.PASS)) { sessionStorage.tgok = '1'; ok(); } else { $('#ge').textContent = 'Sai mật khẩu'; $('#gp').value = ''; } };
+}
+
+/* ---- tải & hiển thị ---- */
+async function load() {
+  try {
+    const j = await call({ act: 'get' });
+    S = j.cfg; D = clone(S); KINDS = j.kinds; STATUS = j.status;
+    renderConn(); render();
+  } catch (e) {
+    $('#connMsg').innerHTML = '<span class="t-dot bad"></span>' + esc(e.message) + ' <button class="t-btn s" id="retry">Thử lại</button>';
+    $('#retry').onclick = load;
+  }
+}
+function renderConn() {
+  const s = STATUS, rows = [
+    [s.token ? (s.botErr ? 'bad' : 'ok') : 'bad', 'Bot', s.token ? (s.botErr ? 'Token không hợp lệ, kiểm tra lại token trong Apps Script' : (s.bot || 'Đã có token')) : 'Chưa có token'],
+    [s.chat ? 'ok' : 'bad', 'Cuộc trò chuyện', s.chat ? 'Đã có chat id' : 'Chưa có chat id'],
+    [s.trigger === null ? 'warn' : s.trigger ? 'ok' : 'bad', 'Chạy ngầm', s.trigger === null ? 'Không kiểm tra được' : s.trigger ? 'Trigger mỗi phút đang chạy' : 'Chưa chạy tgInstall()']
+  ], ready = s.token && s.chat && !s.botErr;
+  $('#conn').innerHTML = '<h2>Kết nối</h2>' + rows.map(r => `<div class="t-row"><div class="m t-st"><b><span class="t-dot ${r[0]}"></span>${r[1]}</b><small>${esc(r[2])}</small></div></div>`).join('') +
+    `<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button class="t-btn p" data-test="ping" ${ready ? '' : 'disabled'}>Gửi tin thử</button><button class="t-btn" id="reload">Kiểm tra lại</button></div>` +
+    (ready && s.trigger ? '' : `<div class="t-help"><b>Cần làm trong Apps Script</b><ol><li>Dán token BotFather vào <code>TG_SECRET.token</code> ở đầu file 11_Tele</li><li>Nhắn /start cho bot, rồi chạy <code>tgFindChat</code> để lưu chat id</li><li>Chạy <code>tgInstall</code> một lần để bật chạy ngầm</li></ol></div>`);
+  $('#reload').onclick = load;
+  ['main', 'kinds', 'rp', 'rm'].forEach(id => $('#' + id).classList.remove('hide'));
+}
+const sw = (el, v) => el.setAttribute('aria-checked', v ? 'true' : 'false');
+function render() {
+  sw($('#on'), D.on);
+  $('#kl').innerHTML = Object.keys(KINDS).map(k => `<div class="t-row"><span class="t-ico">${KINDS[k][0]}</span><div class="m"><b>${esc(KINDS[k][1])}</b><small>${esc(KINDS[k][2])}</small></div><button class="t-btn s" data-test="${k}" ${STATUS.token && STATUS.chat ? '' : 'disabled'}>Gửi thử</button><button class="sw" role="switch" data-kind="${k}" aria-checked="${D.kinds[k] !== false}" aria-label="${esc(KINDS[k][1])}"></button></div>`).join('');
+  sw($('#rpOn'), D.rp.on); $('#rpAt').value = D.rp.at; rpHint();
+  $('#rml').innerHTML = D.rm.length ? D.rm.map((r, i) => `<div class="t-rm" data-i="${i}"><div class="l1"><input class="t-in t-time" type="time" value="${esc(r.at)}" data-f="at" aria-label="Giờ nhắc"><input class="t-in" type="text" maxlength="200" value="${esc(r.text)}" placeholder="Đến giờ ghi chép thu chi" data-f="text" aria-label="Nội dung nhắc"><button class="sw" role="switch" data-f="on" aria-checked="${r.on !== false}" aria-label="Bật nhắc nhở"></button></div>
+<div class="l2">${DAYS.map(([v, n]) => `<button class="t-day" data-day="${v}" aria-pressed="${r.days.includes(v)}">${n}</button>`).join('')}<button class="t-del" data-del>Xóa</button></div></div>`).join('') : '<p class="t-empty">Chưa có nhắc nhở nào. Thêm một giờ hẹn để bot nhắn bạn mỗi ngày.</p>';
+  dirty();
+}
+function rpHint() {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(D.rp.at || ''), h = m ? +m[1] : 6;
+  $('#rpHint').textContent = h >= 12 ? 'Báo cáo tổng kết hôm nay, gửi vào giờ đã chọn.' : 'Báo cáo tổng kết hôm qua, gửi vào giờ đã chọn. Chọn giờ từ 12:00 trở đi để nhận báo cáo hôm nay.';
+}
+const same = () => JSON.stringify(D) === JSON.stringify(S);
+function dirty() { $('#bar').classList.toggle('on', !same()); }
+
+/* ---- thao tác ---- */
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button'); if (!t || !D) return;
+  if (t.id === 'on') { D.on = !D.on; sw(t, D.on); return dirty(); }
+  if (t.id === 'rpOn') { D.rp.on = !D.rp.on; sw(t, D.rp.on); return dirty(); }
+  if (t.dataset.kind) { const k = t.dataset.kind; D.kinds[k] = D.kinds[k] === false; sw(t, D.kinds[k]); return dirty(); }
+  if (t.id === 'rmAdd') { if (D.rm.length >= 20) return toast('Tối đa 20 nhắc nhở', 1); D.rm.push({ id: 'r' + Date.now().toString(36), at: '21:00', text: '', on: true, days: [] }); return render(); }
+  const row = t.closest('.t-rm'), i = row ? +row.dataset.i : -1;
+  if (t.dataset.f === 'on' && i >= 0) { D.rm[i].on = D.rm[i].on === false; sw(t, D.rm[i].on); return dirty(); }
+  if (t.dataset.day != null && i >= 0) { const v = +t.dataset.day, a = D.rm[i].days, k = a.indexOf(v); k < 0 ? a.push(v) : a.splice(k, 1); t.setAttribute('aria-pressed', k < 0); return dirty(); }
+  if (t.hasAttribute('data-del') && i >= 0) { D.rm.splice(i, 1); return render(); }
+  if (t.id === 'undo') { D = clone(S); return render(); }
+  if (t.id === 'save') return save();
+  if (t.dataset.test) return test(t);
+});
+document.addEventListener('input', e => {
+  const t = e.target; if (!D) return;
+  if (t.id === 'rpAt') { if (t.value) { D.rp.at = t.value; rpHint(); } return dirty(); }
+  const row = t.closest && t.closest('.t-rm'); if (row && t.dataset.f) { D.rm[+row.dataset.i][t.dataset.f] = t.value; dirty(); }
+});
+async function save() {
+  if (busy) return;
+  const bad = D.rm.findIndex(r => !/^\d{1,2}:\d{2}$/.test(r.at || ''));
+  if (bad >= 0) return toast('Nhắc nhở thứ ' + (bad + 1) + ' chưa có giờ hợp lệ', 1);
+  busy = true; $('#save').disabled = true;
+  try { const j = await call({ act: 'set', cfg: D }); S = j.cfg; D = clone(S); render(); toast('Đã lưu thay đổi'); }
+  catch (e) { toast(e.message, 1); }
+  finally { busy = false; $('#save').disabled = false; }
+}
+async function test(btn) {
+  if (dirty.t) return; const old = btn.textContent; btn.disabled = true; btn.textContent = 'Đang gửi…';
+  try { await call({ act: 'test', kind: btn.dataset.test }); toast('Đã gửi tin thử, mở Telegram để xem'); }
+  catch (e) { toast(e.message, 1); }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+addEventListener('beforeunload', e => { if (D && S && !same()) { e.preventDefault(); e.returnValue = ''; } });
+gate();
+</script>
+</body></html>
