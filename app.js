@@ -1735,13 +1735,6 @@ const CFG_KINDS = {
     limit: ['⚠️', 'Hạng mục bội chi', 'Khi khoản chi làm vượt hạn mức ngày hoặc tháng'],
     sync: ['🔄', 'Thay đổi từ thiết bị khác', 'Giao dịch mới, được sửa hoặc xóa ở nơi khác']
 };
-const TG_KINDS = {
-    tx: ['🧾', 'Giao dịch được tạo, cập nhật, xóa', 'Kèm mã giao dịch'],
-    limit: ['⚠️', 'Bội chi và dự báo bội chi', 'Khi chi vượt hạn mức hoặc sắp vượt'],
-    report: ['📒', 'Báo cáo thu chi hằng ngày', 'Gửi cùng giờ báo cáo'],
-    remind: ['⏰', 'Nhắc nhở, hạn thẻ, khoản nợ', 'Nhắc ghi chép, thẻ tín dụng, khoản nợ sắp đến hạn'],
-    err: ['❗', 'Lỗi lưu hoặc hủy thay đổi', 'Khi giao dịch chưa lưu được']
-};
 function cfg() {
     let c = {};
     try {
@@ -2116,9 +2109,7 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
     const pTg = () => `<div class="sec">Gửi thông báo qua Telegram</div>
 <div class="menu">${tgSw('tg.on', '✈️', 'Gửi qua Telegram từ thiết bị này', 'Chỉ nên bật ở một thiết bị để không nhận tin trùng', c.tg.on)}
 <div class="row"><span class="dot">🧪</span><span class="m"><b>Gửi tin thử</b><small id="tgst">Kiểm tra kết nối tới bot Telegram</small></span><button class="chip" data-nt="tg-test">Gửi thử</button></div></div>
-<div class="sec">Loại thông báo gửi đi</div>
-<div class="menu" style="${c.tg.on ? '' : 'opacity:.5'}">${Object.entries(TG_KINDS).map(([k, [i, t, s]]) => tgSw('tg:' + k, i, t, s, c.tg.kinds[k] !== false)).join('')}</div>
-<p class="hint">Cài đặt này lưu riêng trên từng thiết bị. Thông báo “Thay đổi từ thiết bị khác” không gửi sang Telegram để tránh trùng với giao dịch đã gửi từ máy tạo ra nó. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
+<p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo. Cài đặt này lưu riêng trên từng thiết bị. Nếu nhiều thiết bị cùng bật gửi Telegram, bạn sẽ nhận tin trùng nên chỉ bật ở một thiết bị. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
     const tabs = [['ui', 'Giao diện'], ['nt', 'Thông báo'], ['tg', 'Telegram']];
     $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
 <div class="seg s3">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -3163,7 +3154,7 @@ async function tgSend(title, text) {
 }
 function tgPush(kind, title, text) {
     const t = cfg().tg;
-    if (!/^https?:$/.test(location.protocol) || !t.on || t.kinds[kind] === false)
+    if (!/^https?:$/.test(location.protocol) || !t.on)
         return;
     tgSend(title, text);
 }
@@ -3173,7 +3164,7 @@ if (typeof notify === 'function') {
         o = o || {};
         if (fxOn() && !o.bg) { o.err ? sfx.err() : sfx.ok(); }
         const r = _notify.apply(this, arguments);
-        if (TG_KINDS[o.kind] && !(o.kind === 'report' && !o.bg))
+        if (!o.kind || kindOn(o.kind))
             tgPush(o.kind, (o.ico ? o.ico + ' ' : '') + (o.title || 'Sổ Thu Chi'), body);
         return r;
     };
