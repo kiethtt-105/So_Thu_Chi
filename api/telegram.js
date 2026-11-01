@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
     const r = await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TG_CHAT_ID, text })
+      body: JSON.stringify({ chat_id: TG_CHAT_ID, text, disable_notification: !!body.silent })
     });
     const j = await r.json();
     return res.status(j.ok ? 200 : 502).json({ ok: !!j.ok, err: j.ok ? '' : j.description });

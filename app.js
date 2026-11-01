@@ -1746,7 +1746,8 @@ function cfg() {
         kinds: { tx: true, limit: true, sync: true, report: true, remind: true, ...c.kinds },
         rp: { on: true, at: '06:00', ...c.rp },
         rm: Array.isArray(c.rm) ? c.rm : [],
-        tg: { on: true, ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
+        adv: { max: 3, hist: 40, ...(c.adv || {}), f: { date: true, acc: true, cat: true, note: true, img: true, bal: true, ...((c.adv || {}).f) }, quiet: { on: false, from: '22:00', to: '06:00', ...((c.adv || {}).quiet) } },
+        tg: { on: true, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
 }
 const cfgSave = c => { try {
@@ -1754,6 +1755,13 @@ const cfgSave = c => { try {
 }
 catch (e) { } };
 const kindOn = k => !k || cfg().kinds[k] !== false;
+const inQuiet = () => {
+    const q = cfg().adv.quiet;
+    if (!q.on) return false;
+    const a = toMin(q.from), b = toMin(q.to), d = new Date(), n = d.getHours() * 60 + d.getMinutes();
+    if (a < 0 || b < 0 || a === b) return false;
+    return a < b ? (n >= a && n < b) : (n >= a || n < b);
+};
 const nlog = () => { try {
     return JSON.parse(localStorage.nlog || '[]');
 }
@@ -1761,7 +1769,7 @@ catch (e) {
     return [];
 } };
 const nsave = a => { try {
-    localStorage.nlog = JSON.stringify(a.slice(0, 40));
+    localStorage.nlog = JSON.stringify(a.slice(0, cfg().adv.hist || 40));
 }
 catch (e) { } };
 const ago = t => { const s = (Date.now() - t) / 1e3; return s < 60 ? 'vừa xong' : s < 3600 ? Math.floor(s / 60) + ' phút trước' : s < 86400 ? Math.floor(s / 3600) + ' giờ trước' : new Date(t).toLocaleDateString('vi-VN'); };
@@ -1886,31 +1894,34 @@ function notify(body, o) {
     nsave(a);
     nbUpdate();
     toast(body, o.undo, { title, ico, err: o.err, sticky: o.sticky });
-    if (pushOn() && (o.force || cfg().fg || document.hidden || !document.hasFocus()))
+    if (pushOn() && !inQuiet() && (o.force || cfg().fg || document.hidden || !document.hasFocus()))
         showSys(title, body, o);
 }
 const txLine = t => (t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : '') + num(t.amount) + ' · ' + (t.sub || t.cat || t.type) + ' · ' + (t.type === 'Chuyển khoản' && t.accTo ? t.acc + ' → ' + t.accTo : t.acc);
 const txMsg = (t, cur) => {
-    const n = noteTxt(t.note), hm = (t.at || '').slice(11, 16);
+    const F = cfg().adv.f, n = noteTxt(t.note), hm = (t.at || '').slice(11, 16);
     const sign = t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : '';
     const acc = t.type === 'Chuyển khoản' && t.accTo ? t.acc + ' → ' + t.accTo : t.acc;
-    let b = balMap()[t.id], bl = 'Số dư cuối';
-    if (b === undefined || cur) {
-        const a = S.acc.find(x => x.name === t.acc);
-        if (a) { b = bal(a); bl = 'Số dư hiện tại'; }
+    let b, bl = 'Số dư cuối';
+    if (F.bal !== false) {
+        b = balMap()[t.id];
+        if (b === undefined || cur) {
+            const a = S.acc.find(x => x.name === t.acc);
+            if (a) { b = bal(a); bl = 'Số dư hiện tại'; }
+        }
     }
     return [
         'Mã ' + t.id,
         sign + num(t.amount) + ' ₫ · ' + t.type,
-        '📅 ' + t.date + (hm ? ' ' + hm : ''),
-        '🏦 ' + acc,
-        (t.cat || t.sub) ? '📂 ' + [t.cat, t.sub].filter(Boolean).join(' › ') : '',
-        n ? '📝 ' + n : '',
-        hasImg(t.note) ? '📎 Có ảnh đính kèm' : '',
+        F.date !== false ? '📅 ' + t.date + (hm ? ' ' + hm : '') : '',
+        F.acc !== false ? '🏦 ' + acc : '',
+        F.cat !== false && (t.cat || t.sub) ? '📂 ' + [t.cat, t.sub].filter(Boolean).join(' › ') : '',
+        F.note !== false && n ? '📝 ' + n : '',
+        F.img !== false && hasImg(t.note) ? '📎 Có ảnh đính kèm' : '',
         b !== undefined ? '💰 ' + bl + ': ' + num(b) + ' ₫' : ''
     ].filter(Boolean).join('\n');
 };
-const txMsgs = (L, cur) => L.slice(0, 3).map(t => txMsg(t, cur)).join('\n\n') + (L.length > 3 ? '\n\n+' + (L.length - 3) + ' giao dịch khác' : '');
+const txMsgs = (L, cur) => { const mx = cfg().adv.max || 3; return L.slice(0, mx).map(t => txMsg(t, cur)).join('\n\n') + (L.length > mx ? '\n\n+' + (L.length - mx) + ' giao dịch khác' : ''); };
 function notifyChanges(nw, up, del) {
     del = del || [];
     const pack = (L, one, many, ico, cur) => {
@@ -2109,11 +2120,27 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
     const pTg = () => `<div class="sec">Gửi thông báo qua Telegram</div>
 <div class="menu">${tgSw('tg.on', '✈️', 'Gửi qua Telegram từ thiết bị này', 'Chỉ nên bật ở một thiết bị để không nhận tin trùng', c.tg.on)}
 <div class="row"><span class="dot">🧪</span><span class="m"><b>Gửi tin thử</b><small id="tgst">Kiểm tra kết nối tới bot Telegram</small></span><button class="chip" data-nt="tg-test">Gửi thử</button></div></div>
+<div class="sec">Tùy chọn gửi</div>
+<div class="menu">${tgSw('tg.retry', '🔁', 'Tự thử lại khi gửi lỗi', 'Thử lại tối đa 2 lần nếu mạng chập chờn', c.tg.retry !== false)}
+<div class="row"><span class="m"><b>Tiền tố tiêu đề</b><small>Ví dụ [Sổ nhà]. Để trống để giống web 100%</small></span><input class="tx" data-cfg="tg.pfx" value="${esc(c.tg.pfx || '')}" maxlength="20" placeholder="Không có"></div></div>
 <p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo. Cài đặt này lưu riêng trên từng thiết bị. Nếu nhiều thiết bị cùng bật gửi Telegram, bạn sẽ nhận tin trùng nên chỉ bật ở một thiết bị. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
-    const tabs = [['ui', 'Giao diện'], ['nt', 'Thông báo'], ['tg', 'Telegram']];
+    const A = c.adv, FL = [['date', '📅', 'Ngày giờ giao dịch'], ['acc', '🏦', 'Tài khoản'], ['cat', '📂', 'Hạng mục'], ['note', '📝', 'Ghi chú'], ['img', '📎', 'Ảnh đính kèm'], ['bal', '💰', 'Số dư sau giao dịch']];
+    const segc = (act, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="adv:${act}:${v}" class="${cur === v ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
+    const pAdv = () => `<div class="sec">Nội dung thông báo</div>
+<div class="menu">${FL.map(([k, i, t]) => sw('adv.f:' + k, i, t, 'Hiện trong thông báo giao dịch', A.f[k] !== false)).join('')}</div>
+<p class="hint">Mã, số tiền và loại giao dịch luôn hiện. Web và Telegram dùng chung nội dung này nên luôn giống nhau.</p>
+<div class="sec">Thông báo gộp</div>
+<div class="row"><span class="m"><b>Số giao dịch tối đa mỗi thông báo</b><small>Phần còn lại gộp thành “+N giao dịch khác”</small></span></div>${segc('max', [1, 3, 5, 10], A.max)}
+<div class="sec">Giờ yên tĩnh</div>
+<div class="menu">${sw('adv.quiet.on', '🌙', 'Bật giờ yên tĩnh', 'Không bật chuông thông báo hệ thống, Telegram gửi im lặng. Thông báo vẫn được lưu', A.quiet.on)}
+<div class="row"><span class="m"><b>Từ – đến</b><small>Qua nửa đêm vẫn đúng</small></span><input type="time" class="tm" data-cfg="adv.quiet.from" value="${esc(A.quiet.from)}"><input type="time" class="tm" data-cfg="adv.quiet.to" value="${esc(A.quiet.to)}"></div></div>
+<div class="sec">Lịch sử thông báo</div>
+<div class="row"><span class="m"><b>Số thông báo lưu trên thiết bị</b><small>Cũ hơn sẽ tự xóa</small></span></div>${segc('hist', [20, 40, 100], A.hist, v => v + ' mục')}
+<div style="margin-top:16px"><button class="btn w" data-nt="adv-reset">Khôi phục mặc định phần nâng cao</button></div>`;
+    const tabs = [['ui', 'Giao diện'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['adv', 'Nâng cao']];
     $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
-<div class="seg s3">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-${SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : pUi()}`;
+<div class="seg">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : pUi()}`;
     openSheet();
 }
 document.addEventListener('click', async (e) => {
@@ -2123,6 +2150,17 @@ document.addEventListener('click', async (e) => {
     const [k, a, d] = b.dataset.nt.split(':'), c = cfg();
     if (k === 'stab') {
         SET_TAB = a;
+        return openSettings();
+    }
+    if (k === 'adv') {
+        if (a === 'max') c.adv.max = +d;
+        else if (a === 'hist') c.adv.hist = +d;
+        cfgSave(c);
+        return openSettings();
+    }
+    if (k === 'adv-reset') {
+        try { const r = JSON.parse(localStorage.stcfg || '{}'); delete r.adv; if (r.tg) { delete r.tg.pfx; delete r.tg.retry; } localStorage.stcfg = JSON.stringify(r); } catch (e) { }
+        toast('Đã khôi phục cấu hình nâng cao');
         return openSettings();
     }
     if (k === 'tg-test') {
@@ -2207,6 +2245,19 @@ document.addEventListener('change', e => {
         }
         else if (g === 'tg.on')
             c.tg.on = t.checked;
+        else if (g === 'tg.retry')
+            c.tg.retry = t.checked;
+        else if (g === 'tg.pfx')
+            c.tg.pfx = t.value.trim().slice(0, 20);
+        else if (g.startsWith('adv.f:'))
+            c.adv.f[g.slice(6)] = t.checked;
+        else if (g === 'adv.quiet.on')
+            c.adv.quiet.on = t.checked;
+        else if (g === 'adv.quiet.from' || g === 'adv.quiet.to') {
+            if (toMin(t.value) < 0)
+                return;
+            c.adv.quiet[g.slice(10)] = t.value;
+        }
         else if (g.startsWith('tg:'))
             c.tg.kinds[g.slice(3)] = t.checked;
         else if (g.startsWith('k:'))
@@ -3133,30 +3184,37 @@ document.addEventListener('pointermove', e => {
         c.style.setProperty('--my', e.clientY - r.top + 'px');
     });
 }, { passive: true });
-async function tgSend(title, text) {
-    try {
-        const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', text: title + '\n' + String(text || '') }) });
-        let j = {};
+async function tgSend(title, text, silent) {
+    const t = cfg().tg, pfx = String(t.pfx || '').trim(), tries = t.retry === false ? 1 : 3;
+    let last = { ok: false, err: 'Không có kết nối mạng' };
+    for (let i = 0; i < tries; i++) {
+        if (i) await new Promise(r => setTimeout(r, 1500 * i));
         try {
-            j = await r.json();
+            const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', text: (pfx ? pfx + ' ' : '') + title + '\n' + String(text || ''), silent: !!silent }) });
+            let j = {};
+            try {
+                j = await r.json();
+            }
+            catch (e) { }
+            if (r.ok && j.ok)
+                return { ok: true };
+            const err = r.status === 404 ? 'Chưa có /api/telegram (kiểm tra thư mục api/ và deploy lại)' : r.status === 401 ? 'Sai key (APP_KEY chưa khớp, hãy deploy lại)' : (j.err || 'Lỗi ' + r.status);
+            console.warn('Telegram:', r.status, err);
+            last = { ok: false, err };
+            if (r.status >= 400 && r.status < 500) return last;
         }
-        catch (e) { }
-        if (r.ok && j.ok)
-            return { ok: true };
-        const err = r.status === 404 ? 'Chưa có /api/telegram (kiểm tra thư mục api/ và deploy lại)' : r.status === 401 ? 'Sai key (APP_KEY chưa khớp, hãy deploy lại)' : (j.err || 'Lỗi ' + r.status);
-        console.warn('Telegram:', r.status, err);
-        return { ok: false, err };
+        catch (e) {
+            console.warn('Telegram:', e);
+            last = { ok: false, err: 'Không có kết nối mạng' };
+        }
     }
-    catch (e) {
-        console.warn('Telegram:', e);
-        return { ok: false, err: 'Không có kết nối mạng' };
-    }
+    return last;
 }
-function tgPush(kind, title, text) {
+function tgPush(kind, title, text, silent) {
     const t = cfg().tg;
     if (!/^https?:$/.test(location.protocol) || !t.on)
         return;
-    tgSend(title, text);
+    tgSend(title, text, silent);
 }
 if (typeof notify === 'function') {
     const _notify = notify;
@@ -3165,7 +3223,7 @@ if (typeof notify === 'function') {
         if (fxOn() && !o.bg) { o.err ? sfx.err() : sfx.ok(); }
         const r = _notify.apply(this, arguments);
         if (!o.kind || kindOn(o.kind))
-            tgPush(o.kind, (o.ico ? o.ico + ' ' : '') + (o.title || 'Sổ Thu Chi'), body);
+            tgPush(o.kind, (o.ico ? o.ico + ' ' : '') + (o.title || 'Sổ Thu Chi'), body, inQuiet());
         return r;
     };
 }
