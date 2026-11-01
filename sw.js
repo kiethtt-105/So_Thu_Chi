@@ -1,7 +1,7 @@
 
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
-const V = 'stc-v34';
+const V = 'stc-v35';
 const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -120,8 +120,7 @@ async function obSend(job) {
   if (start < files.length) {
     await Promise.all(files.map(async (f, i) => {
       if (i < start) return;
-      try { const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }); res[i] = j.url; }
-      catch (e) { if (e.net) throw e; }
+      const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }); res[i] = j.url;
     }));
     job.urls = res.filter(Boolean);
     await obPut(job);
@@ -150,15 +149,13 @@ async function obRun() {
       const t = setInterval(() => obBeat(job.id), 3000);
       try { await obSend(job); await obDel(job.id); sent++; }
       catch (err) {
-        if (err.net) { clearInterval(t); await obUnbeat(job.id); throw err; }
-        await obDel(job.id);
-        await obNote('Chưa lưu được một thay đổi: ' + err.message);
+        // Không bao giờ bỏ thay đổi: giữ trong hàng đợi và để trình duyệt thử lại sau
+        clearInterval(t); await obUnbeat(job.id); throw err;
       }
       clearInterval(t);
       await obUnbeat(job.id);
     }
   }
-  if (sent) await obNote('Đã gửi ' + sent + ' thay đổi đang chờ');
 }
 self.addEventListener('sync', e => { if (e.tag === 'stc-outbox') e.waitUntil(obFlush()); });
 self.addEventListener('message', e => { if (e.data && e.data.type === 'flush') e.waitUntil(obFlush().catch(() => { })); });

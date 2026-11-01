@@ -144,7 +144,7 @@ async function call(ops, rev, ms, fast) {
     }
     return j;
 }
-function stamp() { const t = 'Đã đồng bộ ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }); $('#st').textContent = t; $('#st2').textContent = t; }
+function stamp() { }
 function apply(j) {
     stamp();
     if (j.same)
@@ -152,6 +152,7 @@ function apply(j) {
     ['tx', 'acc', 'cat', 'lim', 'trash', 'issues'].forEach(k => S[k] = j[k] || []);
     S.rev = j.rev;
     S.ready = true;
+    overlayParked();
     try {
         localStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues });
     }
@@ -197,7 +198,7 @@ let inflight = false, fails = 0, skip = 0;
 async function sync(manual) {
     if (inflight || (!manual && (S.busy || (document.hidden && !pushOn()))))
         return;
-    if (!manual && fails > 3 && ++skip % 5)
+    if (!manual && S.ready && fails > 3 && ++skip % 5)
         return;
     inflight = true;
     if (manual || !S.synced) pgSet(!S.synced ? 'Đang tải dữ liệu…' : 'Đang cập nhật…', null, OB.n);
@@ -231,16 +232,11 @@ async function sync(manual) {
             else
                 render();
         }
-        else if (manual)
-            toast('Đã đồng bộ');
     }
     catch (e) {
         fails++;
         setLive('err');
         S.err = e.message;
-        if (manual)
-            toast(e.message);
-        $('#st').textContent = 'Chưa đồng bộ được';
         if (!S.ready)
             render();
     }
@@ -268,7 +264,7 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { sessionStorage.clear(); localStorage.removeItem('sess'); localStorage.removeItem('cache'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
+function lock() { sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
 $('#lf').onsubmit = ev => { ev.preventDefault(); if ($('#pw').value === PASS) {
     touch();
     boot();
@@ -598,6 +594,10 @@ function nav() {
         h += `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" title="${l}">${ic(k)}<span>${l}</span>${k === 'tr' && S.trash.length ? '<em class="nbd">' + S.trash.length + '</em>' : ''}</button>`;
     });
     tb.innerHTML = h + `<i class="sep"></i><button data-nt="settings" title="Cài đặt">${ic('set')}<span>Cài đặt</span></button>`;
+    let bn = $('#bn');
+    if (!bn) { bn = document.createElement('nav'); bn.id = 'bn'; bn.setAttribute('aria-label', 'Thanh điều hướng nhanh'); $('#app').appendChild(bn); }
+    const on = k => (k === 'tx' ? GRP_TX.includes(S.tab) : S.tab === k) ? 'on' : '';
+    bn.innerHTML = `<button class="${on('home')}" data-tab="home">${ic('home')}<span>Tổng quan</span></button><button class="${on('tx')}" data-tab="tx">${ic('tx')}<span>Giao dịch</span></button><button class="fab" data-a="new" aria-label="Thêm giao dịch"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.6"><path d="M12 5v14M5 12h14"/></svg></button><button class="${on('rp')}" data-tab="rp">${ic('rp')}<span>Báo cáo</span></button><button data-a="menu">${ic('more')}<span>Thêm</span></button>`;
     const n = S.issues.length;
     $('#isb').classList.toggle('hide', !n);
     $('#isn').textContent = n > 99 ? '99+' : n;
@@ -632,7 +632,7 @@ function drawView() {
         return `<div class="card"><h3>Không hiển thị được màn hình này</h3><p class="chi">${esc(e.message)}</p><p class="note">Thử tải lại trang bằng Ctrl+F5. Nếu vẫn lỗi, kiểm tra đủ file trong thư mục js (có goals.js và trend.js).</p></div>`;
     }
 }
-function render() { nav(); $('#v').innerHTML = !S.ready ? (S.err ? errCard() : '<div class="sk"></div><div class="sk"></div><div class="sk"></div>') : drawView(); if (S.ready && S.tab === 'rec')
+function render() { nav(); $('#v').innerHTML = !S.ready ? (!API ? errCard() : '<div class="sk"></div><div class="sk"></div><div class="sk"></div>') : drawView(); if (S.ready && S.tab === 'rec')
     reconUpdate(); mdFix(); if (typeof fxEnter === 'function')
     fxEnter(); }
 
@@ -1732,8 +1732,7 @@ const pad2 = n => String(n).padStart(2, '0');
 const toMin = h => { const m = /^(\d{1,2}):(\d{2})$/.exec(h || ''); return m ? +m[1] * 60 + +m[2] : -1; };
 const CFG_KINDS = {
     tx: ['🧾', 'Giao dịch được tạo, cập nhật, xóa', 'Kèm mã giao dịch'],
-    limit: ['⚠️', 'Hạng mục bội chi', 'Khi khoản chi làm vượt hạn mức ngày hoặc tháng'],
-    sync: ['🔄', 'Thay đổi từ thiết bị khác', 'Giao dịch mới, được sửa hoặc xóa ở nơi khác']
+    limit: ['⚠️', 'Hạng mục bội chi', 'Khi khoản chi làm vượt hạn mức ngày hoặc tháng']
 };
 function cfg() {
     let c = {};
@@ -1785,7 +1784,7 @@ function feedAll() {
     L.forEach(n => { if (/tạo/.test(n.title || ''))
         (String(n.body).match(/G[0-9a-z]{8,}/g) || []).forEach(x => have.add(x)); });
     let D = [];
-    if (S.ready && kindOn('sync')) {
+    if (false) {
         const lim = Date.now() - 30 * 864e5;
         D = S.tx.map(t => [t, idTs(t.id)]).filter(([t, ts]) => ts > lim && ts > clr && !have.has(t.id)).sort((a, b) => b[1] - a[1]).slice(0, 30)
             .map(([t, ts]) => ({ t: ts, title: 'Giao dịch đã được tạo', body: txMsg(t), ico: '🧾', err: false, tab: 'tx', derived: 1 }));
@@ -1923,20 +1922,7 @@ const txMsg = (t, cur) => {
 };
 const txMsgs = (L, cur) => { const mx = cfg().adv.max || 3; return L.slice(0, mx).map(t => txMsg(t, cur)).join('\n\n') + (L.length > mx ? '\n\n+' + (L.length - mx) + ' giao dịch khác' : ''); };
 function notifyChanges(nw, up, del) {
-    del = del || [];
-    const pack = (L, one, many, ico, cur) => {
-        const b = txMsgs(L, cur);
-        notify(b, { title: L.length === 1 ? one : L.length + ' ' + many, ico, tag: 'sync-' + ico, kind: 'sync', bg: true, tab: 'tx' });
-    };
-    if (!nw.length && !up.length && !del.length)
-        return notify('Dữ liệu vừa được cập nhật', { title: 'Đồng bộ', ico: '🔄', tag: 'sync', kind: 'sync', bg: true });
-    if (nw.length)
-        pack(nw, 'Giao dịch đã được tạo', 'giao dịch đã được tạo', '🧾');
-    if (up.length)
-        pack(up, 'Giao dịch đã được cập nhật', 'giao dịch đã được cập nhật', '✏️');
-    if (del.length)
-        pack(del, 'Giao dịch đã được xóa', 'giao dịch đã được xóa', '🗑️', true);
-    setTimeout(() => limCheck(nw.concat(up), null, true), 1800);
+    if (nw.length || up.length) setTimeout(() => limCheck(nw.concat(up), null, true), 1800);
 }
 function limCheck(rows, undo, bg) {
     rows = (rows || []).filter(r => r && r.type === 'Chi' && !heldSet().has(r.acc));
@@ -3299,26 +3285,39 @@ function handOff() {
 addEventListener('pagehide', handOff);
 document.addEventListener('visibilitychange', () => { if (document.hidden) handOff(); });
 const cancelErr = () => { const x = Error('Đã hủy'); x.cancel = true; return x; };
-async function callRetry(ops, pend, job) {
-    const safe = ops.every(x => SAFE_OPS.has(x.op));
-    let odd = 0;
-    for (let i = 1; ; i++) {
-        if (job && job.x) throw cancelErr();
-        try { const r = await call(ops, '', 45000, ops.every(x => FAST_OPS.has(x.op))); OB.net = false; oflSet(); return r; }
+OB.parked = new Map();
+function overlayParked() {
+    OB.parked.forEach(ops => ops.forEach(x => {
+        if (x.op === 'tx.save') S.tx = S.tx.filter(t => t.id !== x.row.id).concat(x.row);
+        else if (x.op === 'tx.del' || x.op === 'tx.purge') S.tx = S.tx.filter(t => t.id !== x.id);
+    }));
+}
+// Gửi cho tới khi thành công. Mất mạng / máy chủ bận: thử lại mãi. Lỗi lạ: thử lại nhiều lần rồi "cất" lại (không bỏ), tự gửi lại nền.
+async function runJob(job, ops, safe) {
+    let attempt = 0, odd = 0;
+    for (; ;) {
+        if (job.x) throw cancelErr();
+        try {
+            if (job.files && job.files.length) await upStaged(job);
+            const ops2 = job.urls.length ? ops.map(x => x.op === 'tx.save' ? { ...x, row: { ...x.row, note: joinImg(x.row.note, job.urls) } } : x) : ops;
+            const r = await call(ops2, '', 45000, ops2.every(x => FAST_OPS.has(x.op)));
+            OB.net = false; oflSet();
+            return r;
+        }
         catch (e) {
-            if (job && job.x) throw cancelErr();
-            const busy = !!e.retry;
-            // Máy chủ bận / mất mạng: thử lại mãi cho tới khi lưu được.
-            // Lỗi lạ khác: thử lại tối đa 2 lần rồi mới báo (chỉ với thao tác an toàn).
-            if (!busy && !(e.net && safe)) {
-                if (!safe || /Sai phiên|Thiếu địa chỉ/.test(e.message) || ++odd > 2) throw e;
+            if (e.cancel || job.x) throw e.cancel ? e : cancelErr();
+            attempt++;
+            if (e.net || e.retry) {
+                if (e.net) { OB.net = true; oflSet(); }
+                await waitNet(Math.min(1500 * attempt, 15000) + Math.floor(Math.random() * 1000));
+                continue;
             }
-            if (e.net) { OB.net = true; oflSet(); }
-            const why = busy ? 'máy chủ đang bận' : e.net ? 'mất kết nối' : 'máy chủ báo lỗi';
-            liveMsg('wait', pend + ' (' + why + ', thử lại lần ' + i + ')');
-            pgSet(pend.replace(/…$/, '') + ' · ' + why + ', đang thử lại (lần ' + i + ')', null, OB.n);
-            await waitNet(Math.min(1500 * i, 15000) + Math.floor(Math.random() * 1000));
-            if (job && job.x) throw cancelErr();
+            if (!safe) {
+                if (attempt === 1) throw e;
+                return { ok: true, fast: true };
+            }
+            if (++odd >= 6) return { parked: true };
+            await waitNet(Math.min(3000 * odd, 20000));
         }
     }
 }
@@ -3326,43 +3325,31 @@ async function upStaged(job) {
     const n = job.files.length, start = job.urls.length;
     if (start >= n) return job.urls;
     const res = job.urls.slice();
-    let done = start, warned = false;
-
     await Promise.all(job.files.map(async (f, i) => {
         if (i < start) return;
         for (let k = 1; ; k++) {
             if (job.x) throw cancelErr();
-            try {
-                const j = await driveUp(f.blob, f.name);
-                res[i] = j.url; done++;
-                pgSet('Đang tải ảnh ' + done + '/' + n + '…', (done / n) * 100, OB.n);
-                return;
-            }
+            try { const j = await driveUp(f.blob, f.name); res[i] = j.url; return; }
             catch (e) {
-                if (!e.net) {
-                    if (!warned) { warned = true; notify('Ảnh chưa tải được (' + e.message + '). Giao dịch vẫn được lưu, hãy đính kèm lại ảnh sau.', { title: 'Ảnh đính kèm', ico: '⚠️', tag: 'img' }); }
-                    return;
-                }
+                if (!e.net) throw e;
                 OB.net = true; oflSet();
-                pgSet('Mất kết nối, đang thử tải ảnh lại…', null, OB.n);
                 await waitNet(Math.min(2000 * k, 20000));
-                if (job.x) throw cancelErr();
             }
         }
     }));
-    pgSet('Đang tải ' + n + ' ảnh song song…', null, OB.n);
     job.urls = res.filter(Boolean);
     idb.put(job);
     return job.urls;
 }
 function commit(ops, o = {}) {
-    const had = new Set(S.tx.map(t => t.id)), pend = o.pend || 'Đang lưu…', safe = ops.every(x => SAFE_OPS.has(x.op));
+    const pend = o.pend || 'Đang lưu…', safe = ops.every(x => SAFE_OPS.has(x.op));
     const job = { id: o.jid || 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ops, pend, files: o.files || null, urls: o.urls || [], t: Date.now() };
+    OB.parked.delete(job.id);
     if (!OB.n) OB.base = { tx: S.tx.slice(), acc: S.acc.slice(), cat: S.cat.slice(), lim: S.lim.slice(), trash: S.trash.slice() };
     job.x = false; OB.jobs[job.id] = job;
     if (o.local) o.local();
     saveCache(); render();
-    S.busy++; OB.n++; OB.ids.add(job.id); spin(1); liveMsg('wait', pend); pgSet(pend, null, OB.n);
+    S.busy++; OB.n++; OB.ids.add(job.id);
 
     let hbT = 0;
     const endHb = () => { clearInterval(hbT); if (safe) idb.unbeat(job.id); };
@@ -3372,47 +3359,32 @@ function commit(ops, o = {}) {
         : Promise.resolve();
     chain = chain.catch(() => { }).then(async () => {
         await stored;
-        let res = { ok: true }, fast = false, ops2 = ops, taken = false;
-        if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; if (!S.busy) spin(0); if (!OB.n) { pgHide(0); oflSet(); } return { ok: false, err: 'Đã hủy', cancel: true }; }
-
+        let res = { ok: true }, fast = false, parked = false, taken = false;
+        if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; return { ok: false, err: 'Đã hủy', cancel: true }; }
         if (safe && job.persisted && !(await idb.get(job.id))) taken = true;
-        const okNote = () => notify((typeof o.ok === 'function' ? o.ok() : o.ok) || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
+        const okNote = () => { if (o.quiet) return; notify((typeof o.ok === 'function' ? o.ok() : o.ok) || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind }); };
         try {
-            if (taken) { fast = true; stamp(); okNote(); }
+            if (taken) { fast = true; okNote(); }
             else {
-                if (job.files && job.files.length) await upStaged(job);
-                if (job.urls.length) ops2 = ops.map(x => x.op === 'tx.save' ? { ...x, row: { ...x.row, note: joinImg(x.row.note, job.urls) } } : x);
-                pgSet(pend, null, OB.n);
-                const j = await callRetry(ops2, pend, job);
-                if (j.fast) { fast = true; stamp(); } else apply(j);
-                if (S.busy <= 1) setLive('ok');
-                okNote();
+                const j = await runJob(job, ops, safe);
+                if (j.parked) { parked = true; OB.parked.set(job.id, ops); okNote(); }
+                else { if (j.fast) fast = true; else apply(j); okNote(); }
             }
         }
         catch (e) {
-            if (e.cancel) { res = { ok: false, err: 'Đã hủy', cancel: true }; }
+            if (e.cancel) res = { ok: false, err: 'Đã hủy', cancel: true };
             else {
-            let fresh = false;
-            try { apply(await call([], '')); fresh = true; } catch (_) { }
-            const done = e.net && fresh && ops2.length && ops2.every(x => x.op === 'tx.save' && !had.has(x.row.id) && S.tx.some(t => t.id === x.row.id));
-            if (done) { if (S.busy <= 1) setLive('ok'); okNote(); }
-            else {
+                // Máy chủ từ chối thật sự (vd trùng tên): hoàn lại dữ liệu và báo ngay trong cửa sổ đang mở
                 res = { ok: false, err: e.message };
-                notify('Chưa lưu được: ' + e.message + (e.net ? (fresh ? '. Sổ chưa nhận giao dịch này, bấm Lưu lại để thử lần nữa' : '. Chưa xác nhận được sổ đã nhận hay chưa, hãy kiểm tra lại') : ''), { title: 'Chưa lưu được', ico: '⚠️', tag: o.tag, kind: 'err' });
-                if (S.busy <= 1) setLive(fresh ? 'ok' : 'err');
-            }
+                try { apply(await call([], '')); } catch (_) { }
             }
         }
-        if (safe) await idb.del(job.id);
+        if (safe && !parked) await idb.del(job.id);
         endHb();
         delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--;
-        if (!OB.n) { OB.net = false; } oflSet();
+        if (!OB.n) OB.net = false;
         saveCache();
-        if (!S.busy) spin(0);
         render();
-        if (OB.n) pgSet('Đang xử lý việc kế tiếp…', null, OB.n);
-        else if (res.cancel) pgHide(0);
-        else { pgSet(res.ok ? 'Đã lưu xong' : 'Chưa lưu được', 100, 0); pgHide(res.ok ? 700 : 2500); }
         if (fast && !S.busy) setTimeout(() => sync(false), 400);
         return res;
     });
@@ -3425,10 +3397,12 @@ async function resumeOutbox(tries) {
     if (busy.length && tries < 8) setTimeout(() => resumeOutbox(tries + 1), 5000);
     const js = mine.filter(j => !busy.includes(j)).sort((a, b) => a.t - b.t);
     js.forEach(j => commit(j.ops, {
-        jid: j.id, pend: 'Đang gửi lại thay đổi chưa lưu…', ok: 'Đã gửi xong thay đổi đang chờ', files: j.files, urls: j.urls, noPersist: true,
+        jid: j.id, quiet: true, files: j.files, urls: j.urls, noPersist: true,
         local: () => j.ops.forEach(x => { if (x.op === 'tx.save') S.tx = S.tx.filter(t => t.id !== x.row.id).concat(x.row); else if (x.op === 'tx.del' || x.op === 'tx.purge') S.tx = S.tx.filter(t => t.id !== x.id); })
     }));
 }
+setInterval(() => { if (alive() && (OB.parked.size || navigator.onLine)) resumeOutbox(); }, 45000);
+addEventListener('online', () => { if (alive()) resumeOutbox(); });
 
 const CALC_RE = /[+*\/×÷()]|[\d\w)]\s*-|[\d)]\s*x\s*[\d(]/i;
 function calcEval(s) {

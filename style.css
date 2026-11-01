@@ -676,3 +676,40 @@ svg{max-width:100%}
  .dtop{gap:10px}.dbal b{font-size:19px}
  .row{gap:10px}
 }
+
+/* ===== Ẩn mọi chỉ báo đồng bộ: người dùng không cần biết máy chủ đang làm gì ===== */
+#live,#st,#st2,#pg,#ofl{display:none!important}
+
+/* ===== Thanh điều hướng dưới (điện thoại) ===== */
+#bn{display:none}
+@media(max-width:699px){
+ #bn{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;position:fixed;left:0;right:0;bottom:0;z-index:12;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--card) 90%,transparent);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+ #bn button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;border-radius:12px;color:var(--mut);font-size:10.5px;font-weight:600;transition:color .15s,background .15s}
+ #bn button.on{color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+ #bn button svg.i{width:22px;height:22px}
+ #bn .fab{width:54px;height:54px;min-height:0;justify-self:center;margin-top:-22px;border-radius:50%;background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#B05BFF));color:var(--on-acc);box-shadow:0 8px 22px color-mix(in srgb,var(--acc) 45%,transparent)}
+ #bn .fab:active{transform:scale(.92)}
+ .wrap{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+ .top .pri{display:none}
+ html.sdo #bn{z-index:5}
+ /* chạm dễ hơn */
+ .chip{min-height:36px}.btn{min-height:42px}
+ #tb button{height:46px;font-size:14.5px}
+ .vsw{width:100%}.vsw button{flex:1 0 auto}
+ .tabs.vsw{position:sticky;top:calc(var(--hd) - 2px);z-index:5;background:var(--card)}
+ .toast,#toast{top:calc(8px + env(safe-area-inset-top))}
+}
+@media print{#bn{display:none!important}}
+
+/* ===== Thẻ & tab: rõ ràng hơn ===== */
+.tabs button{min-height:38px;transition:background .15s,color .15s}
+.tabs button:not(.on):hover{color:var(--ink);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.card .ch{padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.kpi small{text-transform:none;letter-spacing:0}
+.kpis>.card{min-height:92px}
+.row .m b{font-size:14.5px}
+.empty{padding:44px 14px}
+.empty b{font-size:16px}
+.sk{height:110px;border-radius:var(--r)}
+button:focus-visible,.chip:focus-visible,.row:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.sheet .f label{font-weight:600}
