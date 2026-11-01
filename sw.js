@@ -106,7 +106,11 @@ async function obPost(body) {
   try { r = await fetch(CFG.API, { method: 'POST', body: JSON.stringify(Object.assign({ key: CFG.KEY || '' }, body)) }); }
   catch (e) { const x = new Error('Không có kết nối mạng'); x.net = true; throw x; }
   try { j = await r.json(); } catch (e) { const x = new Error('Lỗi máy chủ'); x.net = true; throw x; }
-  if (!j.ok) throw new Error(j.err || 'Lỗi máy chủ');
+  if (!j.ok) {
+    const x = new Error(j.err || 'Lỗi máy chủ');
+    if (/chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i.test(j.err || '')) x.net = true;
+    throw x;
+  }
   return j;
 }
 async function obSend(job) {

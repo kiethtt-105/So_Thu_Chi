@@ -107,6 +107,8 @@ const splitImg = n => { n = String(n || ''); return { text: n.replace(IMG_RE, ''
 const noteTxt = n => splitImg(n).text, hasImg = n => splitImg(n).imgs.length > 0;
 const joinImg = (t, a) => [String(t || '').trim(), ...(a || [])].filter(Boolean).join(' ');
 
+// Lỗi tạm thời từ máy chủ (đang bận, chờ khóa quá lâu...): chưa xử lý gì nên luôn an toàn để gửi lại
+const TRANSIENT_RE = /chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i;
 async function call(ops, rev, ms, fast) {
     if (!API)
         throw Error('Thiếu địa chỉ API: file config.js chưa được tải');
@@ -135,7 +137,10 @@ async function call(ops, rev, ms, fast) {
     if (!j.ok) {
         if (/Thao tác không hợp lệ/i.test(j.err || ''))
             throw Error('Sai phiên làm việc. Vui lòng tải lại trang');
-        throw Error(j.err || 'Lỗi máy chủ');
+        const x = Error(j.err || 'Lỗi máy chủ');
+        if (TRANSIENT_RE.test(j.err || ''))
+            x.retry = true;
+        throw x;
     }
     return j;
 }
@@ -3222,16 +3227,23 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) handO
 const cancelErr = () => { const x = Error('Đã hủy'); x.cancel = true; return x; };
 async function callRetry(ops, pend, job) {
     const safe = ops.every(x => SAFE_OPS.has(x.op));
+    let odd = 0;
     for (let i = 1; ; i++) {
         if (job && job.x) throw cancelErr();
         try { const r = await call(ops, '', 45000, ops.every(x => FAST_OPS.has(x.op))); OB.net = false; oflSet(); return r; }
         catch (e) {
             if (job && job.x) throw cancelErr();
-            if (!e.net || !safe) throw e;
-            OB.net = true; oflSet();
-            liveMsg('wait', pend + ' (mất kết nối, thử lại lần ' + i + ')');
-            pgSet(pend.replace(/…$/, '') + ' · mất kết nối, đang thử lại (lần ' + i + ')', null, OB.n);
-            await waitNet(Math.min(1500 * i, 20000));
+            const busy = !!e.retry;
+            // Máy chủ bận / mất mạng: thử lại mãi cho tới khi lưu được.
+            // Lỗi lạ khác: thử lại tối đa 2 lần rồi mới báo (chỉ với thao tác an toàn).
+            if (!busy && !(e.net && safe)) {
+                if (!safe || /Sai phiên|Thiếu địa chỉ/.test(e.message) || ++odd > 2) throw e;
+            }
+            if (e.net) { OB.net = true; oflSet(); }
+            const why = busy ? 'máy chủ đang bận' : e.net ? 'mất kết nối' : 'máy chủ báo lỗi';
+            liveMsg('wait', pend + ' (' + why + ', thử lại lần ' + i + ')');
+            pgSet(pend.replace(/…$/, '') + ' · ' + why + ', đang thử lại (lần ' + i + ')', null, OB.n);
+            await waitNet(Math.min(1500 * i, 15000) + Math.floor(Math.random() * 1000));
             if (job && job.x) throw cancelErr();
         }
     }
