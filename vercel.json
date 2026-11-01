@@ -2,6 +2,6 @@
   "buildCommand": "node build.js",
   "outputDirectory": "public",
   "headers": [
-    { "source": "/(sw.js|index.html|config.js|)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    { "source": "/(sw.js|app.js|style.css|index.html|config.js|)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
   ]
 }

@@ -1729,6 +1729,12 @@ const CFG_KINDS = {
     limit: ['⚠️', 'Hạng mục bội chi', 'Khi khoản chi làm vượt hạn mức ngày hoặc tháng'],
     sync: ['🔄', 'Thay đổi từ thiết bị khác', 'Giao dịch mới hoặc vừa được sửa ở nơi khác']
 };
+const TG_KINDS = {
+    tx: ['🧾', 'Giao dịch được tạo, cập nhật, xóa', 'Kèm mã giao dịch'],
+    limit: ['⚠️', 'Bội chi và dự báo bội chi', 'Khi chi vượt hạn mức hoặc sắp vượt'],
+    report: ['📒', 'Báo cáo thu chi hằng ngày', 'Gửi cùng giờ báo cáo'],
+    remind: ['⏰', 'Nhắc nhở, hạn thẻ, khoản nợ', 'Nhắc ghi chép, thẻ tín dụng, khoản nợ sắp đến hạn']
+};
 function cfg() {
     let c = {};
     try {
@@ -1739,7 +1745,8 @@ function cfg() {
         fg: c.fg != null ? !!c.fg : localStorage.nall === '1',
         kinds: { tx: true, limit: true, sync: true, report: true, remind: true, ...c.kinds },
         rp: { on: true, at: '06:00', ...c.rp },
-        rm: Array.isArray(c.rm) ? c.rm : []
+        rm: Array.isArray(c.rm) ? c.rm : [],
+        tg: { on: true, ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, ...((c.tg || {}).kinds) } }
     };
 }
 const cfgSave = c => { try {
@@ -2041,6 +2048,7 @@ ${L.length ? `<div class="shh sub"><b>Gần đây</b><button class="chip" data-n
 <div class="menu">${L.map(n => `<div class="row"><span class="dot">${esc(n.ico)}</span><span class="m"><b>${esc(n.title)}</b><small style="white-space:pre-line">${esc(n.body)}</small></span><small class="mut">${ago(n.t)}</small></div>`).join('') || empty('Chưa có thông báo', 'Giao dịch, bội chi, nhắc nhở và báo cáo sẽ xuất hiện ở đây.')}</div>`;
     openSheet();
 }
+let SET_TAB = 'ui';
 function openSettings() {
     ED = null;
     E = null;
@@ -2050,16 +2058,14 @@ function openSettings() {
     const hint = p === 'denied' ? 'Bấm biểu tượng ổ khóa cạnh thanh địa chỉ, đổi “Thông báo” sang Cho phép, rồi tải lại trang. Trên điện thoại: Cài đặt → Ứng dụng/Trang web → Thông báo.'
         : p === 'unsupported' && IOS ? 'iPhone/iPad chỉ nhận thông báo khi ứng dụng đã được thêm vào Màn hình chính: Chia sẻ → Thêm vào Màn hình chính, rồi mở từ biểu tượng mới.' : '';
     const day = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
-
-<div class="sec">Giao diện</div>
+    const pUi = () => `<div class="sec">Giao diện</div>
 <div class="seg s3">${[['auto', 'Theo thiết bị'], ['light', 'Sáng'], ['dark', 'Tối']].map(([k, l]) => `<button data-nt="theme:${k}" class="${mode === k ? 'on' : ''}">${l}</button>`).join('')}</div>
 
 <div class="shh sub"><b>Menu hiển thị</b><button type="button" class="chip" data-visreset>Hiện tất cả</button></div>
 <div class="menu">${TABS.filter(t => t[0] !== 'home').map(([k, l]) => `<label class="row sw">${ic(k)}<span class="m"><b>${l}</b></span><input type="checkbox" role="switch" data-vis="${k}" ${tabOn(k) ? 'checked' : ''} aria-label="Hiện ${l}"></label>`).join('')}</div>
 <p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Lưu riêng trên từng thiết bị.</p>
-
-<div class="sec">Thông báo trên thiết bị</div>
+${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}`;
+    const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
 ${p === 'granted' ? sw('fg', '📲', 'Hiện cả khi đang mở ứng dụng', 'Mặc định chỉ hiện khi bạn ở ứng dụng hoặc tab khác', c.fg) : ''}</div>
 ${hint ? `<p class="hint">${hint}</p>` : ''}
@@ -2075,8 +2081,18 @@ ${hint ? `<p class="hint">${hint}</p>` : ''}
 ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="tm" data-rm="at:${r.id}" value="${esc(r.at)}"><input class="tx" data-rm="text:${r.id}" value="${esc(r.text)}" placeholder="Nội dung nhắc" aria-label="Nội dung nhắc"><label class="sw"><input type="checkbox" role="switch" data-rm="on:${r.id}" ${r.on ? 'checked' : ''} aria-label="Bật nhắc nhở"></label><button class="x" data-nt="rm-del:${r.id}" aria-label="Xóa nhắc nhở">×</button></div>
 <div class="days">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button type="button" class="${(r.days || []).includes(d) ? 'on' : ''}" data-nt="rm-day:${r.id}:${d}" aria-pressed="${(r.days || []).includes(d)}">${day[d]}</button>`).join('')}</div></div>`).join('')}
 <button class="btn w" data-nt="rm-add">＋ Thêm nhắc nhở</button>
-<p class="hint">Nhắc nhở và báo cáo chạy khi ứng dụng đang mở (kể cả ở tab nền hoặc ứng dụng đã cài). Nếu bạn mở lại sau giờ hẹn, ứng dụng sẽ nhắc bù.</p>
-${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}`;
+<p class="hint">Nhắc nhở và báo cáo chạy khi ứng dụng đang mở (kể cả ở tab nền hoặc ứng dụng đã cài). Nếu bạn mở lại sau giờ hẹn, ứng dụng sẽ nhắc bù.</p>`;
+    const tgSw = (key, ico, t, sub, on) => sw(key, ico, t, sub, on);
+    const pTg = () => `<div class="sec">Gửi thông báo qua Telegram</div>
+<div class="menu">${tgSw('tg.on', '✈️', 'Gửi qua Telegram từ thiết bị này', 'Chỉ nên bật ở một thiết bị để không nhận tin trùng', c.tg.on)}
+<div class="row"><span class="dot">🧪</span><span class="m"><b>Gửi tin thử</b><small id="tgst">Kiểm tra kết nối tới bot Telegram</small></span><button class="chip" data-nt="tg-test">Gửi thử</button></div></div>
+<div class="sec">Loại thông báo gửi đi</div>
+<div class="menu" style="${c.tg.on ? '' : 'opacity:.5'}">${Object.entries(TG_KINDS).map(([k, [i, t, s]]) => tgSw('tg:' + k, i, t, s, c.tg.kinds[k] !== false)).join('')}</div>
+<p class="hint">Cài đặt này lưu riêng trên từng thiết bị. Thông báo “Thay đổi từ thiết bị khác” không gửi sang Telegram để tránh trùng với giao dịch đã gửi từ máy tạo ra nó. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
+    const tabs = [['ui', 'Giao diện'], ['nt', 'Thông báo'], ['tg', 'Telegram']];
+    $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
+<div class="seg s3">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+${SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : pUi()}`;
     openSheet();
 }
 document.addEventListener('click', async (e) => {
@@ -2084,6 +2100,19 @@ document.addEventListener('click', async (e) => {
     if (!b || b.type === 'checkbox')
         return;
     const [k, a, d] = b.dataset.nt.split(':'), c = cfg();
+    if (k === 'stab') {
+        SET_TAB = a;
+        return openSettings();
+    }
+    if (k === 'tg-test') {
+        const st = $('#tgst');
+        if (st)
+            st.textContent = 'Đang gửi…';
+        const r = await tgSend('Sổ Thu Chi', 'Tin nhắn thử: kết nối Telegram hoạt động tốt.');
+        if (st)
+            st.textContent = r.ok ? '✅ Đã gửi, hãy kiểm tra Telegram' : '❌ ' + r.err;
+        return;
+    }
     if (k === 'open')
         return openNotif();
     if (k === 'settings')
@@ -2155,6 +2184,10 @@ document.addEventListener('change', e => {
             c.kinds.report = t.checked;
             c.rp.on = t.checked;
         }
+        else if (g === 'tg.on')
+            c.tg.on = t.checked;
+        else if (g.startsWith('tg:'))
+            c.tg.kinds[g.slice(3)] = t.checked;
         else if (g.startsWith('k:'))
             c.kinds[g.slice(2)] = t.checked;
     }
@@ -2175,6 +2208,8 @@ document.addEventListener('change', e => {
         }
     }
     cfgSave(c);
+    if (g === 'tg.on')
+        openSettings();
 });
 document.addEventListener('input', e => {
     const m = e.target.dataset && e.target.dataset.rm;
@@ -3077,11 +3112,30 @@ document.addEventListener('pointermove', e => {
         c.style.setProperty('--my', e.clientY - r.top + 'px');
     });
 }, { passive: true });
-function tgPush(kind, title, text) {
-    if (!/^https?:$/.test(location.protocol) || !kindOn(kind)) return;
+async function tgSend(title, text) {
     try {
-        fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', text: title + '\n' + String(text || '') }) }).catch(() => { });
-    } catch (e) { }
+        const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', text: title + '\n' + String(text || '') }) });
+        let j = {};
+        try {
+            j = await r.json();
+        }
+        catch (e) { }
+        if (r.ok && j.ok)
+            return { ok: true };
+        const err = r.status === 404 ? 'Chưa có /api/telegram (kiểm tra thư mục api/ và deploy lại)' : r.status === 401 ? 'Sai key (APP_KEY chưa khớp, hãy deploy lại)' : (j.err || 'Lỗi ' + r.status);
+        console.warn('Telegram:', r.status, err);
+        return { ok: false, err };
+    }
+    catch (e) {
+        console.warn('Telegram:', e);
+        return { ok: false, err: 'Không có kết nối mạng' };
+    }
+}
+function tgPush(kind, title, text) {
+    const t = cfg().tg;
+    if (!/^https?:$/.test(location.protocol) || !t.on || t.kinds[kind] === false)
+        return;
+    tgSend(title, text);
 }
 if (typeof notify === 'function') {
     const _notify = notify;
@@ -3089,7 +3143,8 @@ if (typeof notify === 'function') {
         o = o || {};
         if (fxOn() && !o.bg) { o.err ? sfx.err() : sfx.ok(); }
         const r = _notify.apply(this, arguments);
-        if (!o.bg && !o.err && (o.kind === 'tx' || o.kind === 'limit')) tgPush(o.kind, o.title || 'Sổ Thu Chi', body);
+        if (TG_KINDS[o.kind] && !(o.kind === 'report' && !o.bg))
+            tgPush(o.kind, o.title || 'Sổ Thu Chi', body);
         return r;
     };
 }
