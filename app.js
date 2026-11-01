@@ -296,7 +296,9 @@ setInterval(() => { if (!alive()) {
     if (!$('#app').classList.contains('hide'))
         lock();
     return;
-} if (Date.now() - ACT_T > 120000 && ++PT % 6) return; sync(false); }, POLL_MS);
+} if (Date.now() - ACT_T > 120000 && ++PT % 2) return; sync(false); }, POLL_MS);
+addEventListener('focus', () => { if (alive()) sync(false); });
+document.addEventListener('pointerenter', () => { if (alive()) sync(false); }, { once: false, passive: true });
 document.addEventListener('focusout', () => setTimeout(() => { if (S.dirty && !typing()) {
     S.dirty = false;
     render();
@@ -1732,7 +1734,8 @@ const pad2 = n => String(n).padStart(2, '0');
 const toMin = h => { const m = /^(\d{1,2}):(\d{2})$/.exec(h || ''); return m ? +m[1] * 60 + +m[2] : -1; };
 const CFG_KINDS = {
     tx: ['🧾', 'Giao dịch được tạo, cập nhật, xóa', 'Kèm mã giao dịch'],
-    limit: ['⚠️', 'Hạng mục bội chi', 'Khi khoản chi làm vượt hạn mức ngày hoặc tháng']
+    limit: ['⚠️', 'Hạng mục bội chi', 'Khi khoản chi làm vượt hạn mức ngày hoặc tháng'],
+    sync: ['🔄', 'Giao dịch từ thiết bị khác', 'Giao dịch mới, được sửa hoặc xóa ở nơi khác']
 };
 function cfg() {
     let c = {};
@@ -1784,7 +1787,7 @@ function feedAll() {
     L.forEach(n => { if (/tạo/.test(n.title || ''))
         (String(n.body).match(/G[0-9a-z]{8,}/g) || []).forEach(x => have.add(x)); });
     let D = [];
-    if (false) {
+    if (S.ready && kindOn('sync')) {
         const lim = Date.now() - 30 * 864e5;
         D = S.tx.map(t => [t, idTs(t.id)]).filter(([t, ts]) => ts > lim && ts > clr && !have.has(t.id)).sort((a, b) => b[1] - a[1]).slice(0, 30)
             .map(([t, ts]) => ({ t: ts, title: 'Giao dịch đã được tạo', body: txMsg(t), ico: '🧾', err: false, tab: 'tx', derived: 1 }));
@@ -1898,9 +1901,9 @@ function notify(body, o) {
 }
 const txLine = t => (t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : '') + num(t.amount) + ' · ' + (t.sub || t.cat || t.type) + ' · ' + (t.type === 'Chuyển khoản' && t.accTo ? t.acc + ' → ' + t.accTo : t.acc);
 const txMsg = (t, cur) => {
-    const F = cfg().adv.f, n = noteTxt(t.note), hm = (t.at || '').slice(11, 16);
+    const F = cfg().adv.f, n = noteTxt(t.note), imgs = splitImg(t.note).imgs, at = String(t.at || '');
     const sign = t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : '';
-    const acc = t.type === 'Chuyển khoản' && t.accTo ? t.acc + ' → ' + t.accTo : t.acc;
+    const dmy = d => String(d).split('-').reverse().join('/');
     let b, bl = 'Số dư cuối';
     if (F.bal !== false) {
         b = balMap()[t.id];
@@ -1909,19 +1912,32 @@ const txMsg = (t, cur) => {
             if (a) { b = bal(a); bl = 'Số dư hiện tại'; }
         }
     }
+    const created = at.length >= 16 ? at.slice(11, 16) + ' ' + dmy(at.slice(0, 10)) : '';
     return [
-        'Mã ' + t.id,
-        sign + num(t.amount) + ' ₫ · ' + t.type,
-        F.date !== false ? '📅 ' + t.date + (hm ? ' ' + hm : '') : '',
-        F.acc !== false ? '🏦 ' + acc : '',
-        F.cat !== false && (t.cat || t.sub) ? '📂 ' + [t.cat, t.sub].filter(Boolean).join(' › ') : '',
-        F.note !== false && n ? '📝 ' + n : '',
-        F.img !== false && hasImg(t.note) ? '📎 Có ảnh đính kèm' : '',
-        b !== undefined ? '💰 ' + bl + ': ' + num(b) + ' ₫' : ''
+        '🆔 ID: ' + t.id,
+        F.date !== false ? '📅 Ngày: ' + dmy(t.date) : '',
+        '🔖 Loại: ' + t.type,
+        '💵 Số tiền: ' + sign + num(t.amount) + ' ₫',
+        F.acc !== false ? '🏦 Tài khoản: ' + t.acc : '',
+        F.acc !== false && t.accTo ? '➡️ Tài khoản đến: ' + t.accTo : '',
+        F.cat !== false && t.cat ? '📂 Hạng mục cha: ' + t.cat : '',
+        F.cat !== false && t.sub ? '🏷️ Hạng mục con: ' + t.sub : '',
+        F.note !== false && n ? '📝 Ghi chú: ' + n : '',
+        F.at !== false && created ? '🕒 Tạo lúc: ' + created : '',
+        b !== undefined ? '💰 ' + bl + ': ' + num(b) + ' ₫' : '',
+        F.img !== false && imgs.length ? '📎 Ảnh: ' + imgs.join(' ') : '',
+        F.month !== false && t.date ? '🗓️ Tháng: ' + t.date.slice(5, 7) + '/' + t.date.slice(0, 4) : ''
     ].filter(Boolean).join('\n');
 };
 const txMsgs = (L, cur) => { const mx = cfg().adv.max || 3; return L.slice(0, mx).map(t => txMsg(t, cur)).join('\n\n') + (L.length > mx ? '\n\n+' + (L.length - mx) + ' giao dịch khác' : ''); };
 function notifyChanges(nw, up, del) {
+    del = del || [];
+    const pack = (L, one, many, ico, cur) => {
+        notify(txMsgs(L, cur), { title: L.length === 1 ? one : L.length + ' ' + many, ico, tag: 'sync-' + ico, kind: 'sync', bg: true, tab: 'tx' });
+    };
+    if (nw.length) pack(nw, 'Giao dịch đã được tạo', 'giao dịch đã được tạo', '🧾');
+    if (up.length) pack(up, 'Giao dịch đã được cập nhật', 'giao dịch đã được cập nhật', '✏️');
+    if (del.length) pack(del, 'Giao dịch đã được xóa', 'giao dịch đã được xóa', '🗑️', true);
     if (nw.length || up.length) setTimeout(() => limCheck(nw.concat(up), null, true), 1800);
 }
 function limCheck(rows, undo, bg) {
@@ -2110,7 +2126,7 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
 <div class="menu">${tgSw('tg.retry', '🔁', 'Tự thử lại khi gửi lỗi', 'Thử lại tối đa 2 lần nếu mạng chập chờn', c.tg.retry !== false)}
 <div class="row"><span class="m"><b>Tiền tố tiêu đề</b><small>Ví dụ [Sổ nhà]. Để trống để giống web 100%</small></span><input class="tx" data-cfg="tg.pfx" value="${esc(c.tg.pfx || '')}" maxlength="20" placeholder="Không có"></div></div>
 <p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo. Cài đặt này lưu riêng trên từng thiết bị. Nếu nhiều thiết bị cùng bật gửi Telegram, bạn sẽ nhận tin trùng nên chỉ bật ở một thiết bị. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
-    const A = c.adv, FL = [['date', '📅', 'Ngày giờ giao dịch'], ['acc', '🏦', 'Tài khoản'], ['cat', '📂', 'Hạng mục'], ['note', '📝', 'Ghi chú'], ['img', '📎', 'Ảnh đính kèm'], ['bal', '💰', 'Số dư sau giao dịch']];
+    const A = c.adv, FL = [['date', '📅', 'Ngày'], ['acc', '🏦', 'Tài khoản và tài khoản đến'], ['cat', '📂', 'Hạng mục cha, con'], ['note', '📝', 'Ghi chú'], ['at', '🕒', 'Tạo lúc'], ['bal', '💰', 'Số dư cuối'], ['img', '📎', 'Ảnh (link)'], ['month', '🗓️', 'Tháng']];
     const segc = (act, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="adv:${act}:${v}" class="${cur === v ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
     const pAdv = () => `<div class="sec">Nội dung thông báo</div>
 <div class="menu">${FL.map(([k, i, t]) => sw('adv.f:' + k, i, t, 'Hiện trong thông báo giao dịch', A.f[k] !== false)).join('')}</div>
