@@ -218,12 +218,13 @@ async function sync(manual) {
         const old = new Map(S.tx.map(t => [t.id, JSON.stringify(t)]));
         if (apply(j)) {
             if (!first && !manual) {
-                const nw = [], up = [];
-                S.tx.forEach(t => { const o = old.get(t.id); if (o === undefined)
+                const nw = [], up = [], del = [], cur = new Set();
+                S.tx.forEach(t => { cur.add(t.id); const o = old.get(t.id); if (o === undefined)
                     nw.push(t);
                 else if (o !== JSON.stringify(t))
                     up.push(t); });
-                notifyChanges(nw, up);
+                old.forEach((o, id) => { if (!cur.has(id)) { try { del.push(JSON.parse(o)); } catch (e) { } } });
+                notifyChanges(nw, up, del);
             }
             if (typing())
                 S.dirty = true;
@@ -1253,7 +1254,7 @@ const catOk = (t, p, c) => S.cat.some(x => x.t === t && x.p === p && x.c === c);
 function txSave(row, okMsg, files) {
     const prev = S.tx.find(t => t.id === row.id), old = prev && { ...prev }, isNew = !prev;
     return commit([{ op: 'tx.save', row }], {
-        pend: isNew ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…', ok: txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx', files: files && files.length ? files : null,
+        pend: isNew ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…', ok: () => txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx', files: files && files.length ? files : null,
         local: () => { S.tx = S.tx.filter(t => t.id !== row.id).concat(row); },
         undo: () => commit(old ? [{ op: 'tx.save', row: old }] : [{ op: 'tx.purge', id: row.id }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(t => t.id !== row.id); if (old)
                 S.tx.push(old); } })
@@ -1263,7 +1264,7 @@ function txSave(row, okMsg, files) {
 function txDel(id) {
     const old = { ...S.tx.find(x => x.id === id) };
     return commit([{ op: 'tx.del', id }], {
-        pend: 'Đang xóa giao dịch…', ok: 'Mã ' + id + ' đã chuyển vào Thùng rác', title: 'Giao dịch đã được xóa', ico: '🗑️', tag: 'tx-' + id, kind: 'tx', local: () => { S.tx = S.tx.filter(x => x.id !== id); },
+        pend: 'Đang xóa giao dịch…', ok: () => 'Đã chuyển vào Thùng rác\n' + txMsg(old, true), title: 'Giao dịch đã được xóa', ico: '🗑️', tag: 'tx-' + id, kind: 'tx', local: () => { S.tx = S.tx.filter(x => x.id !== id); },
         undo: () => {
             const tr = S.trash.find(t => t.k === 'gd' && t.id === id);
             return commit(tr ? [{ op: 'restore', at: tr.at, kind: 'gd' }, { op: 'tx.save', row: old }] : [{ op: 'tx.save', row: old }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(x => x.id !== id).concat(old); } });
@@ -1732,13 +1733,14 @@ const toMin = h => { const m = /^(\d{1,2}):(\d{2})$/.exec(h || ''); return m ? +
 const CFG_KINDS = {
     tx: ['🧾', 'Giao dịch được tạo, cập nhật, xóa', 'Kèm mã giao dịch'],
     limit: ['⚠️', 'Hạng mục bội chi', 'Khi khoản chi làm vượt hạn mức ngày hoặc tháng'],
-    sync: ['🔄', 'Thay đổi từ thiết bị khác', 'Giao dịch mới hoặc vừa được sửa ở nơi khác']
+    sync: ['🔄', 'Thay đổi từ thiết bị khác', 'Giao dịch mới, được sửa hoặc xóa ở nơi khác']
 };
 const TG_KINDS = {
     tx: ['🧾', 'Giao dịch được tạo, cập nhật, xóa', 'Kèm mã giao dịch'],
     limit: ['⚠️', 'Bội chi và dự báo bội chi', 'Khi chi vượt hạn mức hoặc sắp vượt'],
     report: ['📒', 'Báo cáo thu chi hằng ngày', 'Gửi cùng giờ báo cáo'],
-    remind: ['⏰', 'Nhắc nhở, hạn thẻ, khoản nợ', 'Nhắc ghi chép, thẻ tín dụng, khoản nợ sắp đến hạn']
+    remind: ['⏰', 'Nhắc nhở, hạn thẻ, khoản nợ', 'Nhắc ghi chép, thẻ tín dụng, khoản nợ sắp đến hạn'],
+    err: ['❗', 'Lỗi lưu hoặc hủy thay đổi', 'Khi giao dịch chưa lưu được']
 };
 function cfg() {
     let c = {};
@@ -1751,7 +1753,7 @@ function cfg() {
         kinds: { tx: true, limit: true, sync: true, report: true, remind: true, ...c.kinds },
         rp: { on: true, at: '06:00', ...c.rp },
         rm: Array.isArray(c.rm) ? c.rm : [],
-        tg: { on: true, ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, ...((c.tg || {}).kinds) } }
+        tg: { on: true, ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
 }
 const cfgSave = c => { try {
@@ -1895,18 +1897,41 @@ function notify(body, o) {
         showSys(title, body, o);
 }
 const txLine = t => (t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : '') + num(t.amount) + ' · ' + (t.sub || t.cat || t.type) + ' · ' + (t.type === 'Chuyển khoản' && t.accTo ? t.acc + ' → ' + t.accTo : t.acc);
-const txMsg = t => 'Mã ' + t.id + '\n' + txLine(t);
-function notifyChanges(nw, up) {
-    const pack = (L, one, many, ico) => {
-        const b = L.slice(0, 3).map(t => 'Mã ' + t.id + ': ' + txLine(t)).join('\n') + (L.length > 3 ? '\n+' + (L.length - 3) + ' giao dịch khác' : '');
+const txMsg = (t, cur) => {
+    const n = noteTxt(t.note), hm = (t.at || '').slice(11, 16);
+    const sign = t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : '';
+    const acc = t.type === 'Chuyển khoản' && t.accTo ? t.acc + ' → ' + t.accTo : t.acc;
+    let b = balMap()[t.id], bl = 'Số dư cuối';
+    if (b === undefined || cur) {
+        const a = S.acc.find(x => x.name === t.acc);
+        if (a) { b = bal(a); bl = 'Số dư hiện tại'; }
+    }
+    return [
+        'Mã ' + t.id,
+        sign + num(t.amount) + ' ₫ · ' + t.type,
+        '📅 ' + t.date + (hm ? ' ' + hm : ''),
+        '🏦 ' + acc,
+        (t.cat || t.sub) ? '📂 ' + [t.cat, t.sub].filter(Boolean).join(' › ') : '',
+        n ? '📝 ' + n : '',
+        hasImg(t.note) ? '📎 Có ảnh đính kèm' : '',
+        b !== undefined ? '💰 ' + bl + ': ' + num(b) + ' ₫' : ''
+    ].filter(Boolean).join('\n');
+};
+const txMsgs = (L, cur) => L.slice(0, 3).map(t => txMsg(t, cur)).join('\n\n') + (L.length > 3 ? '\n\n+' + (L.length - 3) + ' giao dịch khác' : '');
+function notifyChanges(nw, up, del) {
+    del = del || [];
+    const pack = (L, one, many, ico, cur) => {
+        const b = txMsgs(L, cur);
         notify(b, { title: L.length === 1 ? one : L.length + ' ' + many, ico, tag: 'sync-' + ico, kind: 'sync', bg: true, tab: 'tx' });
     };
-    if (!nw.length && !up.length)
+    if (!nw.length && !up.length && !del.length)
         return notify('Dữ liệu vừa được cập nhật', { title: 'Đồng bộ', ico: '🔄', tag: 'sync', kind: 'sync', bg: true });
     if (nw.length)
-        pack(nw, 'Giao dịch mới được tạo', 'giao dịch mới được tạo', '🧾');
+        pack(nw, 'Giao dịch đã được tạo', 'giao dịch đã được tạo', '🧾');
     if (up.length)
         pack(up, 'Giao dịch đã được cập nhật', 'giao dịch đã được cập nhật', '✏️');
+    if (del.length)
+        pack(del, 'Giao dịch đã được xóa', 'giao dịch đã được xóa', '🗑️', true);
     setTimeout(() => limCheck(nw.concat(up), null, true), 1800);
 }
 function limCheck(rows, undo, bg) {
@@ -2722,7 +2747,7 @@ document.addEventListener('click', e => {
         if (!mark.length) return;
         xsave();
         if (!rows.length) return;
-        commit(rows.map(row => ({ op: 'tx.save', row })), { ok: 'Đã tự ghi ' + rows.length + ' giao dịch định kỳ', title: 'Giao dịch định kỳ', ico: '🔁', kind: 'tx', tag: 'rc', local: () => { S.tx = S.tx.concat(rows); } })
+        commit(rows.map(row => ({ op: 'tx.save', row })), { ok: () => 'Đã tự ghi ' + rows.length + ' giao dịch định kỳ\n\n' + txMsgs(rows), title: 'Giao dịch định kỳ', ico: '🔁', kind: 'tx', tag: 'rc', local: () => { S.tx = S.tx.concat(rows); } })
             .then(res => { if (!res.ok) { mark.forEach(([r, p]) => { r.last = p; }); xsave(); } });
     }
     function rcPending() {
@@ -3149,7 +3174,7 @@ if (typeof notify === 'function') {
         if (fxOn() && !o.bg) { o.err ? sfx.err() : sfx.ok(); }
         const r = _notify.apply(this, arguments);
         if (TG_KINDS[o.kind] && !(o.kind === 'report' && !o.bg))
-            tgPush(o.kind, o.title || 'Sổ Thu Chi', body);
+            tgPush(o.kind, (o.ico ? o.ico + ' ' : '') + (o.title || 'Sổ Thu Chi'), body);
         return r;
     };
 }
@@ -3302,7 +3327,7 @@ function commit(ops, o = {}) {
         if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; if (!S.busy) spin(0); if (!OB.n) { pgHide(0); oflSet(); } return { ok: false, err: 'Đã hủy', cancel: true }; }
 
         if (safe && job.persisted && !(await idb.get(job.id))) taken = true;
-        const okNote = () => notify(o.ok || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
+        const okNote = () => notify((typeof o.ok === 'function' ? o.ok() : o.ok) || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind });
         try {
             if (taken) { fast = true; stamp(); okNote(); }
             else {
