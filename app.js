@@ -1,6 +1,36 @@
 
-const { PASS, API, NAME } = window.CONFIG || {}, POLL_MS = 10000, TTL = 7 * 24 * 3600e3;
+const { PASS, API, NAME, TTL_H } = window.CONFIG || {}, POLL_MS = 10000, TTL = (+TTL_H > 0 ? +TTL_H : 168) * 3600e3; // hạn phiên (giờ) lấy từ biến Vercel APP_TTL_HOURS, mặc định 168h = 7 ngày
 const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
+// ===== Khóa phiên đa thiết bị =====
+// Mỗi tab có một SID. Máy chủ giữ danh sách SID được phép:
+//  - đăng nhập mới ('sess.login')  => chỉ còn SID đó, mọi phiên khác bị khóa ngay ở lần đồng bộ kế tiếp
+//  - phiên bị khóa nhập lại mật khẩu ('sess.join') => được thêm vào, dùng song song (tối đa 2 phiên)
+// Hạn dùng của phiên vẫn như cũ (TTL ở trên). Máy chủ chưa hỗ trợ 'sess.*' thì tính năng tự tắt, app chạy như trước.
+const SID = (() => { try { return sessionStorage.sid || (sessionStorage.sid = Math.random().toString(36).slice(2) + Date.now().toString(36)); } catch (e) { return Math.random().toString(36).slice(2); } })();
+let KICK = false, announcing = null;
+const pendOf = () => { try { return sessionStorage.pend || ''; } catch (e) { return ''; } };
+function announce(kind) {
+    try { if (kind) sessionStorage.pend = kind; } catch (e) { }
+    if (announcing || !pendOf()) return announcing;
+    return announcing = (async () => {
+        try {
+            await call([{ op: 'sess.' + pendOf(), sid: SID }], '', 15000);
+            sessionStorage.removeItem('pend');
+        }
+        catch (e) {
+            if (/Sai phiên/.test(e.message || '')) { try { sessionStorage.removeItem('pend'); } catch (_) { } }
+        }
+        finally { announcing = null; }
+    })();
+}
+function kick() {
+    if (KICK) return;
+    KICK = true;
+    try { sessionStorage.removeItem('sess'); } catch (e) { }
+    $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet();
+    const g = $('#lgreet'); if (g) g.textContent = 'Có thiết bị khác vừa đăng nhập nên phiên này bị khóa. Nhập mật khẩu để tiếp tục (dùng song song 2 phiên).';
+    $('#lerr').textContent = '';
+}
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -115,7 +145,7 @@ async function call(ops, rev, ms, fast) {
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 30000);
     let r;
     try {
-        r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '', fast: !!fast }) });
+        r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '', fast: !!fast, sid: SID }) });
     }
     catch (e) {
         const x = Error(e && e.name === 'AbortError' ? 'Máy chủ Google phản hồi quá chậm, chưa nhận được kết quả' : navigator.onLine === false ? 'Không có kết nối mạng' : 'Không kết nối được tới máy chủ Google');
@@ -133,6 +163,10 @@ async function call(ops, rev, ms, fast) {
         const x = Error('Lỗi máy chủ. Kiểm tra lại cấu hình kết nối');
         x.net = true;
         throw x;
+    }
+    if (j.sess === false && !pendOf()) {
+        kick();
+        throw Error('Phiên đã bị khóa vì có thiết bị khác đăng nhập');
     }
     if (!j.ok) {
         if (/Thao tác không hợp lệ/i.test(j.err || ''))
@@ -200,6 +234,7 @@ async function sync(manual) {
         return;
     if (!manual && S.ready && fails > 3 && ++skip % 5)
         return;
+    if (pendOf() && !announcing) announce();
     inflight = true;
     if (manual || !S.synced) pgSet(!S.synced ? 'Đang tải dữ liệu…' : 'Đang cập nhật…', null, OB.n);
     if (manual)
@@ -264,9 +299,13 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
+function lock() { if (KICK) return; sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
 $('#lf').onsubmit = ev => { ev.preventDefault(); if ($('#pw').value === PASS) {
+    const kind = KICK ? 'join' : 'login';
+    KICK = false;
+    try { sessionStorage.sess = Date.now(); } catch (e) { }
     touch();
+    announce(kind);
     boot();
 }
 else {
@@ -3237,8 +3276,11 @@ if (typeof notify === 'function') {
             u.searchParams.delete(kn);
             history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
             const K = (window.CONFIG || {}).KEY;
-            if (K && k === K)
+            if (K && k === K) {
+                const was = alive();
                 touch();
+                if (!was) announce('login');
+            }
         }
     }
     catch (e) { }
