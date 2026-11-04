@@ -320,7 +320,11 @@ $('#lf').onsubmit = async ev => {
     if (!STORE) { $('#lerr').textContent = 'Thiếu file config.js'; return; }
     LOGIN_BUSY = true;
     let j;
-    try { const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: pw }) }); j = await r.json(); }
+    try {
+        const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: pw }) });
+        try { j = await r.json(); }
+        catch (e) { j = { ok: false, net: true, err: 'Máy chủ trả lỗi ' + r.status + (r.status === 404 ? ' (không thấy /api/store, kiểm tra thư mục api/ và deploy lại)' : ' (xem Logs trên Vercel)') }; }
+    }
     catch (e) { j = { ok: false, net: true, err: 'Không kết nối được máy chủ' }; }
     LOGIN_BUSY = false;
     if (j.ok) {
@@ -332,7 +336,7 @@ $('#lf').onsubmit = async ev => {
         boot();
     }
     else {
-        $('#lerr').textContent = j.wait ? 'Thử sai quá nhiều lần, hãy thử lại sau ' + Math.ceil(j.wait / 60) + ' phút' : j.net ? j.err : 'Sai mật khẩu !!';
+        $('#lerr').textContent = j.wait ? 'Thử sai quá nhiều lần, hãy thử lại sau ' + Math.ceil(j.wait / 60) + ' phút' : (j.net || j.hubErr || (j.err && j.err !== 'Sai mật khẩu')) ? j.err : 'Sai mật khẩu !!';
         $('#lf').classList.remove('shake');
         void $('#lf').offsetWidth;
         $('#lf').classList.add('shake');

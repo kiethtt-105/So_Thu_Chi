@@ -5,7 +5,8 @@
 //  - Request có thao tác khác (tài khoản, danh mục, hạn mức, phiên...) được chuyển thẳng sang Google Sheet như cũ.
 // Cùng định dạng request/response với Apps Script nên app.js dùng như cũ, chỉ thêm trường "hub" (trạng thái đồng bộ).
 
-const { APP_KEY, APP_API, CRON_SECRET } = process.env;
+const { APP_KEY, APP_API, APP_PASS, CRON_SECRET } = process.env;
+const auth = require('./_auth');
 const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const P = 'stc:';
@@ -14,6 +15,7 @@ const MISC = ['acc', 'cat', 'lim', 'trash', 'issues'];
 const SESS_ERR = 'Phiên đã bị khóa vì có thiết bị khác đăng nhập';
 const PULL_EVERY = 15000;          // tối thiểu giữa hai lần kéo dữ liệu từ Google Sheet
 const BATCH = 20;                  // gộp tối đa 20 việc trong hàng đợi thành 1 lần gọi Apps Script (1 lần khóa + 1 lần tính lại)
+let TOUCHED = false;                // request này đã gửi thao tác ghi sang Google Sheet chưa (để quyết định có được chuyển thẳng khi Redis lỗi)
 let DL = 0;                        // hạn chót của request hiện tại (ms) — maxDuration 60s
 const TRANSIENT = /chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i;
 
@@ -31,6 +33,7 @@ async function rd(cmds) {
 }
 
 async function sheet(body, ms) {
+  if (body && body.ops && body.ops.length) TOUCHED = true;
   const left = DL ? DL - Date.now() : 1e9, lim = Math.min(ms || 25000, left);
   if (lim < 3000) return { ok: false, net: true, err: 'Hết thời gian xử lý, sẽ thử lại' };
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), lim);
@@ -107,12 +110,12 @@ async function pull(sid, force) {
   const j = await sheet({ ops: [], rev: force ? '' : (srev || ''), sid });
   if (j.sess === false) { await sessLost(sid); return { sess: false }; }
   if (!j.ok) return { err: j.err || 'Lỗi Google Sheet', net: !!j.net };
-  if (sid) await rd([['SET', P + 'sid', sid]]);
-  await rd([['SET', P + 'pullAt', String(Date.now())]]);
-  if (j.same) return { changed: false };
+  const base = []; if (sid) base.push(['SET', P + 'sid', sid]);
+  base.push(['SET', P + 'pullAt', String(Date.now())]);
+  if (j.same) { await rd(base); return { changed: false }; }
   // Không DEL cả hash (sẽ làm mất giao dịch vừa ghi nhanh xen giữa, và thiết bị khác thấy hash rỗng).
   // Thay bằng: HDEL những id không còn, HSET phần còn lại theo lô, rồi phủ lại hàng đợi một lần nữa để vá khe hở.
-  const [q, old] = await rd([['LRANGE', P + 'q', 0, -1], ['HKEYS', P + 'tx']]);
+  const r0 = await rd(base.concat([['LRANGE', P + 'q', 0, -1], ['HKEYS', P + 'tx']])), q = r0[r0.length - 2], old = r0[r0.length - 1];
   const tx = new Map((j.tx || []).map(t => [t.id, t]));
   overlay(q || [], tx);
   const misc = {}; MISC.forEach(k => { misc[k] = j[k] || []; });
@@ -164,27 +167,112 @@ async function drain(sid) {
   } finally { await rd([['DEL', P + 'lock']]).catch(() => { }); }
 }
 
+// Chạy tiếp việc nền SAU KHI đã trả lời thiết bị (Vercel waitUntil). Không có thì trả false để nơi gọi tự chờ.
+function bg(p) {
+  try {
+    const c = globalThis[Symbol.for('@vercel/request-context')], x = c && c.get && c.get();
+    if (x && typeof x.waitUntil === 'function') { x.waitUntil(p); return true; }
+  } catch (e) { }
+  return false;
+}
+
+// Ghi Redis và Google Sheet SONG SONG: sau khi cả hai xong, nếu Sheet đã nhận thì gỡ việc khỏi hàng đợi (LREM).
+// Sheet lỗi/bận: việc vẫn nằm trong hàng đợi (đã có trong Redis) nên drain() sẽ gửi lại như cũ. Luôn nhả khóa ở cuối, không bao giờ throw.
+async function settle(redisP, sheetP, job, sid) {
+  let rok = true;
+  try { await redisP; } catch (e) { rok = false; }
+  try {
+    const j = await sheetP;
+    if (j.sess === false) await sessLost(sid);
+    else if (j.ok) { if (rok) await rd([['LREM', P + 'q', '1', job]]); }
+    else if (j.net || TRANSIENT.test(j.err || '')) await setMeta({ err: j.err || 'Google Sheet đang bận' });
+    // Sheet từ chối thật: giữ nguyên trong hàng đợi, drain() sẽ tách lô / chuyển sang "dead" như cũ
+  } catch (e) { }
+  finally { await rd([['DEL', P + 'lock']]).catch(() => { }); }
+}
+
+// ---- Chuyển thẳng sang Google Sheet (khi không có Redis, hoặc Redis lỗi trước khi ghi gì) ----
+async function proxy(body) {
+  const sid = typeof body.sid === 'string' ? body.sid.slice(0, 64) : '';
+  return sheet({ ops: Array.isArray(body.ops) ? body.ops : [], rev: body.rev || '', fast: !!body.fast, sid }, 45000);
+}
+
+// ---- Đăng nhập: so mật khẩu ở server, giới hạn số lần thử sai ----
+const FAIL_MAX = 5, FAIL_WIN = 900, ALL_MAX = 60, ALL_WIN = 3600;   // 5 lần sai / 15 phút / IP; 60 lần sai / giờ toàn hệ thống
+const memFail = new Map();
+const clientIp = req => String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'x').split(',')[0].trim();
+async function failWait(ip, has) {
+  if (has) {
+    try {
+      const [a, b, ta, tb] = await rd([['GET', P + 'lf:' + ip], ['GET', P + 'lf:all'], ['TTL', P + 'lf:' + ip], ['TTL', P + 'lf:all']]);
+      if (+a >= FAIL_MAX) return Math.max(+ta, 1);
+      if (+b >= ALL_MAX) return Math.max(+tb, 1);
+    } catch (e) { }
+    return 0;
+  }
+  const m = memFail.get(ip);
+  return m && m.exp > Date.now() && m.n >= FAIL_MAX ? Math.ceil((m.exp - Date.now()) / 1000) : 0;
+}
+async function failAdd(ip, has) {
+  if (has) {
+    try {
+      const [a, b] = await rd([['INCR', P + 'lf:' + ip], ['INCR', P + 'lf:all']]), c = [];
+      if (+a === 1) c.push(['EXPIRE', P + 'lf:' + ip, String(FAIL_WIN)]);
+      if (+b === 1) c.push(['EXPIRE', P + 'lf:all', String(ALL_WIN)]);
+      if (c.length) await rd(c);
+    } catch (e) { }
+    return;
+  }
+  const m = memFail.get(ip);
+  if (m && m.exp > Date.now()) m.n++; else memFail.set(ip, { n: 1, exp: Date.now() + FAIL_WIN * 1000 });
+}
+async function doLogin(req, res, body, has) {
+  const ip = clientIp(req), wait = await failWait(ip, has);
+  if (wait) return res.status(429).json({ ok: false, wait, err: 'Thử sai quá nhiều lần' });
+  if (!auth.secretOk(String(body.login || ''))) {
+    await failAdd(ip, has);
+    await new Promise(r => setTimeout(r, 500));
+    return res.status(200).json({ ok: false, err: 'Sai mật khẩu' });
+  }
+  if (has) { try { await rd([['DEL', P + 'lf:' + ip]]); } catch (e) { } }
+  res.setHeader('Set-Cookie', auth.cookie());
+  return res.status(200).json({ ok: true });
+}
+
 function reply(res, state, hub, extra) {
   return res.status(200).json(Object.assign({ ok: true }, state.st, { rev: state.rev, hub }, extra || {}));
 }
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  DL = Date.now() + 52000;
-  if (!RU || !RT || !APP_API || !APP_KEY)
-    return res.status(200).json({ ok: false, hubErr: true, err: 'Chưa cấu hình Redis (KV_REST_API_URL / KV_REST_API_TOKEN) hoặc APP_API / APP_KEY' });
+  DL = Date.now() + 52000; TOUCHED = false;
+  if (!APP_API || !APP_KEY || !APP_PASS)
+    return res.status(200).json({ ok: false, hubErr: true, err: 'Chưa cấu hình APP_API / APP_KEY / APP_PASS trên Vercel' });
+  const HAS_REDIS = !!(RU && RT);   // không có Redis: chạy chế độ chuyển thẳng sang Google Sheet
+  let body = null;
   try {
     // Cron của Vercel: chạy nền khi không có ai mở app
     if (req.method === 'GET') {
-      if (!CRON_SECRET) return res.status(200).json({ ok: true, redis: true, cron: false });   // kiểm tra nhanh: chưa đặt CRON_SECRET thì không chạy gì
+      if (!CRON_SECRET || !HAS_REDIS) return res.status(200).json({ ok: true, redis: HAS_REDIS, cron: false });   // kiểm tra nhanh
       if (req.headers.authorization !== 'Bearer ' + CRON_SECRET) return res.status(401).json({ ok: false, err: 'Unauthorized' });
       const sid = (await rd([['GET', P + 'sid']]))[0] || '';
       const d = await drain(sid); const p = await pull(sid, false);
       return res.status(200).json({ ok: true, drain: d, pull: p, hub: await status() });
     }
     if (req.method !== 'POST') return res.status(405).json({ ok: false, err: 'Method not allowed' });
-    const body = typeof req.body === 'string' ? parse(req.body || '{}') || {} : (req.body || {});
-    if (body.key !== APP_KEY) return res.status(401).json({ ok: false, err: 'Sai key' });
+    const sfs = req.headers['sec-fetch-site'];
+    if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });   // chặn gọi từ trang web khác
+    body = typeof req.body === 'string' ? parse(req.body || '{}') || {} : (req.body || {});
+
+    // Đăng nhập (chưa cần cookie)
+    if (body.login !== undefined) return await doLogin(req, res, body, HAS_REDIS);
+    // Mọi request còn lại phải có cookie hợp lệ
+    if (!auth.ok(req)) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
+
+    // Tải ảnh: chuyển sang Apps Script (KEY nằm ở server)
+    if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));
+    if (!HAS_REDIS) return res.status(200).json(await proxy(body));
+    
     const ops = Array.isArray(body.ops) ? body.ops : [], sid = typeof body.sid === 'string' ? body.sid.slice(0, 64) : '';
     const isSess = o => o && typeof o.op === 'string' && o.op.indexOf('sess.') === 0;
     const hasAt = ops.some(o => o && ((o.row && String(o.row.id || '')[0] === '@') || String(o.id || '')[0] === '@'));   // ID theo vị trí dòng: phải xử lý ngay trên Sheet
@@ -192,24 +280,39 @@ module.exports = async (req, res) => {
 
     // 0) Chỉ có thao tác phiên (đăng nhập / tham gia): chuyển thẳng, không cần kéo dữ liệu
     if (ops.length && ops.every(isSess)) {
-      const j = await sheet({ ops, rev: '', sid }, 15000);
+      const [j, hub] = await Promise.all([sheet({ ops, rev: '', sid }, 15000), status()]);
       if (j.ok && j.sess !== false) await sessMirror(ops, sid);
-      return res.status(200).json(Object.assign({}, j, { hub: await status() }));
+      return res.status(200).json(Object.assign({}, j, { hub }));
     }
 
-    // 1) Chỉ có thao tác giao dịch: ghi vào Redis ngay, đẩy sang Sheet sau
+    // 1) Chỉ có thao tác giao dịch: ghi Redis và gửi Google Sheet SONG SONG (không chờ xong cái này mới tới cái kia)
     if (ops.length && !hasAt && ops.every(x => TX.has(x.op))) {
-      if (!(await rd([['EXISTS', P + 'misc']]))[0]) {
+      const [has, got, qn] = await rd([['EXISTS', P + 'misc'], ['SET', P + 'lock', '1', 'NX', 'EX', '70'], ['LLEN', P + 'q']]);
+      if (!has) {
+        if (got === 'OK') await rd([['DEL', P + 'lock']]);
         const p = await pull(sid, true);
         if (p.sess === false) return res.status(200).json(sessFail());
         if (p.err) return res.status(200).json({ ok: false, err: 'Máy chủ đang bận: ' + p.err });
       }
-      const cmds = [];
+      const cmds = [], job = JSON.stringify({ t: Date.now(), ops });
       rowsOf(ops).forEach(r => cmds.push(['HSET', P + 'tx', r.id, JSON.stringify(r)]));
       delsOf(ops).forEach(id => cmds.push(['HDEL', P + 'tx', id]));
-      cmds.push(['RPUSH', P + 'q', JSON.stringify({ t: Date.now(), ops })], ['INCR', P + 'rev']);
+      cmds.push(['RPUSH', P + 'q', job], ['INCR', P + 'rev']);
+      // Giữ được khóa + hàng đợi đang rỗng (có Redis, không việc nào đi trước) => gửi thẳng sang Sheet cùng lúc với ghi Redis, đúng thứ tự.
+      if (has && got === 'OK' && !+qn) {
+        const redisP = rd(cmds), sheetP = sheet({ ops, rev: '', fast: true, sid });
+        const done = settle(redisP, sheetP, job, sid);
+        try { await redisP; } catch (e) { await done; throw e; }
+        const hub = await status();
+        if (!bg(done)) await done;          // không có waitUntil: chờ nốt Sheet trước khi trả lời để khỏi bị cắt giữa chừng
+        return res.status(200).json({ ok: true, fast: true, hub });
+      }
+      // Còn việc đi trước (hoặc đang có tiến trình đẩy khác): vẫn ghi Redis ngay + xếp hàng; tiến trình đang đẩy sẽ lấy tiếp, hoặc ta tự đẩy nền.
+      if (has && got === 'OK') cmds.push(['DEL', P + 'lock']);
       await rd(cmds);
-      return res.status(200).json({ ok: true, fast: true, hub: await status() });
+      const hub = await status();
+      if (has && got === 'OK') bg(drain(sid).catch(() => { }));
+      return res.status(200).json({ ok: true, fast: true, hub });
     }
 
     // 2) Thao tác khác (tài khoản, danh mục, hạn mức, phiên...): đẩy hết hàng đợi trước để giữ đúng thứ tự, rồi chuyển thẳng sang Sheet
@@ -220,29 +323,29 @@ module.exports = async (req, res) => {
       const j = await sheet({ ops, rev: '', fast: !!body.fast, sid }, 45000);
       if (j.sess === false) { await sessLost(sid); return res.status(200).json(sessFail()); }
       if (!j.ok) return res.status(200).json(j);
-      if (sid) await rd([['SET', P + 'sid', sid]]);
-      await sessMirror(ops, sid);
+      await Promise.all([sid ? rd([['SET', P + 'sid', sid]]) : null, sessMirror(ops, sid)]);
       await pull(sid, true);
-      const st = await readState();
-      return reply(res, st || { st: j, rev: String(j.rev || '') }, await status(), { sess: j.sess });
+      const [st, hub2] = await Promise.all([readState(), status()]);
+      return reply(res, st || { st: j, rev: String(j.rev || '') }, hub2, { sess: j.sess });
     }
 
-    // 3) Thiết bị hỏi (poll): đẩy hàng đợi nếu còn, kéo thay đổi từ Sheet nếu đã đến hạn, rồi trả về từ Redis
-    let st = await readState();
+    // 3) Thiết bị hỏi (poll): đọc trạng thái + hàng đợi cùng lúc; đẩy hàng đợi (nếu còn) rồi kéo thay đổi từ Sheet (nếu đến hạn); chỉ đọc lại Redis khi có gì đổi
+    let [st, hub] = await Promise.all([readState(), status()]), dirty = false;
     const sess = {};
-    if (!st) { const p = await pull(sid, true); if (p.sess === false) return res.status(200).json(sessFail()); if (p.err) return res.status(200).json({ ok: false, err: p.err }); st = await readState(); }
+    if (!st) { const p = await pull(sid, true); if (p.sess === false) return res.status(200).json(sessFail()); if (p.err) return res.status(200).json({ ok: false, err: p.err }); dirty = true; }
     else {
-      const hub0 = await status();
-      if (hub0.q) { const d = await drain(sid); if (d.sess === false) return res.status(200).json(sessFail()); }
+      if (hub.q) { const d = await drain(sid); if (d.sess === false) return res.status(200).json(sessFail()); dirty = true; }
       const p = await pull(sid, !body.rev);     // rev rỗng = mở app / bấm làm mới: kéo ngay từ Google Sheet
       if (p.sess === false) return res.status(200).json(sessFail());
-      st = await readState();
+      if (!p.skipped) dirty = true;
     }
+    if (dirty) [st, hub] = await Promise.all([readState(), status()]);
     if (!st) return res.status(200).json({ ok: false, err: 'Chưa có dữ liệu trên Redis' });
-    const hub = await status();
     if (body.rev && body.rev === st.rev) return res.status(200).json({ ok: true, same: true, rev: st.rev, hub });
     return reply(res, st, hub, sess);
   } catch (e) {
+    // Redis lỗi trước khi ghi gì sang Sheet: chuyển thẳng sang Google Sheet như chế độ không có Redis
+    if (body && body.login === undefined && !TOUCHED) { try { return res.status(200).json(await proxy(body)); } catch (e2) { } }
     return res.status(200).json({ ok: false, hubErr: true, err: 'Redis: ' + (e && e.message || e) });
   }
 };
