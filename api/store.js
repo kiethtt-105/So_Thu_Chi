@@ -152,7 +152,8 @@ module.exports = async (req, res) => {
   try {
     // Cron của Vercel: chạy nền khi không có ai mở app
     if (req.method === 'GET') {
-      if (CRON_SECRET && req.headers.authorization !== 'Bearer ' + CRON_SECRET) return res.status(401).json({ ok: false, err: 'Unauthorized' });
+      if (!CRON_SECRET) return res.status(200).json({ ok: true, redis: true, cron: false });   // kiểm tra nhanh: chưa đặt CRON_SECRET thì không chạy gì
+      if (req.headers.authorization !== 'Bearer ' + CRON_SECRET) return res.status(401).json({ ok: false, err: 'Unauthorized' });
       const sid = (await rd([['GET', P + 'sid']]))[0] || '';
       const d = await drain(sid); const p = await pull(sid, false);
       return res.status(200).json({ ok: true, drain: d, pull: p, hub: await status() });
