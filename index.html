@@ -1,22 +1,21 @@
 <!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F4F6FA"><meta name="color-scheme" content="light dark">
-<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#F3F4FB"><meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Sổ Thu Chi</title>
 <link rel="icon" href="icons/icon.png"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
-<script>try{var t=localStorage.theme;if(t)document.documentElement.dataset.t=t}catch(e){}</script>
+<script>try{var d=document.documentElement,t=localStorage.theme;if(t)d.dataset.t=t;if(localStorage.hide==="1")d.classList.add("hid")}catch(e){}</script>
 </head><body>
-<form id="lg" class="hide"><img src="icons/icon.png" alt="" width="72" height="72"><h1>Sổ Thu Chi</h1>
+<form id="lg" class="hide"><div class="lgc"><img src="icons/icon.png" alt="" width="76" height="76"><h1>Sổ Thu Chi</h1><p>Nhập mật khẩu để mở sổ</p>
 <input id="pw" type="password" autocomplete="current-password" placeholder="Mật khẩu" aria-label="Mật khẩu" autofocus>
-<button class="btn p" id="lb">Mở sổ</button><p id="le" role="alert"></p></form>
+<button class="btn p w" id="lb">Mở sổ</button><p id="le" role="alert"></p></div></form>
 <div id="app" class="hide">
-<aside id="sd"><div class="br"><img src="icons/icon.png" alt="" width="32" height="32">Sổ Thu Chi</div><nav id="nv"></nav>
-<div class="sdf"><button class="ib" data-a="theme" aria-label="Đổi giao diện">◐</button><button class="ib" data-a="lock" aria-label="Khóa sổ">🔒</button></div></aside>
-<header id="tp"><b id="ttl"></b><div id="mn"></div><span id="lv" class="lv"></span>
-<button class="ib m-only" data-a="theme" aria-label="Đổi giao diện">◐</button><button class="ib m-only" data-a="lock" aria-label="Khóa sổ">🔒</button>
-<button class="btn p d-only" data-a="new">＋ Thêm giao dịch</button></header>
+<aside id="sd"><div class="br"><img src="icons/icon.png" alt="" width="36" height="36">Sổ Thu Chi</div><button class="btn p w" data-a="new">＋ Thêm giao dịch</button><nav id="nv"></nav>
+<div class="sdf"><button class="ib" data-a="eye" aria-label="Ẩn/hiện số tiền" title="Ẩn/hiện số tiền">👁</button><button class="ib" data-a="theme" aria-label="Đổi giao diện" title="Sáng/tối">◐</button><button class="ib" data-a="lock" aria-label="Khóa sổ" title="Khóa sổ">🔒</button></div></aside>
+<header id="tp"><b id="ttl"></b><span id="lv" class="lv" data-a="sync" title="Đồng bộ"></span>
+<span class="m-only tools"><button class="ib" data-a="eye" aria-label="Ẩn/hiện số tiền">👁</button><button class="ib" data-a="theme" aria-label="Đổi giao diện">◐</button><button class="ib" data-a="lock" aria-label="Khóa sổ">🔒</button></span><div id="mn"></div></header>
 <main id="v"></main>
 <nav id="bn"></nav></div>
 <div id="ov"><div id="sh" role="dialog" aria-modal="true"></div></div><div id="ts" role="status"></div>
