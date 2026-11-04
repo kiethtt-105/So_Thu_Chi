@@ -45,6 +45,16 @@ async function sheet(body, ms) {
 const parse = s => { try { return JSON.parse(s); } catch (e) { return null; } };
 const rowsOf = ops => ops.filter(x => x.op === 'tx.save' && x.row && x.row.id).map(x => x.row);
 const delsOf = ops => ops.filter(x => (x.op === 'tx.del' || x.op === 'tx.purge') && x.id).map(x => x.id);
+// Phủ hàng đợi lên bản đồ giao dịch theo ĐÚNG thứ tự từng thao tác. keepDel=true: xóa được ghi là null (để HDEL).
+function overlay(q, tx, keepDel) {
+  q.forEach(s => {
+    const jb = parse(s); if (!jb || !Array.isArray(jb.ops)) return;
+    jb.ops.forEach(x => {
+      if (x.op === 'tx.save' && x.row && x.row.id) tx.set(x.row.id, x.row);
+      else if ((x.op === 'tx.del' || x.op === 'tx.purge') && x.id) { if (keepDel) tx.set(x.id, null); else tx.delete(x.id); }
+    });
+  });
+}
 
 // ---- đọc trạng thái ----
 async function readState() {
@@ -98,19 +108,33 @@ async function pull(sid, force) {
   if (j.sess === false) { await sessLost(sid); return { sess: false }; }
   if (!j.ok) return { err: j.err || 'Lỗi Google Sheet', net: !!j.net };
   if (sid) await rd([['SET', P + 'sid', sid]]);
-  const cmds = [['SET', P + 'pullAt', String(Date.now())]];
-  if (!j.same) {
-    const q = (await rd([['LRANGE', P + 'q', 0, -1]]))[0] || [];
-    const tx = new Map((j.tx || []).map(t => [t.id, t]));
-    q.forEach(s => { const jb = parse(s); if (!jb) return; rowsOf(jb.ops).forEach(r => tx.set(r.id, r)); delsOf(jb.ops).forEach(id => tx.delete(id)); });
-    const misc = {}; MISC.forEach(k => { misc[k] = j[k] || []; });
-    cmds.push(['DEL', P + 'tx']);
-    const flat = []; tx.forEach((v, id) => flat.push(id, JSON.stringify(v)));
-    for (let i = 0; i < flat.length; i += 400) cmds.push(['HSET', P + 'tx'].concat(flat.slice(i, i + 400)));
-    cmds.push(['SET', P + 'misc', JSON.stringify(misc)], ['SET', P + 'srev', String(j.rev || '')], ['INCR', P + 'rev']);
-  }
+  await rd([['SET', P + 'pullAt', String(Date.now())]]);
+  if (j.same) return { changed: false };
+  // Không DEL cả hash (sẽ làm mất giao dịch vừa ghi nhanh xen giữa, và thiết bị khác thấy hash rỗng).
+  // Thay bằng: HDEL những id không còn, HSET phần còn lại theo lô, rồi phủ lại hàng đợi một lần nữa để vá khe hở.
+  const [q, old] = await rd([['LRANGE', P + 'q', 0, -1], ['HKEYS', P + 'tx']]);
+  const tx = new Map((j.tx || []).map(t => [t.id, t]));
+  overlay(q || [], tx);
+  const misc = {}; MISC.forEach(k => { misc[k] = j[k] || []; });
+  const gone = (old || []).filter(id => !tx.has(id)), flat = [];
+  tx.forEach((v, id) => flat.push(id, JSON.stringify(v)));
+  const cmds = [];
+  for (let i = 0; i < gone.length; i += 400) cmds.push(['HDEL', P + 'tx'].concat(gone.slice(i, i + 400)));
+  for (let i = 0; i < flat.length; i += 400) cmds.push(['HSET', P + 'tx'].concat(flat.slice(i, i + 400)));
+  cmds.push(['SET', P + 'misc', JSON.stringify(misc)], ['SET', P + 'srev', String(j.rev || '')], ['INCR', P + 'rev']);
   await rd(cmds);
-  return { changed: !j.same };
+  // Vá: nếu có giao dịch ghi nhanh chen vào giữa lúc đọc hàng đợi và lúc ghi hash, phủ lại hàng đợi hiện tại
+  const q2 = (await rd([['LRANGE', P + 'q', 0, -1]]))[0] || [];
+  if (q2.length) {
+    const fix = new Map(); overlay(q2, fix, true);
+    const sets = [], dels = [];
+    fix.forEach((v, id) => v ? sets.push(id, JSON.stringify(v)) : dels.push(id));
+    const c2 = [];
+    for (let i = 0; i < dels.length; i += 400) c2.push(['HDEL', P + 'tx'].concat(dels.slice(i, i + 400)));
+    for (let i = 0; i < sets.length; i += 400) c2.push(['HSET', P + 'tx'].concat(sets.slice(i, i + 400)));
+    if (c2.length) { c2.push(['INCR', P + 'rev']); await rd(c2); }
+  }
+  return { changed: true };
 }
 
 // ---- Redis -> Google Sheet (đẩy hàng đợi, gộp lô) ----
