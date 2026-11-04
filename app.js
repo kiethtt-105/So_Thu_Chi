@@ -1,5 +1,5 @@
 
-const { PASS, API, NAME, TTL_H } = window.CONFIG || {}, POLL_MS = 10000, TTL = (+TTL_H > 0 ? +TTL_H : 168) * 3600e3; // hạn phiên (giờ) lấy từ biến Vercel APP_TTL_HOURS, mặc định 168h = 7 ngày
+const { PASS, API, NAME, TTL_H, STORE } = window.CONFIG || {}, POLL_MS = 10000, TTL = (+TTL_H > 0 ? +TTL_H : 168) * 3600e3; // hạn phiên (giờ) lấy từ biến Vercel APP_TTL_HOURS, mặc định 168h = 7 ngày
 const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
 // ===== Khóa phiên đa thiết bị =====
 // Mỗi tab có một SID. Máy chủ giữ danh sách SID được phép:
@@ -139,13 +139,15 @@ const joinImg = (t, a) => [String(t || '').trim(), ...(a || [])].filter(Boolean)
 
 // Lỗi tạm thời từ máy chủ (đang bận, chờ khóa quá lâu...): chưa xử lý gì nên luôn an toàn để gửi lại
 const TRANSIENT_RE = /chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i;
+let HUB_OFF = 0;
 async function call(ops, rev, ms, fast) {
     if (!API)
         throw Error('Thiếu địa chỉ API: file config.js chưa được tải');
+    const useHub = !!STORE && Date.now() > HUB_OFF;
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 30000);
     let r;
     try {
-        r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '', fast: !!fast, sid: SID }) });
+        r = await fetch(useHub ? STORE : API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '', fast: !!fast, sid: SID }) });
     }
     catch (e) {
         const x = Error(e && e.name === 'AbortError' ? 'Máy chủ Google phản hồi quá chậm, chưa nhận được kết quả' : navigator.onLine === false ? 'Không có kết nối mạng' : 'Không kết nối được tới máy chủ Google');
@@ -160,10 +162,13 @@ async function call(ops, rev, ms, fast) {
         j = await r.json();
     }
     catch (e) {
+        if (useHub) { HUB_OFF = Date.now() + 60000; hubSet(null); return call(ops, rev, ms, fast); }
         const x = Error('Lỗi máy chủ. Kiểm tra lại cấu hình kết nối');
         x.net = true;
         throw x;
     }
+    if (useHub && j.hubErr) { HUB_OFF = Date.now() + 60000; hubSet(null); return call(ops, rev, ms, fast); }
+    if (useHub && j.hub) hubSet(j.hub);
     if (j.sess === false && !pendOf()) {
         kick();
         throw Error('Phiên đã bị khóa vì có thiết bị khác đăng nhập');
@@ -419,7 +424,8 @@ function balMap() {
 function txRow(t, v) {
     const bm = balMap(), xs = typeof v === 'string' && t.type === 'Chuyển khoản', sg = xs ? (t.acc === v ? '−' : '+') : (t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : ''), hb = xs && t.acc !== v;
     const c = CLS[t.type], ttl = t.type === 'Chuyển khoản' ? `${esc(t.acc)} → ${esc(t.accTo)}` : esc(t.sub || t.cat || (t.type === 'Chi' || t.type === 'Thu' ? 'Chưa phân loại' : t.type)), ico = t.type === 'Chuyển khoản' ? '⇄' : t.type === 'Điều chỉnh' ? '±' : emo(t.sub || t.cat);
-    return `<button class="row" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(noteTxt(t.note) || t.cat || '') + (hasImg(t.note) ? ' 📎' : '')}${t.type === 'Chuyển khoản' ? '' : (noteTxt(t.note) || t.cat || hasImg(t.note) ? ' · ' : '') + esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${sg}${num(t.amount)}</b>${bm[t.id] !== undefined && !hb ? `<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(bm[t.id])}</small>` : ''}</span></button>`;
+    const sy = rowSy(t.id);
+    return `<button class="row${sy ? ' syn' : ''}" data-edit="${esc(t.id)}"><span class="dot ${c}">${ico}</span><span class="m"><b>${ttl}</b><small>${esc(noteTxt(t.note) || t.cat || '') + (hasImg(t.note) ? ' 📎' : '')}${t.type === 'Chuyển khoản' ? '' : (noteTxt(t.note) || t.cat || hasImg(t.note) ? ' · ' : '') + esc(t.acc)}</small></span><span class="am"><b class="sens ${c}">${sg}${num(t.amount)}</b>${bm[t.id] !== undefined && !hb ? `<small class="sens mut" title="Số dư của ${esc(t.acc)} sau giao dịch này">Dư ${num(bm[t.id])}</small>` : ''}</span>${sy ? syHtml(t.id) : ''}</button>`;
 }
 function donut(rows, tot, off = 0, fi = emo) {
     if (!rows.length || !tot)
@@ -3287,14 +3293,77 @@ if (typeof notify === 'function') {
 })();
 
 const OB = { n: 0, ids: new Set(), jobs: {}, wk: new Set(), base: null, net: false };
-let pgT = 0;
-function pgSet(t, p, n) {
-    const e = $('#pg'); if (!e) return; clearTimeout(pgT);
-    e.classList.add('on'); e.classList.toggle('ind', p == null);
-    $('#pgl').textContent = t; $('#pgc').textContent = n > 1 ? n + ' việc đang chờ' : '';
-    const x = $('#pgx'); if (x) x.classList.toggle('hide', !(n > 0));
-    $('#pgf').style.width = p == null ? '' : Math.max(4, Math.min(100, p)) + '%';
+// ===== Đồng bộ 3 chiều: Thiết bị → Redis → Google Sheet =====
+const HUB = { q: 0, ids: new Set(), tot: 0, pullAt: 0, err: '', dead: 0, init: false };
+const TXST = new Map(); // id giao dịch -> 'new' | 'edit' khi đang được gửi từ thiết bị
+let PG_X = null, BAR_BUSY = false, BAR_T = 0, KICK_T = 0;
+function txDone(job, parked) {
+    if (parked) return;
+    const still = new Set();
+    Object.values(OB.jobs).forEach(j => j.ops.forEach(x => { if (x.op === 'tx.save' && x.row) still.add(x.row.id); }));
+    job.ops.forEach(x => { if (x.op === 'tx.save' && x.row && !still.has(x.row.id)) TXST.delete(x.row.id); });
 }
+// Trạng thái từng giao dịch: dev = đang gửi từ thiết bị (tạo/sửa), hub = đã nằm trong Redis nhưng chưa ghi xong vào Google Sheet
+function rowSy(id) {
+    const k = TXST.get(id);
+    if (k) return ['dev', k === 'new' ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…'];
+    if (HUB.ids.has(id)) return ['hub', 'Đã lưu · đang ghi vào Google Sheet…'];
+    return null;
+}
+const syHtml = id => { const s = rowSy(id); return s ? `<span class="sy ${s[0]}" title="${s[1]}" role="img" aria-label="${s[1]}"></span>` : ''; };
+function paintSync() {
+    $$('#v [data-edit]').forEach(b => {
+        const s = rowSy(b.dataset.edit), cur = b.querySelector(':scope>.sy');
+        if (!s) { if (cur) cur.remove(); b.classList.remove('syn'); return; }
+        if (cur && cur.classList.contains(s[0]) && cur.title === s[1]) return;
+        if (cur) cur.remove();
+        b.insertAdjacentHTML('beforeend', syHtml(b.dataset.edit)); b.classList.add('syn');
+    });
+}
+function hubKick() {
+    if (KICK_T) return;
+    KICK_T = setTimeout(() => { KICK_T = 0; if (HUB.q && !S.busy) sync(false); }, HUB.err ? 8000 : 1500);
+}
+function hubSet(h) {
+    if (!h) { HUB.q = 0; HUB.ids = new Set(); HUB.tot = 0; HUB.err = ''; paintSync(); barUpdate(); return; }
+    const was = HUB.dead;
+    HUB.q = h.q | 0; HUB.ids = new Set(h.ids || []); HUB.err = h.err || ''; HUB.pullAt = h.pullAt || 0; HUB.dead = h.dead | 0;
+    if (HUB.q > HUB.tot) HUB.tot = HUB.q;
+    if (!HUB.q) HUB.tot = 0;
+    if (HUB.init && HUB.dead > was)
+        notify('Google Sheet từ chối một thay đổi' + (h.deadMsg ? ': ' + h.deadMsg : '') + '. Dữ liệu đã được đồng bộ lại theo Google Sheet.', { title: 'Thay đổi bị từ chối', ico: '⚠️', tag: 'hub-dead', kind: 'err' });
+    HUB.init = true;
+    paintSync(); barUpdate();
+    if (HUB.q) hubKick();
+}
+// Thanh tiến trình dưới đáy: a = thiết bị → Redis, b = Redis → Google Sheet, c = Google Sheet → Redis → thiết bị, ok = xong
+function barUpdate() {
+    const e = $('#pg'); if (!e) return;
+    clearTimeout(BAR_T);
+    const j0 = Object.values(OB.jobs)[0];
+    let ph = '', t = '', p = null, n = 0, bad = false;
+    if (OB.n) { ph = 'a'; n = OB.n; bad = !!OB.net; t = bad ? 'Mất kết nối, sẽ tự gửi lại khi có mạng…' : ((j0 && j0.pend) || 'Đang lưu…'); }
+    else if (HUB.q) { ph = 'b'; n = HUB.q; bad = !!HUB.err; t = bad ? 'Google Sheet đang bận, sẽ tự thử lại…' : 'Đã lưu vào Redis · đang ghi vào Google Sheet…'; p = HUB.tot > 0 && HUB.tot > HUB.q ? (HUB.tot - HUB.q) / HUB.tot * 100 : null; }
+    else if (PG_X) { ph = 'c'; t = PG_X.t; }
+    const x = $('#pgx'), f = $('#pgf');
+    if (ph) {
+        if (ph !== 'c') BAR_BUSY = true;
+        e.dataset.p = ph; e.classList.add('on'); e.classList.toggle('ind', p == null); e.classList.toggle('bad', bad);
+        $('#pgl').textContent = t;
+        $('#pgc').textContent = ph === 'a' ? (n > 1 ? n + ' việc đang chờ' : '') : ph === 'b' ? (n + ' chờ ghi vào Sheet') : '';
+        if (x) x.classList.toggle('hide', ph !== 'a');
+        f.style.width = p == null ? '' : Math.max(6, Math.min(100, p)) + '%';
+    } else if (BAR_BUSY) {
+        BAR_BUSY = false;
+        e.dataset.p = 'ok'; e.classList.add('on'); e.classList.remove('ind', 'bad');
+        $('#pgl').textContent = 'Đã đồng bộ: thiết bị · Redis · Google Sheet'; $('#pgc').textContent = '';
+        if (x) x.classList.add('hide');
+        f.style.width = '100%';
+        BAR_T = setTimeout(() => e.classList.remove('on'), 2200);
+    } else if (e.dataset.p !== 'ok' || !e.classList.contains('on')) e.classList.remove('on');
+}
+const pgSet = (t, p, n) => { PG_X = { t }; barUpdate(); };
+const pgHide = () => { PG_X = null; barUpdate(); };
 function oflSet() {
     const e = $('#ofl'); if (!e) return;
     const off = navigator.onLine === false || OB.net;
@@ -3303,7 +3372,6 @@ function oflSet() {
 }
 addEventListener('online', () => { OB.net = false; oflSet(); });
 addEventListener('offline', oflSet);
-function pgHide(d) { clearTimeout(pgT); const e = $('#pg'); if (e) pgT = setTimeout(() => e.classList.remove('on'), d || 0); }
 const idb = (() => {
     let p;
     const open = () => p || (p = new Promise((ok, no) => { try { const r = indexedDB.open('stc-outbox', 1); r.onupgradeneeded = () => r.result.createObjectStore('j', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); } catch (e) { no(e); } }).catch(() => null));
@@ -3323,6 +3391,7 @@ function bgSync() { try { navigator.serviceWorker && navigator.serviceWorker.rea
 function obCancel() {
     if (!OB.n) return;
     Object.values(OB.jobs).forEach(j => { j.x = true; idb.del(j.id); });
+    TXST.clear();
     OB.wk.forEach(f => f());
     if (OB.base) { Object.assign(S, OB.base); saveCache(); render(); }
     notify('Đã hủy các thay đổi chưa gửi. Nếu sổ đã kịp nhận thì sẽ được cập nhật lại.', { title: 'Đã hủy', ico: '↩️', tag: 'ob', kind: 'err' });
@@ -3405,9 +3474,10 @@ function commit(ops, o = {}) {
     OB.parked.delete(job.id);
     if (!OB.n) OB.base = { tx: S.tx.slice(), acc: S.acc.slice(), cat: S.cat.slice(), lim: S.lim.slice(), trash: S.trash.slice() };
     job.x = false; OB.jobs[job.id] = job;
+    ops.forEach(x => { if (x.op === 'tx.save' && x.row) TXST.set(x.row.id, S.tx.some(t => t.id === x.row.id) ? 'edit' : 'new'); });
     if (o.local) o.local();
     saveCache(); render();
-    S.busy++; OB.n++; OB.ids.add(job.id);
+    S.busy++; OB.n++; OB.ids.add(job.id); barUpdate();
 
     let hbT = 0;
     const endHb = () => { clearInterval(hbT); if (safe) idb.unbeat(job.id); };
@@ -3418,7 +3488,7 @@ function commit(ops, o = {}) {
     chain = chain.catch(() => { }).then(async () => {
         await stored;
         let res = { ok: true }, fast = false, parked = false, taken = false;
-        if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; return { ok: false, err: 'Đã hủy', cancel: true }; }
+        if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; txDone(job, false); barUpdate(); return { ok: false, err: 'Đã hủy', cancel: true }; }
         if (safe && job.persisted && !(await idb.get(job.id))) taken = true;
         const okNote = () => { if (o.quiet) return; notify((typeof o.ok === 'function' ? o.ok() : o.ok) || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind }); };
         try {
@@ -3441,8 +3511,9 @@ function commit(ops, o = {}) {
         endHb();
         delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--;
         if (!OB.n) OB.net = false;
+        txDone(job, parked);
         saveCache();
-        render();
+        render(); barUpdate();
         if (fast && !S.busy) setTimeout(() => sync(false), 400);
         return res;
     });

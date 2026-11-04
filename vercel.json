@@ -2,6 +2,25 @@
   "buildCommand": "node build.js",
   "outputDirectory": "public",
   "headers": [
-    { "source": "/(sw.js|app.js|style.css|index.html|config.js|)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    {
+      "source": "/(sw.js|app.js|style.css|index.html|config.js|)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
+  ],
+  "functions": {
+    "api/store.js": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/store",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

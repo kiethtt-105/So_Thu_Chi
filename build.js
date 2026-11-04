@@ -13,6 +13,7 @@ const cfg = {
   PASS: process.env.APP_PASS,
   API: process.env.APP_API,
   KEY: process.env.APP_KEY,
+  STORE: (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) ? '/api/store' : '', // có Redis thì đồng bộ 3 chiều qua /api/store
   TTL_H: Number(process.env.APP_TTL_HOURS) > 0 ? Number(process.env.APP_TTL_HOURS) : 168 // tùy chọn; mặc định 168 giờ (7 ngày)
 };
 const configJs = 'self.CONFIG = ' + JSON.stringify(cfg, null, 4) + ';\n';

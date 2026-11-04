@@ -1,7 +1,7 @@
 
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
-const V = 'stc-v36';
+const V = 'stc-v37';
 const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -100,12 +100,14 @@ async function toB64(blob) {
   for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
   return btoa(s);
 }
-async function obPost(body) {
+async function obPost(body, direct) {
+  const hub = !direct && CFG.STORE;
   if (!CFG.API) { const x = new Error('Thiếu địa chỉ API'); x.net = true; throw x; }
   let r, j;
-  try { r = await fetch(CFG.API, { method: 'POST', body: JSON.stringify(Object.assign({ key: CFG.KEY || '' }, body)) }); }
+  try { r = await fetch(hub || CFG.API, { method: 'POST', body: JSON.stringify(Object.assign({ key: CFG.KEY || '' }, body)) }); }
   catch (e) { const x = new Error('Không có kết nối mạng'); x.net = true; throw x; }
-  try { j = await r.json(); } catch (e) { const x = new Error('Lỗi máy chủ'); x.net = true; throw x; }
+  try { j = await r.json(); } catch (e) { if (hub) return obPost(body, true); const x = new Error('Lỗi máy chủ'); x.net = true; throw x; }
+  if (hub && j.hubErr) return obPost(body, true);
   if (!j.ok) {
     const x = new Error(j.err || 'Lỗi máy chủ');
     if (/chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i.test(j.err || '')) x.net = true;
@@ -120,7 +122,7 @@ async function obSend(job) {
   if (start < files.length) {
     await Promise.all(files.map(async (f, i) => {
       if (i < start) return;
-      const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }); res[i] = j.url;
+      const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }, true); res[i] = j.url;
     }));
     job.urls = res.filter(Boolean);
     await obPut(job);
