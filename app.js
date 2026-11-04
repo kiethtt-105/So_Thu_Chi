@@ -11,6 +11,9 @@ const EMO=[[/ăn|uống|cafe|cà phê|nhà hàng|thực phẩm|chợ/i,'🍜'],[
 const emo=s=>{for(const [r,e] of EMO)if(r.test(s))return e;return '🏷️'};
 const SID=sessionStorage.sid||(sessionStorage.sid=Math.random().toString(36).slice(2)+Date.now().toString(36));
 const TABS=[['home','Tổng quan','🏠'],['tx','Giao dịch','🧾'],['stat','Thống kê','📊'],['acc','Tài khoản','💳']],MONTHLY=['home','tx','stat'];
+let KICK=false;const TTL=((+(self.CONFIG||{}).TTL_H)>0?+self.CONFIG.TTL_H:168)*3600e3;
+const alive=()=>{let t=0;try{t=+sessionStorage.in||0}catch(e){}return t&&Date.now()-t<TTL};
+let lastTouch=0;const touch=()=>{const n=Date.now();if(n-lastTouch<3e4)return;lastTouch=n;try{sessionStorage.in=n}catch(e){}};
 const S={tx:[],acc:[],cat:[],trash:[],rev:'',ready:false,err:'',m:today().slice(0,7),tab:'home',f:'all',q:'',pg:80};
 /* ---------- tiện ích ---------- */
 const sign=t=>t.type==='Thu'||t.type==='Điều chỉnh'?1:-1,mOf=t=>t.date.slice(0,7);
@@ -30,21 +33,22 @@ async function api(body,ms=30000){const ac=new AbortController(),t=setTimeout(()
  try{r=await fetch(STORE,{method:'POST',credentials:'same-origin',signal:ac.signal,body:JSON.stringify(body)});j=await r.json()}
  catch(e){throw Object.assign(Error(navigator.onLine===false?'Không có kết nối mạng':'Không kết nối được máy chủ'),{net:1})}finally{clearTimeout(t)}
  if(j.auth){lock();throw Object.assign(Error('Phiên đã hết hạn'),{net:1})}
- if(j.sess===false){lock('Phiên bị khóa vì thiết bị khác đăng nhập');throw Object.assign(Error('Phiên bị khóa'),{net:1})}
+ if(j.sess===false){lock('Có thiết bị khác vừa đăng nhập nên phiên này bị khóa. Nhập lại mật khẩu để dùng song song.',true);throw Object.assign(Error('Phiên bị khóa'),{net:1})}
  if(!j.ok)throw Error(j.err||'Lỗi máy chủ');return j}
 function apply(j){if(j.same)return false;['tx','acc','cat','trash'].forEach(k=>S[k]=j[k]||[]);S.rev=j.rev;S.ready=true;try{localStorage.cache2=JSON.stringify({tx:S.tx,acc:S.acc,cat:S.cat})}catch(e){}return true}
 let busy=0;const live=c=>{$('#lv').className='lv '+c};
-async function sync(force){if(busy||(document.hidden&&!force))return;
+async function sync(force){if(busy||$('#app').classList.contains('hide')||(document.hidden&&!force))return;
  try{const j=await api({ops:[],rev:force?'':S.rev,sid:SID});live('ok');S.err='';if(apply(j)||force)render()}catch(e){live('er');if(!S.ready){S.err=e.message;render()}}}
 async function commit(ops,local,msg,undo){const snap={tx:S.tx,acc:S.acc,cat:S.cat};busy++;local&&local();render();
  try{const j=await api({ops,rev:'',fast:ops.every(o=>o.op.startsWith('tx.')),sid:SID});if(j.tx)apply(j);else{busy--;await sync(true);busy++}msg&&toast(msg,undo&&'Hoàn tác',undo);return true}
  catch(e){Object.assign(S,snap);render();toast('Không lưu được: '+e.message);return false}finally{busy--}}
 /* ---------- đăng nhập ---------- */
-function lock(msg){$('#app').classList.add('hide');$('#lg').classList.remove('hide');$('#pw').value='';$('#le').textContent=msg||'';closeSheet()}
+function lock(msg,kicked){KICK=!!kicked;try{sessionStorage.removeItem('in')}catch(e){}$('#app').classList.add('hide');$('#lg').classList.remove('hide');$('#pw').value='';$('#le').textContent=msg||'';closeSheet()}
 $('#lg').onsubmit=async ev=>{ev.preventDefault();const pw=$('#pw').value;if(!pw)return;$('#lb').disabled=true;
  try{const r=await fetch(STORE,{method:'POST',credentials:'same-origin',body:JSON.stringify({login:pw})}),j=await r.json();
-  if(j.ok)boot();else{$('#le').textContent=j.wait?'Thử lại sau '+Math.ceil(j.wait/60)+' phút':(j.err&&j.err!=='Sai mật khẩu'?j.err:'Sai mật khẩu');$('#lg .lgc').classList.remove('shake');void $('#lg').offsetWidth;$('#lg .lgc').classList.add('shake');$('#pw').select()}}
- catch(e){$('#le').textContent='Không kết nối được máy chủ'}$('#lb').disabled=false};
+  if(j.ok){await joinSess();boot()}else{$('#le').textContent=j.wait?'Thử lại sau '+Math.ceil(j.wait/60)+' phút':(j.err&&j.err!=='Sai mật khẩu'?j.err:'Sai mật khẩu');$('#lg .lgc').classList.remove('shake');void $('#lg').offsetWidth;$('#lg .lgc').classList.add('shake');$('#pw').select()}}
+ catch(e){$('#le').textContent=e.message||'Không kết nối được máy chủ'}$('#lb').disabled=false};
+async function joinSess(){const kind=KICK?'join':'login';await api({ops:[{op:'sess.'+kind,sid:SID}],rev:'',sid:SID},15000);KICK=false;lastTouch=0;touch()}
 /* ---------- điều hướng ---------- */
 const tabOk=t=>TABS.some(x=>x[0]===t);
 function go(t){if(!tabOk(t))t='home';S.tab=t;S.pg=80;if(location.hash.slice(1)!==t)location.hash=t;$('#v').scrollTop=0;closeSheet();render()}
@@ -165,4 +169,5 @@ document.addEventListener('visibilitychange',()=>!document.hidden&&sync());addEv
 /* ---------- khởi động ---------- */
 function boot(){$('#lg').classList.add('hide');$('#app').classList.remove('hide');const h=location.hash.slice(1);S.tab=tabOk(h)?h:'home';
  if(!S.ready)try{const c=JSON.parse(localStorage.cache2||'null');if(c){Object.assign(S,c);S.ready=true}}catch(e){}render();sync(true)}
-(async()=>{try{await api({ops:[],rev:'',sid:SID,probe:1});boot()}catch(e){if(e.net&&/mạng|máy chủ/i.test(e.message)){$('#le').textContent=e.message}$('#lg').classList.remove('hide')}})();
+['click','keydown','touchstart'].forEach(t=>document.addEventListener(t,()=>{if(alive())touch()},{passive:true}));
+if(alive())boot();else $('#lg').classList.remove('hide');
