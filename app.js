@@ -1044,7 +1044,12 @@ $('#ov').addEventListener('click', e => {
     if (!b || !E) return;
     const d = new Date(); d.setDate(d.getDate() + +b.dataset.qd);
     E.date = ymd(d); const f = $('#fd'); if (f) f.value = E.date;
+    qdSync();
 });
+function qdSync() {
+    const f = $('#fd'); if (!f) return;
+    $$('.qd3 [data-qd]').forEach(b => { const d = new Date(); d.setDate(d.getDate() + +b.dataset.qd); b.classList.toggle('on', ymd(d) === f.value); });
+}
 function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
 // Ô chọn: màn hình rộng hiện thẻ (chip), màn hình hẹp/dài giữ thanh thả (CSS quyết định, xem .pk trong style.css)
 const pkSel = (id, opts, cur, extra) => `<span class="pk"><select id="${id}">${extra || ''}${opts.map(o => `<option value="${esc(o.v)}" ${o.v === cur ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select><span class="chips fw pkc">${opts.map(o => `<button type="button" class="chip${o.v === cur ? ' on' : ''}" data-pk="${id}" data-v="${esc(o.v)}">${esc(o.t)}</button>`).join('')}</span></span>`;
@@ -1054,15 +1059,16 @@ function form() {
     const accBox = (id, lb, extra) => noAcc
         ? `<div class="w nodata"><span>${S.err ? 'Chưa tải được tài khoản: ' + esc(S.err) : 'Đang tải danh sách tài khoản…'}</span><button type="button" class="chip" data-reload>Tải lại</button></div>`
         : `<label class="w">${lb}${pkSel(id, S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc).map(n => ({ v: n, t: n })), id === 'ft' ? E.accTo : E.acc, extra)}</label>`;
-    $('#sh').innerHTML = `<div id="scanrow"></div><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div>${tplRow()}
-<div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
+    $('#sh').innerHTML = `<div id="scanrow"></div><div class="tfh"><h3>${E.isNew ? 'Thêm giao dịch' : 'Sửa giao dịch'}</h3><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div></div>${tplRow()}
+<div class="tf"><div class="tf-l"><div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
 <div class="qk"><button type="button" class="chip" data-k="000">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div>
 <div class="f">
 <label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label>
-<div class="w qd3"><button type="button" class="chip" data-qd="0">Hôm nay</button><button type="button" class="chip" data-qd="-1">Hôm qua</button><button type="button" class="chip" data-qd="-2">Hôm kia</button></div>
+<div class="w qd3">${[['0', 'Hôm nay'], ['-1', 'Hôm qua'], ['-2', 'Hôm kia']].map(([n, t]) => { const d = new Date(); d.setDate(d.getDate() + +n); return `<button type="button" class="chip${E.date === ymd(d) ? ' on' : ''}" data-qd="${n}">${t}</button>`; }).join('')}</div></div></div>
+<div class="tf-r f">
 ${accBox('fc', ty === 'Chuyển khoản' ? 'Từ tài khoản' : 'Tài khoản')}
 ${ty === 'Chuyển khoản' ? (noAcc ? '' : accBox('ft', 'Đến tài khoản', '<option value="">Chọn…</option>')) : ty === 'Điều chỉnh' ? '' : catFields(ty, E.cat, E.sub)}
-<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="w" id="att"></div></div>
+<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="w" id="att"></div></div></div>
 <div class="sfoot"><button class="btn p w" data-save title="Ctrl + Enter">${E.isNew ? 'Lưu giao dịch' : 'Lưu thay đổi'}</button>
 <div class="sec2"><button type="button" class="btn" data-tplsave>☆ Lưu mẫu</button>${E.isNew ? '' : '<button type="button" class="btn" data-dup>⧉ Nhân đôi</button><button type="button" class="btn d" data-del>🗑 Xóa</button>'}</div></div>`;
     renderAtt();
@@ -1118,6 +1124,7 @@ $('#ov').addEventListener('click', e => {
 });
 $('#ov').addEventListener('input', e => {
     const t = e.target, b = t.tagName === 'SELECT' && t.nextElementSibling;
+    if (t.id === 'fd') qdSync();
     if (b && b.classList.contains('pkc'))
         b.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.v === t.value));
 });
