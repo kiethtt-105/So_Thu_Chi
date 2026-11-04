@@ -1042,12 +1042,14 @@ $('#ov').addEventListener('click', e => {
     E.date = ymd(d); const f = $('#fd'); if (f) f.value = E.date;
 });
 function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
+// Ô chọn: màn hình rộng hiện thẻ (chip), màn hình hẹp/dài giữ thanh thả (CSS quyết định, xem .pk trong style.css)
+const pkSel = (id, opts, cur, extra) => `<span class="pk"><select id="${id}">${extra || ''}${opts.map(o => `<option value="${esc(o.v)}" ${o.v === cur ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select><span class="chips fw pkc">${opts.map(o => `<button type="button" class="chip${o.v === cur ? ' on' : ''}" data-pk="${id}" data-v="${esc(o.v)}">${esc(o.t)}</button>`).join('')}</span></span>`;
 function form() {
     const ty = E.type, op = (a, v) => a.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join(''), noAcc = !S.acc.length;
 
     const accBox = (id, lb, extra) => noAcc
         ? `<div class="w nodata"><span>${S.err ? 'Chưa tải được tài khoản: ' + esc(S.err) : 'Đang tải danh sách tài khoản…'}</span><button type="button" class="chip" data-reload>Tải lại</button></div>`
-        : `<label class="w">${lb}<select id="${id}">${extra || ''}${op(S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc), id === 'ft' ? E.accTo : E.acc)}</select></label>`;
+        : `<label class="w">${lb}${pkSel(id, S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc).map(n => ({ v: n, t: n })), id === 'ft' ? E.accTo : E.acc, extra)}</label>`;
     $('#sh').innerHTML = `<div id="scanrow"></div><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div>${tplRow()}
 <div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
 <div class="qk"><button type="button" class="chip" data-k="000">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div>
@@ -1083,7 +1085,7 @@ function ed(kind, o, idx) {
     E = null;
     const F = { tk: [['name', 'Tên tài khoản', 'text', o.name], ['type', 'Loại', 'select', o.type || ACC_TYPES[0], ACC_TYPES], ['open', 'Số dư ban đầu', 'money', o.open ? num(o.open) : '']],
         dm: [['t', 'Loại', 'select', o.t || 'Chi', ['Chi', 'Thu']], ['p', 'Hạng mục cha', 'text', o.p, L], ['c', 'Chi tiết', 'text', o.c]] }[kind];
-    $('#sh').innerHTML = `<h3>${isN ? 'Thêm' : 'Sửa'} ${{ tk: 'tài khoản', dm: 'hạng mục' }[kind]}</h3><div class="f">${F.map(([id, lb, ty, v, ls]) => `<label class="${id === 'name' || id === 'c' ? 'w' : ''}">${lb}${ty === 'select' ? `<select id="e_${id}">${ls.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>` : ty === 'money' ? `<input id="e_${id}" class="money" data-neg="1" inputmode="text" value="${esc(v)}" placeholder="0">` : `<input id="e_${id}" type="text" value="${esc(v ?? '')}" ${ls ? `list="dl_${id}"` : ''}>${ls ? `<datalist id="dl_${id}">${ls.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}`}</label>`).join('')}${kind === 'tk' ? `<div class="w"><span class="l" style="font-size:12px;color:var(--mut)">Biểu tượng (chỉ lưu trên máy này)</span><div class="cg" style="margin-top:6px"><button type="button" class="chip ${AI[o.name] ? '' : 'on'}" data-ico="">Tự động</button>${EM.map(e => `<button type="button" class="chip ${AI[o.name] === e ? 'on' : ''}" data-ico="${e}">${e}</button>`).join('')}</div></div>` : ''}</div><button class="btn p w" data-esave>Lưu</button>${kind === 'tk' && !isN ? '<button class="btn w" data-viewacc>Xem giao dịch của tài khoản này</button>' : ''}${isN ? '' : '<button class="btn d w" data-edel style="margin-top:2px">Chuyển vào Thùng rác</button>'}`;
+    $('#sh').innerHTML = `<h3>${isN ? 'Thêm' : 'Sửa'} ${{ tk: 'tài khoản', dm: 'hạng mục' }[kind]}</h3><div class="f">${F.map(([id, lb, ty, v, ls]) => `<label class="${id === 'name' || id === 'c' ? 'w' : ''}">${lb}${ty === 'select' ? (ls.length <= 6 ? pkSel('e_' + id, ls.map(x => ({ v: x, t: x })), v) : `<select id="e_${id}">${ls.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`) : ty === 'money' ? `<input id="e_${id}" class="money" data-neg="1" inputmode="text" value="${esc(v)}" placeholder="0">` : `<input id="e_${id}" type="text" value="${esc(v ?? '')}" ${ls ? `list="dl_${id}"` : ''}>${ls ? `<datalist id="dl_${id}">${ls.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}`}</label>`).join('')}${kind === 'tk' ? `<div class="w"><span class="l" style="font-size:12px;color:var(--mut)">Biểu tượng (chỉ lưu trên máy này)</span><div class="cg" style="margin-top:6px"><button type="button" class="chip ${AI[o.name] ? '' : 'on'}" data-ico="">Tự động</button>${EM.map(e => `<button type="button" class="chip ${AI[o.name] === e ? 'on' : ''}" data-ico="${e}">${e}</button>`).join('')}</div></div>` : ''}</div><button class="btn p w" data-esave>Lưu</button>${kind === 'tk' && !isN ? '<button class="btn w" data-viewacc>Xem giao dịch của tài khoản này</button>' : ''}${isN ? '' : '<button class="btn d w" data-edel style="margin-top:2px">Chuyển vào Thùng rác</button>'}`;
     openSheet();
 }
 $('#ov').addEventListener('input', e => {
@@ -1099,6 +1101,21 @@ $('#ov').addEventListener('input', e => {
         }
         else E.acc = t.value;
     }
+});
+$('#ov').addEventListener('click', e => {
+    const b = e.target.closest('[data-pk]');
+    if (!b) return;
+    const s = document.getElementById(b.dataset.pk);
+    if (!s) return;
+    s.value = b.dataset.v;
+    b.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+});
+$('#ov').addEventListener('input', e => {
+    const t = e.target, b = t.tagName === 'SELECT' && t.nextElementSibling;
+    if (b && b.classList.contains('pkc'))
+        b.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.v === t.value));
 });
 function cbOpen(inp, filter) {
     if (!E) return;
@@ -2881,11 +2898,11 @@ document.addEventListener('click', e => {
         RC = { i, r }; ED = null; E = null;
         const cats = S.cat.map((c, k) => ({ ...c, k })).filter(c => c.t === r.type), sel = cats.find(c => c.p === r.cat && c.c === r.sub);
         $('#sh').innerHTML = `<h3>${i == null ? 'Thêm' : 'Sửa'} giao dịch định kỳ</h3><div class="f"><label class="w">Tên<input id="rc_name" value="${esc(r.name)}" placeholder="Ví dụ: Tiền nhà"></label>
-<label>Loại<select id="rc_type">${['Chi', 'Thu'].map(x => `<option ${x === r.type ? 'selected' : ''}>${x}</option>`).join('')}</select></label><label>Số tiền<input class="money" id="rc_amt" inputmode="numeric" value="${r.amount ? num(r.amount) : ''}" placeholder="0"></label>
-<label class="w">Tài khoản<select id="rc_acc">${S.acc.map(a => `<option ${a.name === r.acc ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label>
+<label>Loại${pkSel('rc_type', ['Chi', 'Thu'].map(x => ({ v: x, t: x })), r.type)}</label><label>Số tiền<input class="money" id="rc_amt" inputmode="numeric" value="${r.amount ? num(r.amount) : ''}" placeholder="0"></label>
+<label class="w">Tài khoản${pkSel('rc_acc', S.acc.map(a => ({ v: a.name, t: a.name })), r.acc)}</label>
 <label class="w">Hạng mục<select id="rc_cat"><option value="">Chọn…</option>${cats.map(c => `<option value="${c.k}" ${sel && sel.k === c.k ? 'selected' : ''}>${esc(c.p)} › ${esc(c.c)}</option>`).join('')}</select></label>
-<label>Lặp lại<select id="rc_freq"><option value="m" ${r.freq === 'm' ? 'selected' : ''}>Hằng tháng</option><option value="w" ${r.freq === 'w' ? 'selected' : ''}>Hằng tuần</option></select></label>
-<label>${r.freq === 'm' ? 'Ngày trong tháng' : 'Thứ'}${r.freq === 'm' ? `<input id="rc_day" type="number" min="1" max="31" value="${r.day}">` : `<select id="rc_day">${DAYS.map((d, k) => `<option value="${k}" ${k === +r.day ? 'selected' : ''}>${d}</option>`).join('')}</select>`}</label>
+<label>Lặp lại${pkSel('rc_freq', [{ v: 'm', t: 'Hằng tháng' }, { v: 'w', t: 'Hằng tuần' }], r.freq)}</label>
+<label>${r.freq === 'm' ? 'Ngày trong tháng' : 'Thứ'}${r.freq === 'm' ? `<input id="rc_day" type="number" min="1" max="31" value="${r.day}">` : pkSel('rc_day', DAYS.map((d, k) => ({ v: String(k), t: d })), String(+r.day))}</label>
 <label class="w">Bắt đầu từ<input type="date" id="rc_start" value="${esc(r.start)}"></label></div><p class="hint">Ngày 29–31 sẽ tự lùi về ngày cuối tháng với tháng ngắn hơn.</p>
 <button class="btn p w" data-rcsave>Lưu</button>${i == null ? '' : '<button class="btn d w" data-rcdel style="margin-top:6px">Xóa quy tắc</button>'}`;
         openSheet();
@@ -2923,7 +2940,7 @@ ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu
         const d = i == null ? { who: '', dir: 'owe', amount: 0, due: '', note: '' } : XD.debt[i];
         DB = { i }; ED = null; E = null;
         $('#sh').innerHTML = `<h3>${i == null ? 'Thêm khoản nợ' : 'Sửa khoản nợ'}</h3><div class="f"><label class="w">Người liên quan<input id="db_who" value="${esc(d.who)}" placeholder="Tên người"></label>
-<label class="w">Loại<select id="db_dir"><option value="owe" ${d.dir === 'owe' ? 'selected' : ''}>Mình nợ người khác</option><option value="lent" ${d.dir === 'lent' ? 'selected' : ''}>Người khác nợ mình</option></select></label>
+<label class="w">Loại${pkSel('db_dir', [{ v: 'owe', t: 'Mình nợ người khác' }, { v: 'lent', t: 'Người khác nợ mình' }], d.dir)}</label>
 <label>Số tiền<input class="money" id="db_amt" inputmode="numeric" value="${d.amount ? num(d.amount) : ''}" placeholder="0"></label><label>Hạn trả, không bắt buộc<input type="date" id="db_due" value="${esc(d.due || '')}"></label>
 <label class="w">Ghi chú<input id="db_note" value="${esc(d.note || '')}" placeholder="Không bắt buộc"></label></div><button class="btn p w" data-dbsave>Lưu</button>${i == null ? '' : '<button class="btn d w" data-dbdel style="margin-top:6px">Xóa khoản này</button>'}`;
         openSheet();

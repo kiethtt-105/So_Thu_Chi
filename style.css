@@ -738,3 +738,13 @@ body:has(#ofl.on) #pg{bottom:42px}
 @keyframes syp{50%{opacity:.35}}
 .row.syn .dot{opacity:.75}
 @media print{#pg{display:none!important}}
+
+/* ===== Ô chọn: rộng = thẻ, hẹp/dài = thanh thả ===== */
+.pk{display:block}
+.pk>.pkc{display:none;margin-top:6px;gap:8px}
+.pk .chip{min-height:40px;padding:0 16px;font-weight:600}
+.pk .chip:not(.on){color:var(--ink)}
+.pk .chip:not(.on):hover{border-color:var(--acc);color:var(--acc)}
+@media(min-width:700px){.pk>select{display:none}.pk>.pkc{display:flex}}
+.sheet select{-webkit-appearance:none;appearance:none;cursor:pointer;padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a90b5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px}
+.sheet select option{background:var(--card);color:var(--ink)}
