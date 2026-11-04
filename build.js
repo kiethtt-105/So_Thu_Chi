@@ -1,6 +1,7 @@
 const fs = require('fs'), path = require('path');
 const ROOT = __dirname, OUT = path.join(ROOT, 'public');
 
+// Các biến này chỉ dùng ở SERVER (api/store.js, api/_auth.js). Build chỉ kiểm tra có đủ, KHÔNG ghi vào file công khai.
 const REQUIRED = ['APP_PASS', 'APP_API', 'APP_KEY'];
 const missing = REQUIRED.filter(k => !process.env[k]);
 if (missing.length) {
@@ -8,13 +9,11 @@ if (missing.length) {
   process.exit(1);
 }
 
+// config.js là file CÔNG KHAI: chỉ để thông tin không nhạy cảm.
 const cfg = {
   NAME: process.env.APP_NAME || '',
-  PASS: process.env.APP_PASS,
-  API: process.env.APP_API,
-  KEY: process.env.APP_KEY,
-  STORE: (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) ? '/api/store' : '', // có Redis thì đồng bộ 3 chiều qua /api/store
-  TTL_H: Number(process.env.APP_TTL_HOURS) > 0 ? Number(process.env.APP_TTL_HOURS) : 168 // tùy chọn; mặc định 168 giờ (7 ngày)
+  STORE: '/api/store',
+  TTL_H: Number(process.env.APP_TTL_HOURS) > 0 ? Number(process.env.APP_TTL_HOURS) : 168
 };
 const configJs = 'self.CONFIG = ' + JSON.stringify(cfg, null, 4) + ';\n';
 
@@ -28,4 +27,4 @@ for (const f of ['index.html', 'style.css', 'app.js', 'sw.js', 'manifest.webmani
 if (fs.existsSync(path.join(ROOT, 'icons'))) fs.cpSync(path.join(ROOT, 'icons'), path.join(OUT, 'icons'), { recursive: true });
 else console.warn('Cảnh báo: không thấy thư mục icons, bỏ qua');
 fs.writeFileSync(path.join(OUT, 'config.js'), configJs);
-console.log('Xong: đã tạo public/ (gồm config.js)');
+console.log('Xong: đã tạo public/ (config.js không chứa mật khẩu/KEY)');

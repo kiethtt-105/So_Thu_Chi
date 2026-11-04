@@ -1,7 +1,7 @@
 
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
-const V = 'stc-v37';
+const V = 'stc-v38';
 const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -100,14 +100,14 @@ async function toB64(blob) {
   for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
   return btoa(s);
 }
-async function obPost(body, direct) {
-  const hub = !direct && CFG.STORE;
-  if (!CFG.API) { const x = new Error('Thiếu địa chỉ API'); x.net = true; throw x; }
+async function obPost(body) {
+  if (!CFG.STORE) { const x = new Error('Thiếu cấu hình máy chủ'); x.net = true; throw x; }
   let r, j;
-  try { r = await fetch(hub || CFG.API, { method: 'POST', body: JSON.stringify(Object.assign({ key: CFG.KEY || '' }, body)) }); }
+  try { r = await fetch(CFG.STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify(body) }); }
   catch (e) { const x = new Error('Không có kết nối mạng'); x.net = true; throw x; }
-  try { j = await r.json(); } catch (e) { if (hub) return obPost(body, true); const x = new Error('Lỗi máy chủ'); x.net = true; throw x; }
-  if (hub && j.hubErr) return obPost(body, true);
+  try { j = await r.json(); } catch (e) { const x = new Error('Lỗi máy chủ'); x.net = true; throw x; }
+  // Chưa đăng nhập / hết phiên / máy chủ lỗi: KHÔNG bỏ thay đổi, giữ lại và gửi sau khi đăng nhập lại
+  if (j.auth || j.hubErr) { const x = new Error(j.err || 'Chưa đăng nhập hoặc máy chủ lỗi'); x.net = true; throw x; }
   if (!j.ok) {
     const x = new Error(j.err || 'Lỗi máy chủ');
     if (/chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i.test(j.err || '')) x.net = true;
@@ -122,7 +122,7 @@ async function obSend(job) {
   if (start < files.length) {
     await Promise.all(files.map(async (f, i) => {
       if (i < start) return;
-      const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }, true); res[i] = j.url;
+      const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }); res[i] = j.url;
     }));
     job.urls = res.filter(Boolean);
     await obPut(job);
@@ -151,8 +151,11 @@ async function obRun() {
       const t = setInterval(() => obBeat(job.id), 3000);
       try { await obSend(job); await obDel(job.id); sent++; }
       catch (err) {
-        // Không bao giờ bỏ thay đổi: giữ trong hàng đợi và để trình duyệt thử lại sau
-        clearInterval(t); await obUnbeat(job.id); throw err;
+        clearInterval(t); await obUnbeat(job.id);
+        if (err.net) throw err;                 // lỗi mạng / chưa đăng nhập: giữ trong hàng đợi, thử lại sau
+        await obDel(job.id);                    // máy chủ từ chối thật: bỏ việc này để không chặn các việc sau
+        obNote('Một thay đổi bị máy chủ từ chối: ' + err.message);
+        continue;
       }
       clearInterval(t);
       await obUnbeat(job.id);

@@ -1,14 +1,16 @@
 /* =====================================================================
  * SỔ THU CHI — TOÀN BỘ CODE TRONG 1 FILE (.gs). Không cần file HTML.
- * Đã làm: ép dấu phân cách công thức = ";" · menu có "Nâng cao" · bỏ thanh bên (Sidebar).
+ * v22: tuSua nhẹ (bỏ qua nếu Sheet không đổi, tryLock 3s) · lô nhanh không tính lại toàn sổ
+ *      · saveAcc/saveCat idempotent · bắt buộc KEY · TongQuan loại "Giữ Hộ"
+ *      · "1.5" báo lỗi thay vì làm tròn · thùng rác 1000 mục · năm bất thường = lỗi đỏ
  * ===================================================================== */
 
 /* ===== 00_Config — hằng số cấu hình ===== */
-const VER = 'v21';
+const VER = 'v22';
 const FALLBACK_SHEET_ID = '10yJGQB7IalkqKE8b1nYu2YG78DOURNTtss7sPRbwmKE';
 const TAB = { tx: 'GiaoDich', acc: 'TaiKhoan', cat: 'DanhMuc', lim: 'HanMuc', del: 'DaXoa', fx: '_CongThuc' };
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'];
-const ACC_TYPES = ['Tiền mặt', 'Ngân hàng', 'Thẻ tín dụng', 'Ví điện tử', 'Tiết kiệm', 'Giữ Hộ'];   // "Giữ Hộ": tiền giữ hộ người khác, web không tính vào báo cáo
+const ACC_TYPES = ['Tiền mặt', 'Ngân hàng', 'Thẻ tín dụng', 'Ví điện tử', 'Tiết kiệm', 'Giữ Hộ'];   // "Giữ Hộ": tiền giữ hộ người khác, không tính vào tổng số dư ở TongQuan
 const PERIODS = ['Ngày', 'Tháng'];
 // Dung lượng khớp với bảng tính: TaiKhoan dòng 2–21 (20 TK, dòng 22 = TỔNG), DanhMuc dòng 2–101 (100 hạng mục con), HanMuc dòng 2–201
 const MAX_ACC = 20, MAX_CAT = 100, MAX_LIM = 200;
@@ -22,6 +24,7 @@ const IMG_RE = /https:\/\/drive\.google\.com\/file\/d\/[\w-]+\/view\S*/g;
 const DRIVE_FOLDER_ID = '1Xj-nZA81dGuFGnDY5YXen_bK8w3zQm3G';
 const IMG_MAX_B64 = 14e6;                       // ~10 MB sau khi giải mã
 const BACKUP_KEEP = 14;
+const TRASH_SHOW = 1000;                        // số mục thùng rác web nhìn thấy
 
 // Vùng cột công thức script giữ cho đúng (công thức mẫu lấy từ tab _CongThuc).
 const ZONES = [
@@ -107,8 +110,11 @@ function parseNum(v) {
   else if (!/^-?\d+$/.test(s)) return null;
   const n = Number(s); return isFinite(n) ? snap_(n) : null;
 }
-// TIỀN (VND) LUÔN LÀ SỐ NGUYÊN
-function parseMoney_(v) { const n = parseNum(v); return n === null ? null : Math.round(n) + 0; }
+// TIỀN (VND) LUÔN LÀ SỐ NGUYÊN. Chuỗi kiểu "1.5" / "2,5" là mơ hồ → trả null để báo lỗi (không âm thầm làm tròn).
+function parseMoney_(v) {
+  if (typeof v === 'string' && /^-?\d+[.,]\d{1,2}$/.test(v.replace(/[₫đ\s]/gi, ''))) return null;
+  const n = parseNum(v); return n === null ? null : Math.round(n) + 0;
+}
 
 function parseDate(v) {
   if (v instanceof Date) return isNaN(v) ? null : v;
@@ -136,7 +142,7 @@ function doPost(e) {
   try {
     const d = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const K = PropertiesService.getScriptProperties().getProperty('KEY');
-    if (K && d.key !== K) throw new Error('Không có quyền truy cập');
+    if (!K || d.key !== K) throw new Error('Không có quyền truy cập');   // KEY bắt buộc: phải đặt trong Script Properties và trùng APP_KEY trên Vercel
     if (d.img) return out(uploadImage(d.img));
     let ops = Array.isArray(d.ops) ? d.ops : [];
     const sid = typeof d.sid === 'string' ? d.sid.slice(0, 64) : '';
@@ -150,14 +156,19 @@ function doPost(e) {
   } catch (err) { return out({ ok: false, err: err.message || String(err) }); }
 }
 
-/* HÀM 1 — ĐỒNG BỘ 2 CHIỀU */
+/* HÀM 1 — ĐỒNG BỘ 2 CHIỀU
+ * fast = true: chỉ ghi dữ liệu. Sắp xếp + cột "Số dư cuối" + cột "Tháng" để trigger tuSua (10 phút) làm. */
 let _ctx = null;
 function dongBo(ops, clientRev, fast) {
   ops = Array.isArray(ops) ? ops : [];
   const cache = CacheService.getScriptCache();
   if (ops.length) {
     const lock = LockService.getScriptLock(); lock.waitLock(25000);
-    try { _ctx = null; ops = pinIds_(ops); ops.forEach(applyOp); safe(sapXepGiaoDich_, null); safe(capNhatSoDuCuoi_, null); safe(capNhatThang_, null); SpreadsheetApp.flush(); }
+    try {
+      _ctx = null; ops = pinIds_(ops); ops.forEach(applyOp);
+      if (!fast) { safe(sapXepGiaoDich_, null); safe(capNhatSoDuCuoi_, null); safe(capNhatThang_, null); }
+      SpreadsheetApp.flush();
+    }
     finally { cache.remove('rev'); lock.releaseLock(); }
   }
   if (fast && ops.length) return { ok: true, fast: true };
@@ -286,8 +297,8 @@ function txProblems(r, ctx) {
   const pd_ = parseDate(r.date);
   if (!pd_) L.push(P(2, 'err', 'Ngày không hợp lệ'));
   else { const y_ = +day(pd_).slice(0, 4), ny_ = +day(new Date()).slice(0, 4);
-    if (y_ < 2000 || y_ > ny_ + 5) L.push(P(2, 'warn', 'Năm ' + y_ + ' bất thường (nên trong 2000–' + (ny_ + 5) + ')')); }
-  if (amt === null) L.push(P(4, 'err', 'Số tiền phải là số'));
+    if (y_ < 2000 || y_ > ny_ + 5) L.push(P(2, 'err', 'Năm ' + y_ + ' bất thường (phải trong 2000–' + (ny_ + 5) + ')')); }
+  if (amt === null) L.push(P(4, 'err', 'Số tiền phải là số nguyên (không dùng dấu thập phân)'));
   else if (type === 'Điều chỉnh' ? amt === 0 : amt <= 0) L.push(P(4, 'err', type === 'Điều chỉnh' ? 'Số tiền điều chỉnh phải khác 0' : 'Số tiền phải lớn hơn 0'));
   if (!r.acc) L.push(P(5, 'warn', 'Thiếu tài khoản'));
   else if (!ctx.acc.has(r.acc)) L.push(P(5, 'warn', 'Tài khoản "' + r.acc + '" không có trong tab TaiKhoan'));
@@ -376,7 +387,7 @@ function nextTxRow(g) {
 function saveTx(r) {
   const sp = splitImg_(r.note), o = { id: str(r.id), date: r.date, type: fixType(r.type) || str(r.type), amount: r.amount, acc: str(r.acc), accTo: str(r.accTo), cat: str(r.cat), sub: str(r.sub), note: sp.text };
   if (o.type === 'Chuyển khoản') o.cat = o.sub = ''; else if (o.type === 'Điều chỉnh') o.cat = o.sub = o.accTo = ''; else o.accTo = '';
-  const P_ = txProblems(o, getCtx()); if (P_.length) throw new Error(P_[0].msg);
+  const E_ = txProblems(o, getCtx()).filter(p => p.lv === 'err'); if (E_.length) throw new Error(E_[0].msg);   // chỉ lỗi ĐỎ mới chặn lưu
   const g = need(TAB.tx), c = txCols_(); let row = findRow(o.id);
   if (!o.id || o.id[0] === '@') o.id = newId();
   const rec = { id: o.id, date: parseDate(o.date), type: o.type, amount: parseMoney_(o.amount), acc: o.acc, accTo: o.accTo, cat: o.cat, sub: o.sub, note: o.note };
@@ -388,10 +399,20 @@ function saveTx(r) {
   } else {
     row = nextTxRow(g); rec.at = at || new Date();
     putRow_(g, row, rec);
+    safe(() => unarchiveGd_(o.id), null);
   }
   clearFlags(g, row, c.lc);
   setImgs_(g, row, sp.imgs);
 }
+/* Giao dịch được thêm lại (hoàn tác xóa): đánh dấu bản trong DaXoa là đã khôi phục. */
+function unarchiveGd_(id) {
+  const s = opt(TAB.del); if (!s || s.getLastRow() < 2) return;
+  const V = s.getRange(2, 1, s.getLastRow() - 1, 12).getValues();
+  for (let i = V.length - 1; i >= 0; i--) {
+    if (V[i][10] === 'gd' && V[i][11] === '' && str(V[i][0]) === str(id)) { s.getRange(i + 2, 12).setValue(nowStr()); break; }
+  }
+}
+
 /* Xóa dòng an toàn: gỡ bộ lọc, xóa, dựng lại bộ lọc cũ. */
 function deleteRowSafe_(g, row) {
   if (g.getMaxRows() - g.getFrozenRows() <= 1) g.insertRowsAfter(g.getMaxRows(), 1);
@@ -461,8 +482,9 @@ function saveAcc(a, old) {
   if (!name) throw new Error('Thiếu tên tài khoản');
   if (type && !ACC_TYPES.includes(type)) throw new Error('Loại tài khoản phải là: ' + ACC_TYPES.join(', '));
   const open = a.open === '' || a.open == null ? 0 : parseMoney_(a.open);
-  if (open === null) throw new Error('Số dư ban đầu phải là số');
+  if (open === null) throw new Error('Số dư ban đầu phải là số nguyên');
   const s = need(TAB.acc), V = block(s, MAX_ACC, 3), i = V.findIndex(v => str(v[0]) === (old || name)), dup = V.findIndex(v => str(v[0]) === name);
+  if (!old && i >= 0 && str(V[i][1]) === type && (parseMoney_(V[i][2]) || 0) === open) return;   // lô gửi lại y hệt → bỏ qua, không kẹt hàng đợi
   if (!old && i >= 0) throw new Error('Tài khoản "' + name + '" đã tồn tại');
   if (old && i < 0) throw new Error('Không tìm thấy tài khoản "' + old + '"');
   if (old && name !== old && dup >= 0) throw new Error('Tên "' + name + '" đã được dùng');
@@ -483,6 +505,7 @@ function saveCat(c, old) {
   if (!p || !n) throw new Error('Thiếu hạng mục cha hoặc hạng mục con');
   const s = need(TAB.cat), V = block(s, MAX_CAT, 3), same = (v, x) => str(v[0]) === x.t && str(v[1]) === x.p && str(v[2]) === x.c;
   const i = old ? V.findIndex(v => same(v, old)) : -1;
+  if (!old && V.some(v => same(v, { t, p, c: n }))) return;   // đã có đúng hạng mục này (gửi lại) → bỏ qua
   if (old && i < 0) throw new Error('Không tìm thấy hạng mục cần sửa');
   if (V.some((v, k) => k !== i && str(v[0]) === t && str(v[2]) === n)) throw new Error('Đã có hạng mục con "' + n + '" (mỗi hạng mục con phải có tên riêng)');
   if (old && old.t !== t && usesCat(old.t, old.p, old.c)) throw new Error('Hạng mục đang có giao dịch, không đổi loại Chi/Thu được');
@@ -588,14 +611,17 @@ function arch(a, kind, at) {
 }
 function readTrash() {
   const s = opt(TAB.del); if (!s || s.getLastRow() < 2) return [];
-  return s.getDataRange().getValues().slice(1).filter(r => r[9] && r[11] === '').slice(-300).reverse()
+  return s.getDataRange().getValues().slice(1).filter(r => r[9] && r[11] === '').slice(-TRASH_SHOW).reverse()
     .map(r => ({ at: String(r[9]), k: r[10], id: String(r[0]), date: r[1] instanceof Date ? day(r[1]) : str(r[1]).slice(0, 10), type: r[2], amount: parseMoney_(r[3]) || 0, acc: r[4], accTo: r[5], cat: r[6], sub: r[7], note: r[8] }));
 }
 /* Khôi phục. Giao dịch chỉ được khôi phục khi tài khoản của nó còn tồn tại. */
 function restore(at, kind, id) {
   const d = dx(), v = d.getDataRange().getValues(), want = str(id);
   const i = v.findIndex((r, k) => k > 0 && String(r[9]) === at && r[10] === kind && r[11] === '' && (!want || str(r[0]) === want));
-  if (i < 0) throw new Error('Không tìm thấy mục đã xóa');
+  if (i < 0) {
+    if (v.some((r, k) => k > 0 && String(r[9]) === at && r[10] === kind && r[11] !== '' && (!want || str(r[0]) === want))) return;   // đã khôi phục rồi
+    throw new Error('Không tìm thấy mục đã xóa');
+  }
   const r = v[i];
   if (kind === 'gd') {
     const g = need(TAB.tx), rid = str(r[0]), a9 = r.slice(0, 9), sp = splitImg_(r[8]);
@@ -691,7 +717,7 @@ function fxBaselineBad_() {
 /* Xóa / chèn / sắp xếp dòng, đổi cột trong Gsheet KHÔNG bắn onEdit → dùng onChange */
 function onChangeInstalled(e) {
   try { CacheService.getScriptCache().remove('rev'); } catch (x) {}
-  if (e && e.changeType === 'EDIT') return;
+  if (e && (e.changeType === 'EDIT' || e.changeType === 'FORMAT' || e.changeType === 'OTHER')) return;
   const lock = LockService.getScriptLock(); if (!lock.tryLock(8000)) return;
   try { safe(capNhatTuDong_, null); } finally { lock.releaseLock(); }
 }
@@ -769,7 +795,16 @@ function suaGsheet(silent) {
     return { ok: true, text: L.join('\n') };
   } finally { lock.releaseLock(); }
 }
-function tuSua() { suaGsheet(true); }   // trigger 10 phút
+
+/* Trigger 10 phút: NHẸ. Bỏ qua nếu bảng tính không đổi từ lần chạy trước; chỉ chờ khóa tối đa 3 giây để không chặn web. */
+function tuSua() {
+  const PR = PropertiesService.getScriptProperties();
+  const upd = DriveApp.getFileById(ss().getId()).getLastUpdated().getTime();
+  if (upd <= +(PR.getProperty('TUSUA_AT') || 0)) return;
+  const lock = LockService.getScriptLock(); if (!lock.tryLock(3000)) return;
+  try { capNhatTuDong_(); PR.setProperty('TUSUA_AT', String(Date.now())); }
+  finally { lock.releaseLock(); }
+}
 
 function installTriggers() {
   const mine = ['onEditInstalled', 'onChangeInstalled', 'onOpenInstalled', 'tuSua', 'tuDongCapNhat', 'heal', 'tuSuaGsheet', 'saoLuuTuDong'];
@@ -915,7 +950,8 @@ function datTongQuan_() {
   setF_(s.getRange('B6:B7'), [['=DATE($B$3,$B$4,1)'], ['=DATE($B$3,$B$4+1,1)']]);
   setF_(s.getRange('E9'), [['="THU - CHI THEO THÁNG NĂM "&$B$3']]);
   setF_(s.getRange('B10:B16'), [
-    ['=TaiKhoan!$I$22'], ['=' + sum('Thu', '$B$6', '$B$7')], ['=' + sum('Chi', '$B$6', '$B$7')],
+    ['=SUMIF(TaiKhoan!$B$2:$B$21,"<>Giữ Hộ",TaiKhoan!$I$2:$I$21)'],   // tổng số dư, loại tài khoản "Giữ Hộ"
+    ['=' + sum('Thu', '$B$6', '$B$7')], ['=' + sum('Chi', '$B$6', '$B$7')],
     ['=B11-B12'], ['=IF(B11=0,0,B13/B11)'], ['=' + sum('Điều chỉnh', '$B$6', '$B$7')], ['=COUNTIFS(' + W + ')']
   ]);
   // Cột phụ K:O (dòng 2..60)
@@ -1247,7 +1283,7 @@ const VALIDATION = [
   { sheet: 'tx', max: 0, rules: [
     { col: 'date', fmt: 'yyyy-mm-dd', check: { type: 'date' }, help: 'Nhập ngày hợp lệ, vd 2026-10-10' },
     { col: 'type', check: { type: 'list', values: TYPES }, help: 'Chọn: ' + TYPES.join(' / ') },
-    { col: 'amount', fmt: '#,##0', check: { type: 'between', min: -1e13, max: 1e13 }, help: 'Chỉ nhập số NGUYÊN (đồng). Số lẻ sẽ tự làm tròn. Thu/Chi/Chuyển khoản > 0; Điều chỉnh có thể âm' },
+    { col: 'amount', fmt: '#,##0', check: { type: 'between', min: -1e13, max: 1e13 }, help: 'Chỉ nhập số NGUYÊN (đồng). Thu/Chi/Chuyển khoản > 0; Điều chỉnh có thể âm' },
     { col: ['acc', 'accTo'], check: { type: 'range', sheet: 'acc', a1: 'A2:A' + ACC_LAST_ }, help: 'Chọn tài khoản có trong tab TaiKhoan' },
     { col: 'cat', check: { type: 'range', sheet: 'cat', a1: 'B2:B' + CAT_LAST_ }, help: 'Chọn hạng mục cha có trong tab DanhMuc' },
     { col: 'sub', check: { type: 'range', sheet: 'cat', a1: 'C2:C' + CAT_LAST_ }, help: 'Chọn hạng mục con có trong tab DanhMuc (phải thuộc đúng hạng mục cha)' },

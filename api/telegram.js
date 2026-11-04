@@ -1,9 +1,14 @@
+const auth = require('./_auth');
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, err: 'Method not allowed' });
-  const { TG_TOKEN, TG_CHAT_ID, APP_KEY } = process.env;
+  const { TG_TOKEN, TG_CHAT_ID } = process.env;
   if (!TG_TOKEN || !TG_CHAT_ID) return res.status(500).json({ ok: false, err: 'Thiếu TG_TOKEN hoặc TG_CHAT_ID trên Vercel' });
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  if (!APP_KEY || body.key !== APP_KEY) return res.status(401).json({ ok: false, err: 'Sai key' });
+  const sfs = req.headers['sec-fetch-site'];
+  if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });   // chặn gọi từ trang web khác
+  if (!auth.ok(req)) return res.status(401).json({ ok: false, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });        // cookie đăng nhập, không còn dùng key
+  let body = {};
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) { return res.status(400).json({ ok: false, err: 'Dữ liệu không hợp lệ' }); }
   const text = String(body.text || '').slice(0, 4000);
   if (!text) return res.status(400).json({ ok: false, err: 'Thiếu nội dung' });
   try {

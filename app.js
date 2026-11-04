@@ -1,5 +1,5 @@
 
-const { PASS, API, NAME, TTL_H, STORE } = window.CONFIG || {}, POLL_MS = 10000, TTL = (+TTL_H > 0 ? +TTL_H : 168) * 3600e3; // hạn phiên (giờ) lấy từ biến Vercel APP_TTL_HOURS, mặc định 168h = 7 ngày
+const { NAME, TTL_H, STORE } = window.CONFIG || {}, POLL_MS = 10000, TTL = (+TTL_H > 0 ? +TTL_H : 168) * 3600e3; // hạn phiên (giờ) lấy từ biến Vercel APP_TTL_HOURS, mặc định 168h = 7 ngày
 const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return t && Date.now() - t < TTL; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
 // ===== Khóa phiên đa thiết bị =====
 // Mỗi tab có một SID. Máy chủ giữ danh sách SID được phép:
@@ -139,18 +139,16 @@ const joinImg = (t, a) => [String(t || '').trim(), ...(a || [])].filter(Boolean)
 
 // Lỗi tạm thời từ máy chủ (đang bận, chờ khóa quá lâu...): chưa xử lý gì nên luôn an toàn để gửi lại
 const TRANSIENT_RE = /chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i;
-let HUB_OFF = 0;
 async function call(ops, rev, ms, fast) {
-    if (!API)
-        throw Error('Thiếu địa chỉ API: file config.js chưa được tải');
-    const useHub = !!STORE && Date.now() > HUB_OFF;
+    if (!STORE)
+        throw Error('Thiếu cấu hình máy chủ: file config.js chưa được tải');
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 30000);
     let r;
     try {
-        r = await fetch(useHub ? STORE : API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', key: (window.CONFIG || {}).KEY || '', fast: !!fast, sid: SID }) });
+        r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', fast: !!fast, sid: SID }) });
     }
     catch (e) {
-        const x = Error(e && e.name === 'AbortError' ? 'Máy chủ Google phản hồi quá chậm, chưa nhận được kết quả' : navigator.onLine === false ? 'Không có kết nối mạng' : 'Không kết nối được tới máy chủ Google');
+        const x = Error(e && e.name === 'AbortError' ? 'Máy chủ phản hồi quá chậm, chưa nhận được kết quả' : navigator.onLine === false ? 'Không có kết nối mạng' : 'Không kết nối được tới máy chủ');
         x.net = true;
         throw x;
     }
@@ -162,13 +160,22 @@ async function call(ops, rev, ms, fast) {
         j = await r.json();
     }
     catch (e) {
-        if (useHub) { HUB_OFF = Date.now() + 60000; hubSet(null); return call(ops, rev, ms, fast); }
         const x = Error('Lỗi máy chủ. Kiểm tra lại cấu hình kết nối');
         x.net = true;
         throw x;
     }
-    if (useHub && j.hubErr) { HUB_OFF = Date.now() + 60000; hubSet(null); return call(ops, rev, ms, fast); }
-    if (useHub && j.hub) hubSet(j.hub);
+    if (j.auth) {   // cookie đăng nhập hết hạn: về màn hình mật khẩu, thay đổi chưa gửi được giữ lại và gửi tiếp sau khi đăng nhập
+        lock();
+        const x = Error('Phiên đăng nhập đã hết hạn, hãy nhập lại mật khẩu');
+        x.net = true;
+        throw x;
+    }
+    if (j.hubErr) {
+        const x = Error(j.err || 'Máy chủ đang lỗi');
+        x.net = true;
+        throw x;
+    }
+    if (j.hub) hubSet(j.hub);
     if (j.sess === false && !pendOf()) {
         kick();
         throw Error('Phiên đã bị khóa vì có thiết bị khác đăng nhập');
@@ -305,22 +312,33 @@ else {
     }
 } return r; }
 function lock() { if (KICK) return; sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
-$('#lf').onsubmit = ev => { ev.preventDefault(); if ($('#pw').value === PASS) {
-    const kind = KICK ? 'join' : 'login';
-    KICK = false;
-    try { sessionStorage.sess = Date.now(); } catch (e) { }
-    touch();
-    announce(kind);
-    boot();
-}
-else {
-    $('#lerr').textContent = 'Sai mật khẩu !!';
-    $('#lf').classList.remove('shake');
-    void $('#lf').offsetWidth;
-    $('#lf').classList.add('shake');
-    $('#pw').select();
-} };
-$('#pw').addEventListener('input', () => { const p = String(PASS || ''), f = $('#lf'); if (p && $('#pw').value.length === p.length) f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', { cancelable: true })); });
+let LOGIN_BUSY = false;
+$('#lf').onsubmit = async ev => {
+    ev.preventDefault();
+    const pw = $('#pw').value;
+    if (!pw || LOGIN_BUSY) return;
+    if (!STORE) { $('#lerr').textContent = 'Thiếu file config.js'; return; }
+    LOGIN_BUSY = true;
+    let j;
+    try { const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: pw }) }); j = await r.json(); }
+    catch (e) { j = { ok: false, net: true, err: 'Không kết nối được máy chủ' }; }
+    LOGIN_BUSY = false;
+    if (j.ok) {
+        const kind = KICK ? 'join' : 'login';
+        KICK = false;
+        try { sessionStorage.sess = Date.now(); } catch (e) { }
+        touch();
+        announce(kind);
+        boot();
+    }
+    else {
+        $('#lerr').textContent = j.wait ? 'Thử sai quá nhiều lần, hãy thử lại sau ' + Math.ceil(j.wait / 60) + ' phút' : j.net ? j.err : 'Sai mật khẩu !!';
+        $('#lf').classList.remove('shake');
+        void $('#lf').offsetWidth;
+        $('#lf').classList.add('shake');
+        $('#pw').select();
+    }
+};
 function setUser() {
     const n = String(NAME || '').trim(), ini = Array.from(n)[0] || '';
     $$('.usr').forEach(e => e.classList.toggle('hide', !n));
@@ -679,7 +697,7 @@ function drawView() {
         return `<div class="card"><h3>Không hiển thị được màn hình này</h3><p class="chi">${esc(e.message)}</p><p class="note">Thử tải lại trang bằng Ctrl+F5. Nếu vẫn lỗi, kiểm tra đủ file trong thư mục js (có goals.js và trend.js).</p></div>`;
     }
 }
-function render() { nav(); $('#v').innerHTML = !S.ready ? (!API ? errCard() : '<div class="sk"></div><div class="sk"></div><div class="sk"></div>') : drawView(); if (S.ready && S.tab === 'rec')
+function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : '<div class="sk"></div><div class="sk"></div><div class="sk"></div>') : drawView(); if (S.ready && S.tab === 'rec')
     reconUpdate(); mdFix(); if (typeof fxEnter === 'function')
     fxEnter(); }
 
@@ -2409,12 +2427,12 @@ async function squeeze(f) {
 }
 const b64 = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = () => no(Error('Không đọc được ảnh')); r.readAsDataURL(b); });
 async function driveUp(blob, name) {
-    if (!API)
+    if (!STORE)
         throw Error('Thiếu địa chỉ kết nối');
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 90000);
     let r;
     try {
-        r = await fetch(API, { method: 'POST', signal: ac.signal, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', img: { name, mime: 'image/jpeg', data: await b64(blob) } }) });
+        r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ img: { name, mime: 'image/jpeg', data: await b64(blob) } }) });
     }
     catch (e) {
         const x = Error('Không có kết nối mạng'); x.net = true; throw x;
@@ -2429,6 +2447,7 @@ async function driveUp(blob, name) {
     catch (e) {
         throw Error('Máy chủ chưa cấp quyền Drive hoặc chưa triển khai bản mới');
     }
+    if (j.auth) { const x = Error('Phiên đăng nhập đã hết hạn'); x.net = true; throw x; }
     if (!j.ok)
         throw Error(j.err || 'Tải ảnh thất bại');
     if (!j.url)
@@ -3237,7 +3256,7 @@ async function tgSend(title, text, silent) {
     for (let i = 0; i < tries; i++) {
         if (i) await new Promise(r => setTimeout(r, 1500 * i));
         try {
-            const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: (window.CONFIG || {}).KEY || '', text: (pfx ? pfx + ' ' : '') + title + '\n' + String(text || ''), silent: !!silent }) });
+            const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: (pfx ? pfx + ' ' : '') + title + '\n' + String(text || ''), silent: !!silent }) });
             let j = {};
             try {
                 j = await r.json();
@@ -3245,7 +3264,7 @@ async function tgSend(title, text, silent) {
             catch (e) { }
             if (r.ok && j.ok)
                 return { ok: true };
-            const err = r.status === 404 ? 'Chưa có /api/telegram (kiểm tra thư mục api/ và deploy lại)' : r.status === 401 ? 'Sai key (APP_KEY chưa khớp, hãy deploy lại)' : (j.err || 'Lỗi ' + r.status);
+            const err = r.status === 404 ? 'Chưa có /api/telegram (kiểm tra thư mục api/ và deploy lại)' : r.status === 401 ? 'Chưa đăng nhập hoặc phiên đã hết hạn' : (j.err || 'Lỗi ' + r.status);
             console.warn('Telegram:', r.status, err);
             last = { ok: false, err };
             if (r.status >= 400 && r.status < 500) return last;
@@ -3281,11 +3300,12 @@ if (typeof notify === 'function') {
         if (k !== null) {
             u.searchParams.delete(kn);
             history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
-            const K = (window.CONFIG || {}).KEY;
-            if (K && k === K) {
+            if (k && STORE) {   // server kiểm tra; đúng thì cấp cookie rồi tải lại trang
                 const was = alive();
-                touch();
-                if (!was) announce('login');
+                fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: k }) })
+                    .then(r => r.json())
+                    .then(j => { if (j && j.ok && !was) { try { sessionStorage.sess = Date.now(); sessionStorage.pend = 'login'; } catch (e) { } location.reload(); } })
+                    .catch(() => { });
             }
         }
     }
