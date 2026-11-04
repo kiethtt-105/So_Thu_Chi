@@ -813,3 +813,14 @@ body:has(#ofl.on) #pg{bottom:42px}
 .sheet:has(#fa) .amtw .cur{color:var(--tc,var(--mut))}
 .sheet:has(#fa) .thg{margin-top:6px}
 .sheet:has(#fa) .thg:not(:has(.th:not(.add))) .th.add{width:100%;height:46px;grid-auto-flow:column;gap:8px;justify-content:center}
+
+/* ===== Cải tiến màn hình đăng nhập ===== */
+#login .pwf{position:relative}
+#login .pwf input{padding:12px 52px;font-size:22px;letter-spacing:.3em;text-overflow:clip}
+#login .pwf input[type=text]{letter-spacing:.05em}
+#pwt{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:10px;font-size:18px;line-height:1;opacity:.75;transition:opacity .15s,background .15s}
+#pwt:hover,#pwt[aria-pressed=true]{opacity:1;background:var(--soft)}
+#login input:-webkit-autofill,#login input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 100px var(--field) inset;-webkit-text-fill-color:var(--ink);caret-color:var(--ink);border-radius:12px;transition:background-color 9999s}
+#login .go{color:#fff;background:linear-gradient(135deg,#5B64F5,#8B5CF6);box-shadow:0 10px 24px -10px #6c5bffcc}
+#login .go:hover{filter:brightness(1.08)}
+#login .go:active{transform:scale(.98)}

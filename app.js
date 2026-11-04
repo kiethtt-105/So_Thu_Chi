@@ -27,7 +27,7 @@ function kick() {
     if (KICK) return;
     KICK = true;
     try { sessionStorage.removeItem('sess'); } catch (e) { }
-    $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet();
+    $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet();
     const g = $('#lgreet'); if (g) g.textContent = 'Có thiết bị khác vừa đăng nhập nên phiên này bị khóa. Nhập mật khẩu để tiếp tục (dùng song song 2 phiên).';
     $('#lerr').textContent = '';
 }
@@ -311,8 +311,15 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { if (KICK) return; sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#pw').value = ''; closeSheet(); }
+function lock() { if (KICK) return; sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); }
 let LOGIN_BUSY = false;
+document.addEventListener('click', e => {
+    const b = e.target.closest('#pwt'); if (!b) return;
+    const i = $('#pw'), show = i.type === 'password';
+    i.type = show ? 'text' : 'password';
+    b.textContent = show ? '🙈' : '👁'; b.setAttribute('aria-pressed', show); b.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    i.focus();
+});
 $('#lf').onsubmit = async ev => {
     ev.preventDefault();
     const pw = $('#pw').value;
