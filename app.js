@@ -1061,7 +1061,7 @@ function form() {
         : `<label class="w">${lb}${pkSel(id, S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc).map(n => ({ v: n, t: n })), id === 'ft' ? E.accTo : E.acc, extra)}</label>`;
     $('#sh').innerHTML = `<div id="scanrow"></div><div class="tfh"><h3>${E.isNew ? 'Thêm giao dịch' : 'Sửa giao dịch'}</h3><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div></div>${tplRow()}
 <div class="tf"><div class="tf-l"><div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
-<div class="qk"><button type="button" class="chip" data-k="000">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div>
+<div class="qk"><button type="button" class="chip" data-k="000" title="Thêm 000 vào cuối số tiền">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div>
 <div class="f">
 <label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label>
 <div class="w qd3">${[['0', 'Hôm nay'], ['-1', 'Hôm qua'], ['-2', 'Hôm kia']].map(([n, t]) => { const d = new Date(); d.setDate(d.getDate() + +n); return `<button type="button" class="chip${E.date === ymd(d) ? ' on' : ''}" data-qd="${n}">${t}</button>`; }).join('')}</div></div></div>
