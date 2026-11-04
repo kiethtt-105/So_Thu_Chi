@@ -1,0 +1,73 @@
+/* polish.css — lớp làm đẹp, nạp SAU style.css. Chỉ thêm/ghi đè nhẹ, không đổi cấu trúc. */
+:root{--r:20px;--sh:0 1px 2px #1a1f5a0d,0 12px 30px -14px #2a2f7a33}
+html.dark{--sh:inset 0 1px 0 #ffffff0a,0 14px 34px -16px #000d}
+
+/* nền: lớp sáng loang nhẹ cho cả sáng/tối */
+html body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(720px 420px at 6% -6%,#6b7bff29,transparent 70%),radial-gradient(640px 380px at 100% 2%,#c04bff17,transparent 70%),radial-gradient(640px 380px at 92% 100%,#2de3a41c,transparent 70%)}
+html:not(.dark) body:before{opacity:.65}
+
+/* thẻ */
+.card{padding:20px;border-color:color-mix(in srgb,var(--line) 78%,transparent)}
+.card:hover{border-color:color-mix(in srgb,var(--acc) 26%,var(--line))}
+.card>h3,.ch{font-size:15.5px}
+.ph{margin-bottom:20px}.ph h1{font-size:30px;letter-spacing:-.03em}
+.mn{height:42px;border-radius:14px;box-shadow:var(--sh)}.mn button{width:40px}
+
+/* KPI: vạch màu theo loại + vòng sáng ở thẻ tổng tài sản; bỏ chữ phát sáng (trông như gạch chân) */
+.kpis{gap:14px}.kpi{padding:18px 20px}
+.kpi b{font-size:clamp(22px,2.2vw,28px)}
+.kpi:not(.h):before{content:"";position:absolute;left:20px;top:0;width:36px;height:3px;border-radius:0 0 5px 5px;background:var(--kc,var(--acc))}
+.kpi:has(b.thu){--kc:var(--thu)}.kpi:has(b.chi){--kc:var(--chi)}
+.kpi.h:after{content:"";position:absolute;right:-34px;top:-46px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,#ffffff30,transparent 66%);pointer-events:none}
+html .kpi b.thu,html .kpi b.chi,html .dbal b.thu{text-shadow:none}
+
+/* nút, icon, chip */
+.ib{width:40px;height:40px;border-radius:12px;background:color-mix(in srgb,var(--card) 82%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.btn,.pri{height:40px;border-radius:12px}
+.btn:active,.pri:active,.ib:active,.chip:active{transform:scale(.96)}
+.chip{border-radius:999px;padding:8px 15px}
+.live{height:34px}
+
+/* danh sách giao dịch */
+button.row:hover{background:color-mix(in srgb,var(--acc) 7%,transparent);border-radius:12px}
+.row .dot{width:42px;height:42px;border-radius:14px}
+
+/* biểu đồ & thanh tiến độ */
+.cd svg rect{rx:4px}
+svg line[stroke="var(--line)"]{stroke-dasharray:3 5}
+.bar i{height:9px;border-radius:9px}.bar s{border-radius:9px}
+.bar s,.mbar s{box-shadow:0 3px 10px -3px color-mix(in srgb,var(--bc,var(--acc)) 60%,transparent)}
+
+/* banner dự báo */
+.insight{border-radius:18px;border-left:3px solid var(--acc);padding:16px 18px;align-items:center}
+.insight:before{content:"💡";font-size:18px;line-height:1;flex:none}
+.empty b{font-size:15px}
+
+/* sidebar */
+@media(min-width:960px){
+#sd{background:linear-gradient(180deg,color-mix(in srgb,var(--card) 94%,var(--acc)),var(--card));padding:20px 14px}
+#sd .brand{font-size:18px;padding:4px 8px 16px}
+#tb .sep{font:700 11px var(--fd);letter-spacing:.09em;text-transform:uppercase;opacity:.75;padding:18px 10px 6px}
+#tb button{height:40px;border-radius:12px;transition:background .15s,color .15s,transform .15s}
+#tb button:hover{transform:translateX(3px)}
+#tb button.on{background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 22%,transparent),color-mix(in srgb,var(--acc) 8%,transparent))}
+#tb button .i{transition:transform .2s}#tb button:hover .i,#tb button.on .i{transform:scale(1.12)}
+.top{padding-block:14px}
+}
+
+/* khung nhập / hộp thoại */
+.sheet{border-top-left-radius:28px;border-top-right-radius:28px;box-shadow:0 -22px 60px -22px #000a}
+.sheet :where(input:not([type=checkbox]),select){height:46px;border-radius:14px;transition:border-color .15s,box-shadow .15s}
+.sheet :where(input,select):focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent)}
+#toast{border-radius:16px}
+
+/* đăng nhập */
+#login{background:radial-gradient(620px 420px at 14% 8%,#6b7bff40,transparent 70%),radial-gradient(620px 420px at 92% 96%,#e8479b30,transparent 70%),var(--bg)}
+#login form{border-radius:28px;background:color-mix(in srgb,var(--card) 84%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#login input{border-radius:16px}#login .go{border-radius:16px}
+
+/* thanh điều hướng dưới (điện thoại) */
+#bn{-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);background:color-mix(in srgb,var(--card) 84%,transparent)}
+#bn .fab{background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 55%,#C026D3));box-shadow:0 10px 26px color-mix(in srgb,var(--acc) 45%,transparent)}
+
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
