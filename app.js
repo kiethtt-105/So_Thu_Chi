@@ -3843,6 +3843,18 @@ function renderScan() {
     if (!E.isNew) { r.innerHTML = ''; return; }
     r.innerHTML = `<label class="scanb${E.scan ? ' busy' : ''}">${E.scan ? '<i class="spn"></i>' : '<span>📷</span>'}<span><b>${E.scan ? esc(E.scan) : 'Quét ảnh để tự điền giao dịch'}</b><small>${E.scan ? 'Vui lòng đợi vài giây…' : 'Chụp, chọn hoặc dán (Ctrl+V) hóa đơn, bill ngân hàng, biên lai nhận / chuyển tiền'}</small></span><input type="file" id="fscan" accept="image/*,.heic,.heif" hidden ${E.scan ? 'disabled' : ''}></label>`;
 }
+async function aiScan(blob) {
+    try {
+        const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 40000);
+        const res = await fetch('/api/scan', {
+            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })), cats: S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) })
+        });
+        clearTimeout(tm);
+        const j = await res.json();
+        return j && j.ok && j.data ? Object.assign({}, j.data, { ai: true }) : null;
+    } catch (e) { return null; }
+}
 async function scanImg(f) {
     const E0 = E; if (!E0) return;
     if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) { toast('Chỉ quét được file ảnh (JPG, PNG, WebP, HEIC)'); return; }
@@ -3852,13 +3864,18 @@ async function scanImg(f) {
         const small = await squeeze(f), st = { id: Math.random().toString(36).slice(2), blob: small, name: imgName(), url: URL.createObjectURL(small), kb: Math.round(small.size / 1024) };
         (E0.staged = E0.staged || []).push(st);
         if (E === E0) renderAtt();
-        msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
-        const w = await ocrWorker();
-        _ocrLog = p => { if (p && p.status === 'recognizing text') msg('Đang đọc chữ ' + Math.round((p.progress || 0) * 100) + '%'); };
-        msg('Đang đọc chữ…');
-        const res = await w.recognize(await ocrPrep(small));
-        _ocrLog = null;
-        const r = ocrParse((res.data && res.data.text) || '');
+        msg('AI đang đọc ảnh…');
+        let r = await aiScan(small);
+        if (r && r.notDoc) { E0.scan = ''; if (E === E0) renderScan(); toast('Ảnh này không giống hóa đơn hay bill giao dịch (ảnh vẫn được đính kèm)'); return; }
+        if (!r) {   // dự phòng: đọc chữ trên máy
+            msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
+            const w = await ocrWorker();
+            _ocrLog = p => { if (p && p.status === 'recognizing text') msg('Đang đọc chữ ' + Math.round((p.progress || 0) * 100) + '%'); };
+            msg('Đang đọc chữ…');
+            const res = await w.recognize(await ocrPrep(small));
+            _ocrLog = null;
+            r = ocrParse((res.data && res.data.text) || '');
+        }
         E0.scan = '';
         if (E !== E0) { toast(r.amount ? 'Đã đọc ảnh: ' + num(r.amount) + ' ₫' : 'Đã đọc ảnh nhưng form đã đóng'); return; }
         pull();
@@ -3867,9 +3884,10 @@ async function scanImg(f) {
         if (r.date) E.date = r.date;
         if (r.time) E.time = r.time;
         if (r.note && !E.note) E.note = r.note;
-        if ((E.type === 'Chi' || E.type === 'Thu') && !E.cat) { const g = ocrCat(E.type, r.tx); if (g) { E.cat = g.p; E.sub = g.c; } }
-        const accN = ocrAcc(r);
+        if ((E.type === 'Chi' || E.type === 'Thu') && !E.cat) { const g = r.ai ? (r.cat && r.sub ? { p: r.cat, c: r.sub } : null) : ocrCat(E.type, r.tx); if (g) { E.cat = g.p; E.sub = g.c; } }
+        const accN = r.ai ? (r.acc || null) : ocrAcc(r);
         if (accN) E.acc = accN;
+        if (E.type === 'Chuyển khoản' && r.accTo) E.accTo = r.accTo;
         st.name = imgName();
         form();
         toast(r.amount ? 'Đã tự điền ' + r.type + ' ' + num(r.amount) + ' ₫' + (accN ? ' · ' + accN : '') + (r.date ? ' · ' + r.date.split('-').reverse().join('/') : '') + ' — kiểm tra lại rồi bấm Lưu' : 'Không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)');

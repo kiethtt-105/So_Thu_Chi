@@ -19,6 +19,7 @@ if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(env('APP_API'))) {
 if (env('APP_KEY').length < 16) console.warn('Cảnh báo: APP_KEY ngắn (<16 ký tự), nên dùng chuỗi ngẫu nhiên dài.');
 if (!env('CRON_SECRET')) console.warn('Cảnh báo: chưa có CRON_SECRET, cron nền /api/store sẽ không chạy.');
 if (!env('TG_TOKEN') || !env('TG_CHAT_ID')) console.warn('Cảnh báo: chưa có TG_TOKEN / TG_CHAT_ID, thông báo Telegram sẽ không gửi được.');
+if (!env('ANTHROPIC_API_KEY')) console.warn('Cảnh báo: chưa có ANTHROPIC_API_KEY, quét ảnh bằng AI sẽ dùng bộ đọc chữ trên máy.');
 
 // config.js là file CÔNG KHAI: chỉ để thông tin không nhạy cảm.
 const cfg = {

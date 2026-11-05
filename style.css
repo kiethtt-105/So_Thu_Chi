@@ -824,3 +824,10 @@ body:has(#ofl.on) #pg{bottom:42px}
 #login .go{color:#fff;background:linear-gradient(135deg,#5B64F5,#8B5CF6);box-shadow:0 10px 24px -10px #6c5bffcc}
 #login .go:hover{filter:brightness(1.08)}
 #login .go:active{transform:scale(.98)}
+
+/* ---- Sửa form Thêm giao dịch ---- */
+html:not(.dark) .btn.p{background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#B05BFF));color:#fff;border-color:transparent;box-shadow:0 6px 18px color-mix(in srgb,var(--acc) 36%,transparent)}
+.sheet:has(#fa) input[type=date]{font-size:15px;padding-left:8px;padding-right:8px}
+.cb input{font-size:14px;text-overflow:ellipsis}
+.sheet:has(#fa) .amtw:has(.amt:placeholder-shown):not(:focus-within){border-bottom-color:var(--line2)}
+.sheet:has(#fa) .amtw:has(.amt:placeholder-shown) .cur{color:var(--mut)}
