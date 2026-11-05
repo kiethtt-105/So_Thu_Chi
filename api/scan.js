@@ -1,32 +1,28 @@
-// api/scan.js — AI đọc ảnh hóa đơn / bill ngân hàng và trả về giao dịch có cấu trúc.
-// Cần biến môi trường trên Vercel: ANTHROPIC_API_KEY (bắt buộc). SCAN_MODEL (tùy chọn, mặc định claude-sonnet-5-5).
+// api/scan.js — AI (Gemini) đọc ảnh hóa đơn / bill ngân hàng và trả về giao dịch có cấu trúc.
+// Cần biến môi trường trên Vercel: GEMINI_API_KEY (bắt buộc). SCAN_MODEL (tùy chọn, mặc định gemini-2.5-flash).
 // Khóa API chỉ nằm ở server. Chỉ người đã đăng nhập (cookie) mới gọi được.
 const auth = require('./_auth');
 const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
-const KEY = env('ANTHROPIC_API_KEY'), MODEL = env('SCAN_MODEL') || 'claude-sonnet-5-5';
+const KEY = env('GEMINI_API_KEY'), MODEL = env('SCAN_MODEL') || 'gemini-2.5-flash';
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản'];
 
-const TOOL = {
-  name: 'ghi_giao_dich',
-  description: 'Ghi lại giao dịch đọc được từ ảnh.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      is_financial_document: { type: 'boolean', description: 'false nếu ảnh không phải hóa đơn, bill ngân hàng, biên lai hay màn hình giao dịch' },
-      type: { type: 'string', enum: TYPES, description: 'Chi = tiền ra khỏi tài khoản của chủ sổ (kể cả chuyển tiền cho người khác). Thu = tiền vào. Chuyển khoản = chuyển giữa HAI tài khoản đều có trong danh sách của chủ sổ.' },
-      amount: { type: 'integer', description: 'Số tiền thực tế của giao dịch, đơn vị VND, số nguyên dương. Không lấy số dư, phí, VAT hay mã giao dịch.' },
-      date: { type: 'string', description: 'YYYY-MM-DD, rỗng nếu không thấy' },
-      time: { type: 'string', description: 'HH:mm 24 giờ, rỗng nếu không thấy' },
-      account: { type: 'string', description: 'Tên tài khoản của chủ sổ, phải chép đúng một tên trong danh sách. Với Chi là tài khoản bị trừ, với Thu là tài khoản nhận. Rỗng nếu không chắc.' },
-      account_to: { type: 'string', description: 'Chỉ dùng khi type là Chuyển khoản: tài khoản nhận, chép đúng một tên trong danh sách.' },
-      category: { type: 'string', description: 'Hạng mục cha, chép đúng từ danh sách theo cặp với detail. Rỗng nếu không chắc.' },
-      detail: { type: 'string', description: 'Hạng mục con, chép đúng từ danh sách, phải thuộc category.' },
-      note: { type: 'string', description: 'Ghi chú ngắn (dưới 80 ký tự): tên cửa hàng hoặc người nhận kèm nội dung chuyển khoản.' },
-      confidence: { type: 'number', description: '0 đến 1, độ chắc chắn về số tiền' },
-      unsure: { type: 'array', items: { type: 'string', enum: ['amount', 'date', 'account', 'category'] }, description: 'Các trường bạn không chắc chắn: ảnh mờ, bị che, nhiều số tiền gây nhầm, phải đoán tài khoản hoặc hạng mục. Rỗng nếu chắc chắn tất cả.' }
-    },
-    required: ['is_financial_document', 'type', 'amount']
-  }
+const SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    is_financial_document: { type: 'BOOLEAN', description: 'false nếu ảnh không phải hóa đơn, bill ngân hàng, biên lai hay màn hình giao dịch' },
+    type: { type: 'STRING', enum: TYPES, description: 'Chi = tiền ra khỏi tài khoản của chủ sổ (kể cả chuyển tiền cho người khác). Thu = tiền vào. Chuyển khoản = chuyển giữa HAI tài khoản đều có trong danh sách của chủ sổ.' },
+    amount: { type: 'INTEGER', description: 'Số tiền thực tế của giao dịch, đơn vị VND, số nguyên dương. Không lấy số dư, phí, VAT hay mã giao dịch.' },
+    date: { type: 'STRING', description: 'YYYY-MM-DD, rỗng nếu không thấy' },
+    time: { type: 'STRING', description: 'HH:mm 24 giờ, rỗng nếu không thấy' },
+    account: { type: 'STRING', description: 'Tên tài khoản của chủ sổ, phải chép đúng một tên trong danh sách. Với Chi là tài khoản bị trừ, với Thu là tài khoản nhận. Rỗng nếu không chắc.' },
+    account_to: { type: 'STRING', description: 'Chỉ dùng khi type là Chuyển khoản: tài khoản nhận, chép đúng một tên trong danh sách.' },
+    category: { type: 'STRING', description: 'Hạng mục cha, chép đúng từ danh sách theo cặp với detail. Rỗng nếu không chắc.' },
+    detail: { type: 'STRING', description: 'Hạng mục con, chép đúng từ danh sách, phải thuộc category.' },
+    note: { type: 'STRING', description: 'Ghi chú ngắn (dưới 80 ký tự): tên cửa hàng hoặc người nhận kèm nội dung chuyển khoản.' },
+    confidence: { type: 'NUMBER', description: '0 đến 1, độ chắc chắn về số tiền' },
+    unsure: { type: 'ARRAY', items: { type: 'STRING', enum: ['amount', 'date', 'account', 'category'] }, description: 'Các trường không chắc chắn: ảnh mờ, bị che, nhiều số tiền gây nhầm, phải đoán tài khoản hoặc hạng mục. Rỗng nếu chắc chắn tất cả.' }
+  },
+  required: ['is_financial_document', 'type', 'amount']
 };
 
 const SYSTEM = [
@@ -51,7 +47,7 @@ module.exports = async (req, res) => {
   const sfs = req.headers['sec-fetch-site'];
   if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });
   if (!auth.ok(req)) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
-  if (!KEY) return res.status(200).json({ ok: false, err: 'Chưa cấu hình ANTHROPIC_API_KEY trên Vercel' });
+  if (!KEY) return res.status(200).json({ ok: false, err: 'Chưa cấu hình GEMINI_API_KEY trên Vercel' });
 
   let b = {};
   try { b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) { return res.status(400).json({ ok: false, err: 'Dữ liệu không hợp lệ' }); }
@@ -66,31 +62,43 @@ module.exports = async (req, res) => {
 
   const ctx = 'Hôm nay: ' + today + '\n\nTài khoản của chủ sổ (tên | loại):\n' + accounts.map(a => a.n + ' | ' + a.t).join('\n')
     + '\n\nHạng mục (loại | category | detail):\n' + cats.map(c => c.t + ' | ' + c.p + ' | ' + c.c).join('\n')
-    + '\n\nĐọc ảnh đính kèm và gọi công cụ ghi_giao_dich.';
+    + '\n\nĐọc ảnh đính kèm và trả về JSON giao dịch theo schema.';
 
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 28000);
   let j;
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(MODEL) + ':generateContent', {
       method: 'POST', signal: ac.signal,
-      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: MODEL, max_tokens: 700, system: SYSTEM,
-        tools: [TOOL], tool_choice: { type: 'tool', name: TOOL.name },
-        messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data: image } }, { type: 'text', text: ctx }] }]
+        systemInstruction: { parts: [{ text: SYSTEM }] },
+        contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: image } }, { text: ctx }] }],
+        generationConfig: {
+          temperature: 0, maxOutputTokens: 1024,
+          responseMimeType: 'application/json', responseSchema: SCHEMA,
+          thinkingConfig: { thinkingBudget: 0 }   // tắt "suy nghĩ" để nhanh, rẻ và không ăn vào token trả lời
+        }
       })
     });
     j = await r.json();
     if (!r.ok) {
-      console.warn('scan: Anthropic', r.status, j && j.error && j.error.message);
-      return res.status(200).json({ ok: false, err: r.status === 401 ? 'ANTHROPIC_API_KEY không hợp lệ' : r.status === 429 ? 'AI đang quá tải, thử lại sau' : 'AI lỗi ' + r.status });
+      const msg = j && j.error && j.error.message;
+      console.warn('scan: Gemini', r.status, msg);
+      return res.status(200).json({ ok: false, err:
+        r.status === 429 ? 'AI đang quá tải hoặc hết hạn mức, thử lại sau'
+        : (r.status === 400 && /API key/i.test(msg || '')) || r.status === 401 || r.status === 403 ? 'GEMINI_API_KEY không hợp lệ'
+        : 'AI lỗi ' + r.status });
     }
   } catch (e) {
     return res.status(200).json({ ok: false, err: e && e.name === 'AbortError' ? 'AI phản hồi quá chậm' : 'Không kết nối được AI' });
   } finally { clearTimeout(tm); }
 
-  const tu = (j.content || []).find(x => x.type === 'tool_use');
-  const o = tu && tu.input;
+  let o = null;
+  try {
+    const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+    const txt = parts.map(p => p.text || '').join('').replace(/```json|```/g, '').trim();
+    o = txt ? JSON.parse(txt) : null;
+  } catch (e) { o = null; }
   if (!o) return res.status(200).json({ ok: false, err: 'AI không trả kết quả' });
   if (o.is_financial_document === false) return res.status(200).json({ ok: true, data: { amount: 0, notDoc: true } });
 
