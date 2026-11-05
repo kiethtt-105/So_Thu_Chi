@@ -22,7 +22,8 @@ const TOOL = {
       category: { type: 'string', description: 'Hạng mục cha, chép đúng từ danh sách theo cặp với detail. Rỗng nếu không chắc.' },
       detail: { type: 'string', description: 'Hạng mục con, chép đúng từ danh sách, phải thuộc category.' },
       note: { type: 'string', description: 'Ghi chú ngắn (dưới 80 ký tự): tên cửa hàng hoặc người nhận kèm nội dung chuyển khoản.' },
-      confidence: { type: 'number', description: '0 đến 1, độ chắc chắn về số tiền' }
+      confidence: { type: 'number', description: '0 đến 1, độ chắc chắn về số tiền' },
+      unsure: { type: 'array', items: { type: 'string', enum: ['amount', 'date', 'account', 'category'] }, description: 'Các trường bạn không chắc chắn: ảnh mờ, bị che, nhiều số tiền gây nhầm, phải đoán tài khoản hoặc hạng mục. Rỗng nếu chắc chắn tất cả.' }
     },
     required: ['is_financial_document', 'type', 'amount']
   }
@@ -102,9 +103,15 @@ module.exports = async (req, res) => {
   const okCat = type !== 'Chuyển khoản' && catSet.has(type + '|' + o.category + '|' + o.detail);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(o.date || '') && !isNaN(Date.parse(o.date)) ? o.date : '';
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(o.time || '') ? o.time : '';
+  const unsure = new Set((Array.isArray(o.unsure) ? o.unsure : []).filter(x => ['amount', 'date', 'account', 'category'].includes(x)));
+  if (!acc) unsure.add('account');
+  if (!date) unsure.add('date');
+  if (type !== 'Chuyển khoản' && !okCat) unsure.add('category');
+  if (Number(o.confidence) < 0.6) unsure.add('amount');
   return res.status(200).json({
     ok: true,
     data: {
+      unsure: [...unsure],
       type, amount: amount >= 1 && amount < 1e11 ? amount : 0, date, time, acc, accTo,
       cat: okCat ? o.category : '', sub: okCat ? o.detail : '',
       note: clean(o.note, 120), conf: Math.max(0, Math.min(1, Number(o.confidence) || 0))
