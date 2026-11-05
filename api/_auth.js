@@ -2,7 +2,8 @@
 // Mật khẩu (APP_PASS) và KEY (APP_KEY) chỉ nằm trong biến môi trường của server, không bao giờ gửi xuống trình duyệt.
 // Đăng nhập đúng -> server cấp cookie HttpOnly có chữ ký HMAC (JS trên trang không đọc được; service worker tự gửi kèm).
 const crypto = require('crypto');
-const { APP_PASS = '', APP_KEY = '' } = process.env;
+const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();   // bỏ dấu nháy / khoảng trắng thừa
+const APP_PASS = env('APP_PASS'), APP_KEY = env('APP_KEY');
 const HOURS = Number(process.env.APP_TTL_HOURS) > 0 ? Number(process.env.APP_TTL_HOURS) : 168;
 const NAME = 'stc_auth';
 
