@@ -1,8 +1,11 @@
-  /* =====================================================================
+/* =====================================================================
   * SỔ THU CHI — TOÀN BỘ CODE TRONG 1 FILE (.gs). Không cần file HTML.
   * v22: tuSua nhẹ (bỏ qua nếu Sheet không đổi, tryLock 3s) · lô nhanh không tính lại toàn sổ
   *      · saveAcc/saveCat idempotent · bắt buộc KEY · TongQuan loại "Giữ Hộ"
   *      · "1.5" báo lỗi thay vì làm tròn · thùng rác 1000 mục · năm bất thường = lỗi đỏ
+  * v22.1 (vá): accRows không sập khi TaiKhoan thiếu cột J · số lẻ (kể cả kiểu number) ở GiaoDich = lỗi đỏ
+  *      · saveAcc/saveCat có "old" gửi lại vẫn idempotent · xóa/khôi phục tài khoản giữ cờ "Không tính thu chi"
+  *      · delTx kiểm chứng đúng cột ID
   * ===================================================================== */
 
   /* ===== 00_Config — hằng số cấu hình ===== */
@@ -111,8 +114,15 @@
     else if (!/^-?\d+$/.test(s)) return null;
     const n = Number(s); return isFinite(n) ? snap_(n) : null;
   }
-  // TIỀN (VND) LUÔN LÀ SỐ NGUYÊN. Chuỗi kiểu "1.5" / "2,5" là mơ hồ → trả null để báo lỗi (không âm thầm làm tròn).
+  // TIỀN (VND) LUÔN LÀ SỐ NGUYÊN. Số lẻ ("1.5" / "2,5" dạng chuỗi, hoặc 1.5 dạng number) → trả null để báo lỗi (không âm thầm làm tròn).
   function parseMoney_(v) {
+    if (typeof v === 'string' && /^-?\d+[.,]\d{1,2}$/.test(v.replace(/[₫đ\s]/gi, ''))) return null;
+    const n = parseNum(v);
+    if (n === null || Math.abs(n - Math.round(n)) > 1e-6) return null;
+    return Math.round(n) + 0;
+  }
+  // Bản LÀM TRÒN (dùng cho số dư ban đầu / hạn mức / thùng rác — các cột này được lamTronCot_ làm tròn riêng)
+  function parseMoneyR_(v) {
     if (typeof v === 'string' && /^-?\d+[.,]\d{1,2}$/.test(v.replace(/[₫đ\s]/gi, ''))) return null;
     const n = parseNum(v); return n === null ? null : Math.round(n) + 0;
   }
@@ -335,7 +345,7 @@
     return L;
   }
   function limP(v, dup, parents) {
-    const L = [], per = fixPer(v[0]), cat = str(v[1]), val = parseMoney_(v[2]);
+    const L = [], per = fixPer(v[0]), cat = str(v[1]), val = parseMoneyR_(v[2]);
     if (!per) L.push(P(1, 'err', 'Kỳ phải là "Ngày" hoặc "Tháng"'));
     if (cat && !parents.has(cat)) L.push(P(2, 'warn', 'Hạng mục "' + cat + '" không có trong DanhMuc (loại Chi)'));
     if (val === null || val <= 0) L.push(P(3, 'err', 'Hạn mức phải là số lớn hơn 0'));
@@ -344,12 +354,15 @@
   }
 
   const skipOf_ = v => ['1', 'true', 'x', 'có', 'co'].includes(str(v).toLowerCase());
+  /* Đọc cờ "Không tính thu chi" (cột J của TaiKhoan) an toàn khi sheet chưa có cột J */
+  const skipAt_ = (s, row) => s.getMaxColumns() >= SKIP_COL ? skipOf_(s.getRange(row, SKIP_COL).getValue()) : false;
   function accRows() {
-    const s = need(TAB.acc), V = block(s, MAX_ACC, 3), J = s.getRange(2, SKIP_COL, V.length, 1).getValues(), seen = {};
+    const s = need(TAB.acc), V = block(s, MAX_ACC, 3), seen = {};
+    const J = s.getMaxColumns() >= SKIP_COL ? s.getRange(2, SKIP_COL, V.length, 1).getValues() : V.map(() => ['']);
     return V.map((v, i) => {
       const empty = v.every(x => x === ''), n = str(v[0]); if (n && !empty) seen[n] = (seen[n] || 0) + 1;
       const P_ = empty ? [] : accP(v, n && seen[n] > 1);
-      return { n: i + 2, v, P: P_, empty, bad: P_.some(p => p.lv === 'err'), item: { name: n, type: str(v[1]), open: parseMoney_(v[2]) || 0, skip: skipOf_(J[i][0]) } };
+      return { n: i + 2, v, P: P_, empty, bad: P_.some(p => p.lv === 'err'), item: { name: n, type: str(v[1]), open: parseMoneyR_(v[2]) || 0, skip: skipOf_(J[i][0]) } };
     });
   }
   function catRows() {
@@ -366,7 +379,7 @@
     return V.map((v, i) => {
       const empty = v.every(x => x === ''), per = fixPer(v[0]), k = per + '|' + str(v[1]); if (per && !empty) seen[k] = (seen[k] || 0) + 1;
       const P_ = empty ? [] : limP(v, per && seen[k] > 1, parents);
-      return { n: i + 2, v, P: P_, empty, bad: P_.some(p => p.lv === 'err'), item: { per, cat: str(v[1]), v: parseMoney_(v[2]) || 0 } };
+      return { n: i + 2, v, P: P_, empty, bad: P_.some(p => p.lv === 'err'), item: { per, cat: str(v[1]), v: parseMoneyR_(v[2]) || 0 } };
     });
   }
 
@@ -446,7 +459,7 @@
     try {
       deleteRowSafe_(g, row); SpreadsheetApp.flush();
       const again = findRow(id);
-      if (again && again === row && str(g.getRange(row, 1).getValue()) === str(id)) throw new Error('Không xóa được dòng ' + row + ' trong GiaoDich (kiểm tra bộ lọc / vùng được bảo vệ).');
+      if (again && again === row && str(g.getRange(row, c.id).getValue()) === str(id)) throw new Error('Không xóa được dòng ' + row + ' trong GiaoDich (kiểm tra bộ lọc / vùng được bảo vệ).');
     } catch (e) {
       safe(() => dx().deleteRow(archRow), null);
       throw e;
@@ -489,10 +502,14 @@
     if (open === null) throw new Error('Số dư ban đầu phải là số nguyên');
     const hasSkip = a.skip !== undefined, skip = !!a.skip;
     const s = need(TAB.acc), V = block(s, MAX_ACC, 3), i = V.findIndex(v => str(v[0]) === (old || name)), dup = V.findIndex(v => str(v[0]) === name);
-    const curSkip = i >= 0 ? skipOf_(s.getRange(i + 2, SKIP_COL).getValue()) : false;
-    if (!old && i >= 0 && str(V[i][1]) === type && (parseMoney_(V[i][2]) || 0) === open && (!hasSkip || skip === curSkip)) return;   // lô gửi lại y hệt → bỏ qua
+    const curSkip = i >= 0 ? skipAt_(s, i + 2) : false;
+    if (!old && i >= 0 && str(V[i][1]) === type && (parseMoneyR_(V[i][2]) || 0) === open && (!hasSkip || skip === curSkip)) return;   // lô gửi lại y hệt → bỏ qua
     if (!old && i >= 0) throw new Error('Tài khoản "' + name + '" đã tồn tại');
-    if (old && i < 0) throw new Error('Không tìm thấy tài khoản "' + old + '"');
+    if (old && i < 0) {
+      // Đã đổi tên xong ở lần gửi trước (phản hồi bị mất) → bản đích đã đúng thì bỏ qua, không báo lỗi
+      if (dup >= 0 && str(V[dup][1]) === type && (parseMoneyR_(V[dup][2]) || 0) === open && (!hasSkip || skip === skipAt_(s, dup + 2))) return;
+      throw new Error('Không tìm thấy tài khoản "' + old + '"');
+    }
     if (old && name !== old && dup >= 0) throw new Error('Tên "' + name + '" đã được dùng');
     let row = i + 2;
     if (i < 0) { const e = V.findIndex(v => v.every(x => x === '')); if (e < 0) throw new Error('Đã đủ ' + MAX_ACC + ' tài khoản (giới hạn của bảng)'); row = e + 2; }
@@ -504,8 +521,10 @@
   function delAcc(name) {
     if (usesAcc(name)) throw new Error('Tài khoản đang có giao dịch, không thể xóa');
     const s = need(TAB.acc), V = block(s, MAX_ACC, 3), i = V.findIndex(v => str(v[0]) === name); if (i < 0) return;
-    arch([name, '', V[i][1], V[i][2]], 'tk'); s.getRange(i + 2, 1, 1, 3).clearContent();
-    s.getRange(i + 2, SKIP_COL).clearContent();
+    const sk = skipAt_(s, i + 2);
+    arch([name, '', V[i][1], V[i][2], sk ? '1' : ''], 'tk');   // cột "Tài khoản" của DaXoa (không dùng cho kind 'tk') giữ cờ "Không tính thu chi"
+    s.getRange(i + 2, 1, 1, 3).clearContent();
+    if (s.getMaxColumns() >= SKIP_COL) s.getRange(i + 2, SKIP_COL).clearContent();
   }
   function saveCat(c, old) {
     const t = str(c.t), p = str(c.p), n = str(c.c);
@@ -514,7 +533,10 @@
     const s = need(TAB.cat), V = block(s, MAX_CAT, 3), same = (v, x) => str(v[0]) === x.t && str(v[1]) === x.p && str(v[2]) === x.c;
     const i = old ? V.findIndex(v => same(v, old)) : -1;
     if (!old && V.some(v => same(v, { t, p, c: n }))) return;   // đã có đúng hạng mục này (gửi lại) → bỏ qua
-    if (old && i < 0) throw new Error('Không tìm thấy hạng mục cần sửa');
+    if (old && i < 0) {
+      if (V.some(v => same(v, { t, p, c: n }))) return;   // đã sửa xong ở lần gửi trước → bỏ qua
+      throw new Error('Không tìm thấy hạng mục cần sửa');
+    }
     if (V.some((v, k) => k !== i && str(v[0]) === t && str(v[2]) === n)) throw new Error('Đã có hạng mục con "' + n + '" (mỗi hạng mục con phải có tên riêng)');
     if (old && old.t !== t && usesCat(old.t, old.p, old.c)) throw new Error('Hạng mục đang có giao dịch, không đổi loại Chi/Thu được');
     let row = i + 2;
@@ -546,7 +568,7 @@
   function setLim(per, cat, v) {
     per = fixPer(per); cat = str(cat); v = (v === '' || v == null) ? 0 : parseMoney_(v);
     if (!per) throw new Error('Kỳ phải là Ngày hoặc Tháng');
-    if (v === null || v < 0) throw new Error('Hạn mức phải là số từ 0 trở lên');
+    if (v === null || v < 0) throw new Error('Hạn mức phải là số nguyên từ 0 trở lên');
     if (cat && !getCtx().chiParents.has(cat)) throw new Error('Hạng mục "' + cat + '" không có trong DanhMuc (loại Chi)');
     const s = limSheet(), n = s.getLastRow(), V = n > 1 ? s.getRange(2, 1, n - 1, 3).getValues() : [];
     const i = V.findIndex(r => fixPer(r[0]) === per && str(r[1]) === cat);
@@ -620,7 +642,7 @@
   function readTrash() {
     const s = opt(TAB.del); if (!s || s.getLastRow() < 2) return [];
     return s.getDataRange().getValues().slice(1).filter(r => r[9] && r[11] === '').slice(-TRASH_SHOW).reverse()
-      .map(r => ({ at: String(r[9]), k: r[10], id: String(r[0]), date: r[1] instanceof Date ? day(r[1]) : str(r[1]).slice(0, 10), type: r[2], amount: parseMoney_(r[3]) || 0, acc: r[4], accTo: r[5], cat: r[6], sub: r[7], note: r[8] }));
+      .map(r => ({ at: String(r[9]), k: r[10], id: String(r[0]), date: r[1] instanceof Date ? day(r[1]) : str(r[1]).slice(0, 10), type: r[2], amount: parseMoneyR_(r[3]) || 0, acc: r[4], accTo: r[5], cat: r[6], sub: r[7], note: r[8] }));
   }
   /* Khôi phục. Giao dịch chỉ được khôi phục khi tài khoản của nó còn tồn tại. */
   function restore(at, kind, id) {
@@ -646,7 +668,7 @@
         const row = nextTxRow(g); putRow_(g, row, { id: a9[0], date: a9[1], type: a9[2], amount: a9[3], acc: a9[4], accTo: a9[5], cat: a9[6], sub: a9[7], note: a9[8], at: gio || new Date() }); setImgs_(g, row, sp.imgs);
       }
     }
-    else if (kind === 'tk') saveAcc({ name: r[0], type: r[2], open: r[3] });
+    else if (kind === 'tk') saveAcc({ name: r[0], type: r[2], open: r[3], skip: skipOf_(r[4]) });
     else if (kind === 'dm') saveCat({ t: r[2], p: r[6], c: r[7] });
     d.getRange(i + 1, 12).setValue(nowStr());
   }
@@ -792,7 +814,7 @@
       safe(capNhatCnt_, null);
       autoDat_(); const f = healFormulas(); L.push(f.first ? '• Công thức: lần đầu — đã lưu công thức hiện tại làm chuẩn (' + f.saved + ' vùng)' : '• Công thức: đã khôi phục ' + f.fixed + ' ô/dòng');
       if (!silent) L.push(datTatCa_()); else autoDat_();
-      const n = normalizeTx(2, need(TAB.tx).getLastRow()); L.push('• Chuẩn hóa GiaoDich: sửa ' + n + ' ô (ID / ngày / loại / số tiền, gồm làm tròn số lẻ)');
+      const n = normalizeTx(2, need(TAB.tx).getLastRow()); L.push('• Chuẩn hóa GiaoDich: sửa ' + n + ' ô (ID / ngày / loại / số tiền)');
       const lt = lamTronCot_(need(TAB.acc), 3, MAX_ACC) + (opt(TAB.lim) ? lamTronCot_(opt(TAB.lim), 3, MAX_LIM) : 0); if (lt) L.push('• Đã làm tròn ' + lt + ' ô số dư ban đầu / hạn mức về số nguyên');
       const ta = tachAnh_(); if (ta) L.push('• Đã tách link ảnh khỏi Ghi chú sang cột "' + IMG_HEAD + '": ' + ta + ' dòng');
       safe(sapXepGiaoDich_, null);
@@ -954,7 +976,7 @@
   function datTongQuan_() {
     const s = opt('TongQuan'); if (!s) return 0;
     const D = txRef_('amount'), B = txRef_('date'), C = txRef_('type'), G = txRef_('cat');
-    const win = (f, t) => B + ',">="&' + f + ',' + B + ',"<"&' + t + cntCrit_();    
+    const win = (f, t) => B + ',">="&' + f + ',' + B + ',"<"&' + t + cntCrit_();
     const sum = (type, f, t) => 'SUMIFS(' + D + ',' + C + ',"' + type + '",' + win(f, t) + ')';
     const W = win('$B$6', '$B$7');
     setF_(s.getRange('B6:B7'), [['=DATE($B$3,$B$4,1)'], ['=DATE($B$3,$B$4+1,1)']]);
@@ -1093,6 +1115,7 @@
     g.getRange(2, txCols_().note, n - 1, 1).setValues(N); g.getRange(2, c, n - 1, 1).setValues(I);
     return idx.length;
   }
+  /* Làm tròn cột số dư ban đầu (TaiKhoan) / hạn mức (HanMuc). KHÔNG dùng cho GiaoDich (số lẻ ở đó là lỗi đỏ). */
   function lamTronCot_(s, col, maxRows) {
     if (!s) return 0;
     const n = Math.min(s.getLastRow() - 1, maxRows); if (n < 1) return 0;
@@ -1147,9 +1170,10 @@
   }
 
   function ensureSkipHead_(s) {
+    if (s.getMaxColumns() < SKIP_COL) s.insertColumnsAfter(s.getMaxColumns(), SKIP_COL - s.getMaxColumns());
     if (str(s.getRange(1, SKIP_COL).getValue())) return;
     s.getRange(1, 9).copyTo(s.getRange(1, SKIP_COL), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
-    s.getRange(1, SKIP_COL).setValue(SKIP_HEAD).setNote('Nhập 1 = tài khoản này KHÔNG tính vào thu/chi (số dư vẫn tính). Để trống = tính.\nLoại "Giữ Hộ" luôn không tính.');            
+    s.getRange(1, SKIP_COL).setValue(SKIP_HEAD).setNote('Nhập 1 = tài khoản này KHÔNG tính vào thu/chi (số dư vẫn tính). Để trống = tính.\nLoại "Giữ Hộ" luôn không tính.');
   }
   const cntCrit_ = () => txCols_().cnt ? ',' + txRef_('cnt') + ',"<>0"' : '';
   function capNhatCnt_() {
@@ -1175,7 +1199,7 @@
       let id = str(v[c.id - 1]); if (!id || ids[id]) { id = newId(); set('id', id); } ids[id] = 1;
       const dt = parseDate(v[c.date - 1]); if (dt && !(v[c.date - 1] instanceof Date)) set('date', dt);
       const ty = fixType(v[c.type - 1]); if (ty && ty !== v[c.type - 1]) set('type', ty);
-      const am = parseMoney_(v[c.amount - 1]); if (am !== null && am !== v[c.amount - 1]) set('amount', am);
+      const am = parseMoney_(v[c.amount - 1]); if (am !== null && am !== v[c.amount - 1]) set('amount', am);   // số lẻ → am = null → giữ nguyên, báo đỏ
       if (v[c.at - 1] === '') set('at', new Date());
     });
     return k;
