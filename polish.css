@@ -71,3 +71,98 @@ svg line[stroke="var(--line)"]{stroke-dasharray:3 5}
 #bn .fab{background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 55%,#C026D3));box-shadow:0 10px 26px color-mix(in srgb,var(--acc) 45%,transparent)}
 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ux.css — lớp trải nghiệm, nạp SAU polish.css. Không đổi cấu trúc app, chỉ thêm/ghi đè nhẹ. */
+:root{--spring:cubic-bezier(.34,1.56,.64,1)}
+html{overscroll-behavior-y:contain}
+
+/* ───────── 1. Thẻ KPI gradient mềm + delta + sparkline ───────── */
+.kpis:not(.sm)>.kpi.h{background:linear-gradient(135deg,var(--hero),color-mix(in srgb,var(--hero) 62%,var(--acc)))}
+.kpis:not(.sm)>.kpi:not(.h){
+  background:linear-gradient(150deg,color-mix(in srgb,var(--kc,var(--acc)) 14%,var(--card)) 0%,var(--card) 74%);
+  border-color:color-mix(in srgb,var(--kc,var(--acc)) 22%,var(--line))}
+html.dark .kpis:not(.sm)>.kpi:not(.h){
+  background:linear-gradient(150deg,color-mix(in srgb,var(--kc,var(--acc)) 22%,var(--card)) 0%,var(--card) 80%)}
+.kpi[data-kp=thu]{--kc:var(--thu)}
+.kpi[data-kp=chi]{--kc:var(--chi)}
+.kpi[data-kp=net]{--kc:var(--acc)}
+
+.kpi .kx{display:flex;align-items:center;flex-wrap:wrap;gap:2px 6px;margin-top:7px;font-size:11.5px;line-height:1.35;color:var(--mut)}
+.kpi .kx .dl{font-weight:700;white-space:nowrap}
+.kpi .spk{position:absolute;top:13px;right:14px;width:56px;height:20px;overflow:visible;pointer-events:none}
+.spk .ar{fill:color-mix(in srgb,var(--kc,var(--acc)) 16%,transparent);stroke:none;animation:spkf .6s .45s ease-out backwards}
+.spk .ln{fill:none;stroke:var(--kc,var(--acc));stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:1;stroke-dashoffset:0;animation:spkd .9s .15s cubic-bezier(.2,.8,.2,1) backwards}
+.spk .lp{fill:none;stroke:var(--kc,var(--acc));stroke-width:1.6;stroke-linecap:round;stroke-dasharray:2 2.4;animation:spkf .5s .8s ease-out backwards}
+.spk circle{fill:var(--kc,var(--acc));stroke:var(--card);stroke-width:1.2;animation:spkf .4s .9s ease-out backwards}
+@keyframes spkd{from{stroke-dashoffset:1}}
+@keyframes spkf{from{opacity:0}}
+
+/* ───────── 2. Nảy kiểu lò xo: hộp nhập liệu + nút chính ───────── */
+@media(max-width:959px){
+  html .ov .sheet{transform:translateY(56px);transition:transform .46s var(--spring)}
+  html .ov:not(.open) .sheet{transition:transform .2s ease-in}
+}
+@media(min-width:700px) and (max-width:959px){
+  html .ov .sheet{transform:scale(.92)}
+}
+#bn .fab{transition:transform .38s var(--spring),box-shadow .2s}
+#bn .fab:active{transform:scale(.86)}
+.qk .chip:active,.qamt .chip:active{transform:scale(.9)}
+.ib,.btn,.pri,.chip{transition:transform .32s var(--spring),background .15s,border-color .15s,color .15s,box-shadow .15s}
+
+/* ───────── 3. Cộng nhanh số tiền ───────── */
+.qamt{display:flex;gap:8px;overflow-x:auto;margin:-6px -2px 12px;padding:4px 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.qamt::-webkit-scrollbar{display:none}
+.qamt .chip{flex:none;min-height:36px;padding:0 14px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--tc,var(--acc));
+  border-color:color-mix(in srgb,var(--tc,var(--acc)) 34%,var(--line));
+  background:color-mix(in srgb,var(--tc,var(--acc)) 8%,transparent)}
+.qamt[data-ty=chi]{--tc:var(--chi)}
+.qamt[data-ty=thu]{--tc:var(--thu)}
+.qamt[data-ty=chuyen]{--tc:var(--chuyen)}
+.qamt[data-ty=dc]{--tc:var(--dc)}
+.qamt .chip[data-qamt="0"]{color:var(--mut);border-color:var(--line);background:transparent}
+
+/* ───────── 4. Vuốt dòng giao dịch (chỉ thiết bị cảm ứng) ───────── */
+.swr{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.swr:last-child{border-bottom:0}
+.swr>.row{position:relative;z-index:1;border-bottom:0;touch-action:pan-y;will-change:transform;
+  background:var(--card)!important;-webkit-tap-highlight-color:transparent}
+.swr>.row:active{background:var(--soft)!important}
+.swr.drag{-webkit-user-select:none;user-select:none}
+.swr.snap>.row,.swr.snap .swb{transition:transform .42s var(--spring),width .42s var(--spring)}
+.swr.snap.close>.row,.swr.snap.close .swb{transition:transform .26s cubic-bezier(.2,.8,.2,1),width .26s cubic-bezier(.2,.8,.2,1)}
+.swa{position:absolute;inset:0;z-index:0}
+.swb{position:absolute;top:0;bottom:0;width:0;display:flex;align-items:center;justify-content:center;gap:6px;
+  overflow:hidden;white-space:nowrap;padding:0;border:0;border-radius:0;color:#fff;font:700 13px var(--fb);cursor:pointer}
+.swb.ed{left:0;background:linear-gradient(135deg,#3B82F6,var(--acc))}
+.swb.del{right:0;background:linear-gradient(135deg,#FB7185,var(--chi))}
+.swb svg{flex:none}
+.swb .t2{display:none}
+.swr.arm .swb .t{display:none}
+.swr.arm .swb .t2{display:inline}
+.swr.arm .swb svg{transform:scale(1.18);transition:transform .2s var(--spring)}
+.swr.gone{height:0!important;opacity:0;border-color:transparent;transition:height .22s ease,opacity .2s ease}
+
+/* ───────── 5. Trạng thái trống có hình minh họa ───────── */
+.empty .ill{width:84px;height:84px;margin:0 auto 12px;color:var(--acc);animation:ufl 4.2s ease-in-out infinite}
+.empty .ill svg{width:100%;height:100%;display:block}
+.empty .hint{display:block;margin-top:2px;font-size:13px;color:var(--mut)}
+.empty .btn{margin-top:14px;padding:0 18px}
+@keyframes ufl{50%{transform:translateY(-5px)}}
+
+/* ───────── 6. Kéo xuống để làm mới ───────── */
+#ptr{position:fixed;left:50%;top:calc(var(--hd) + 6px);width:38px;height:38px;margin-left:-19px;border-radius:50%;
+  display:grid;place-items:center;z-index:30;pointer-events:none;color:var(--acc);
+  background:var(--card);box-shadow:var(--sh2);border:1px solid var(--line);
+  opacity:0;transform:translateY(-64px)}
+#ptr.go{transition:transform .35s var(--spring),opacity .2s}
+#ptr.arm{color:var(--thu)}
+#ptr.spin svg{animation:uspin .8s linear infinite}
+@keyframes uspin{to{transform:rotate(360deg)}}
+@media(min-width:960px){#ptr{display:none}}
+
+@media(prefers-reduced-motion:reduce){
+  .empty .ill,.spk *{animation:none!important}
+}
