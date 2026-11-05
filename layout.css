@@ -1,75 +1,83 @@
 /* layout.css — nạp SAU style.css:  <link rel="stylesheet" href="layout.css">
    Chỉ sửa bố cục, không đổi cấu trúc / app.js.
-   Mục tiêu: hết cảnh "trống mà chữ vẫn bị nén" trên máy tính, gọn và không tràn trên điện thoại. */
+   Mục tiêu: tự co giãn vừa mọi màn hình, không bị che / cắt / dồn ép. */
 
 /* ───────────── 1. Chữ không bị nén ───────────── */
 body{letter-spacing:0}
 .sheet h3,.ph h1,.kpi b,.amt{letter-spacing:-.01em}
-.btn,.chip,.pri,.seg button,.tabs button{white-space:nowrap}
+.btn,.pri,.seg button,.tabs button{white-space:nowrap}
 .btn{min-width:0;line-height:1.2}
 
-/* ───────────── 2. Form Thêm giao dịch — MÁY TÍNH ───────────── */
+/* ───────────── 2. Form Thêm giao dịch — DÙNG CHUNG ───────────── */
+/* Bỏ toàn bộ phần gợi ý: "+000", "Gõ 50k, 1.5tr...", +10k +20k +50k +100k, khung hint */
+.sheet:has(#fa) .qk,
+.sheet:has(#fa) .qamt,
+.sheet:has(#fa) .hint{display:none!important}
+
+/* Không phần nào được tràn ngang */
+.sheet:has(#fa),.sheet:has(#fa) .tf,.sheet:has(#fa) .tf-l,.sheet:has(#fa) .tf-r,
+.sheet:has(#fa) .f,.sheet:has(#fa) .pk{min-width:0;max-width:100%;box-sizing:border-box}
+
+/* Các hàng thẻ chọn (tài khoản, hạng mục...) xuống dòng thay vì bị cắt / phải cuộn */
+.sheet:has(#fa) .chips,
+.sheet:has(#fa) .pk .pkc,
+.sheet:has(#fa) .pk>div{flex-wrap:wrap;overflow:visible;min-width:0}
+.sheet:has(#fa) .pk .chip,.sheet:has(#fa) .chips .chip{
+  flex:0 1 auto;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* Ngày + giờ: hai ô đều nhau, ô nào cũng đủ chỗ */
+.sheet:has(#fa) .tf-l .f{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.sheet:has(#fa) .tf-l .qd3{grid-column:1/-1}
+.sheet:has(#fa) input[type=date],.sheet:has(#fa) input[type=time]{
+  min-width:0;width:100%;font-size:16px;padding:0 10px;text-overflow:clip}
+
+/* Số tiền: to, rộng hết khung, không co lại */
+.sheet:has(#fa) .amtw{padding:8px 0 4px;margin-bottom:8px}
+.sheet:has(#fa) .amtw .amt{
+  flex:1 1 auto;width:100%;min-width:0;max-width:none;
+  field-sizing:fixed;text-align:right;font-size:clamp(30px,8vw,46px);line-height:1.1;padding:0}
+.sheet:has(#fa) .amtw .cur{font-size:clamp(18px,4.5vw,22px);padding-left:4px}
+
+/* Chân form: nút Lưu luôn thấy, nền kín */
+.sheet:has(#fa) .sfoot{flex-wrap:wrap}
+
+/* ───────────── 3. Điện thoại + tablet (< 960px): MỘT CỘT ───────────── */
+@media(max-width:959px){
+  .ov.open .sheet:has(#fa){width:min(640px,calc(100vw - 16px));max-width:100%}
+  .sheet:has(#fa) .tf{grid-template-columns:minmax(0,1fr)!important;gap:14px}
+  .sheet:has(#fa) .tf-l{padding-right:0;border-right:0}
+  .sheet:has(#fa) .tfh{flex-direction:column;align-items:stretch;gap:10px}
+  .sheet:has(#fa) .tfh .seg{max-width:none;margin-left:0}
+}
+@media(max-width:480px){
+  .ov.open .sheet:has(#fa){width:calc(100vw - 12px);padding-inline:14px}
+  .sheet:has(#fa) .sfoot .sec2{flex-wrap:wrap}
+  .sheet:has(#fa) .sec2 .btn{white-space:normal;padding:8px 10px;min-height:44px;height:auto}
+}
+
+/* ───────────── 4. Máy tính (≥ 960px): HAI CỘT cân nhau ───────────── */
 @media(min-width:960px){
   .ov.open .sheet:has(#fa){width:min(900px,94vw);padding:28px 32px 0;max-height:92dvh}
 
-  /* hàng đầu: tiêu đề + loại giao dịch */
   .sheet:has(#fa) .tfh{margin-bottom:20px;gap:20px}
   .sheet:has(#fa) .tfh h3{font-size:20px}
   .sheet:has(#fa) .tfh .seg{max-width:460px}
   .sheet:has(#fa) .seg button{min-height:40px;font-size:14px;padding:6px 14px}
 
-  /* hai cột cân nhau, có đường kẻ giữa */
   .sheet:has(#fa) .tf{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:20px 36px;align-items:stretch}
-  .sheet:has(#fa) .tf-l{display:flex;flex-direction:column;gap:6px;padding-right:36px;border-right:1px solid var(--line)}
+  .sheet:has(#fa) .tf-l{display:flex;flex-direction:column;gap:10px;padding-right:36px;border-right:1px solid var(--line)}
   .sheet:has(#fa) .tf-r{padding-top:2px}
 
-  /* số tiền: lớn, rộng hết cột (bỏ field-sizing làm ô co lại) */
-  .sheet:has(#fa) .amtw{padding:10px 0 4px;margin-bottom:6px}
-  .sheet:has(#fa) .amtw .amt{
-    flex:1 1 auto;width:100%;min-width:0;max-width:none;
-    field-sizing:fixed;text-align:right;font-size:46px;line-height:1.1;padding:0}
-  .sheet:has(#fa) .amtw .cur{font-size:22px;padding-left:4px}
-
-  /* +000 / gợi ý nhập */
-  .sheet:has(#fa) .qk{justify-content:flex-start;margin:6px 0 10px;align-items:flex-start}
-  .sheet:has(#fa) .qk small{font-size:12.5px;max-width:none;flex:1}
-
-  /* +10k +20k +50k +100k: xuống dòng thay vì bị cắt */
-  .sheet:has(#fa) .qamt{flex-wrap:wrap;overflow:visible;margin:0 0 18px;padding:0;gap:8px}
-  .sheet:has(#fa) .qamt .chip{flex:1 1 calc(25% - 8px);min-width:72px;justify-content:center;padding:0 10px}
-
-  /* ngày + giờ: 2 ô đều nhau, không cắt chữ */
-  .sheet:has(#fa) .tf-l .f{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:10px 12px}
-  .sheet:has(#fa) input[type=date],.sheet:has(#fa) input[type=time]{
-    font-size:15px;padding:0 10px;min-width:0;text-overflow:clip}
-  .sheet:has(#fa) .tf-l .qd3{grid-column:1/-1}
-
-  /* chân form: dính đáy, nền kín để không lộ nội dung phía sau */
   .sheet:has(#fa) .sfoot{margin:22px -32px 0;padding:16px 32px 20px;flex-wrap:nowrap}
   .sheet:has(#fa) .sfoot>.btn.p{flex:1 1 auto;height:48px;font-size:15px}
   .sheet:has(#fa) .sec2 .btn{height:48px;padding:0 20px}
 }
-
-/* màn hình rất rộng: giữ form vừa tầm mắt */
 @media(min-width:1600px){
   .ov.open .sheet:has(#fa){width:min(960px,94vw)}
   .sheet:has(#fa) .amtw .amt{font-size:52px}
 }
 
-/* ───────────── 3. Form Thêm giao dịch — TABLET / ĐIỆN THOẠI ───────────── */
-@media(max-width:959px){
-  .sheet:has(#fa) .qamt{flex-wrap:nowrap;overflow-x:auto}
-  .sheet:has(#fa) input[type=date],.sheet:has(#fa) input[type=time]{font-size:16px}
-}
-@media(max-width:480px){
-  .sheet:has(#fa) .tf-l .f{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .sheet:has(#fa) .tf-l .qd3{grid-column:1/-1}
-  .sheet:has(#fa) .sfoot .sec2{flex-wrap:wrap}
-  .sheet:has(#fa) .sec2 .btn{white-space:normal;line-height:1.2;padding:8px 10px;min-height:44px;height:auto}
-}
-
-/* ───────────── 4. Trang chủ / nội dung — máy tính ─────────────
-   Dùng bề ngang hợp lý: không kéo giãn quá rộng, không để cột phải trống. */
+/* ───────────── 5. Trang chủ / nội dung — máy tính ───────────── */
 @media(min-width:1280px){
   main,#qb{max-width:1560px}
   .grid.a{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
@@ -82,11 +90,10 @@ body{letter-spacing:0}
   .row .m b{white-space:normal;overflow:visible}
 }
 
-/* ───────────── 5. Điện thoại: nút / thẻ không bị xuống dòng xấu ───────────── */
+/* ───────────── 6. Điện thoại: nút không bị xuống dòng xấu ───────────── */
 @media(max-width:699px){
   .btn{padding-inline:12px}
   .btn.wrapok,.btn[data-wrap]{white-space:normal}
-  /* hai nút cạnh nhau (vd. "Tải ảnh QR" / "Tạo QR cho tài khoản khác") luôn cao bằng nhau */
   .sec2,.rvb,.fb{align-items:stretch}
   .sec2 .btn,.rvb .btn,.fb .btn{display:flex;align-items:center;justify-content:center;text-align:center;height:auto;min-height:46px}
 }
