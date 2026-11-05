@@ -113,12 +113,12 @@ async function pull(sid, force) {
   const j = await sheet({ ops: [], rev: force ? '' : (srev || ''), sid });
   if (j.sess === false) { await sessLost(sid); return { sess: false }; }
   if (!j.ok) return { err: j.err || 'Lỗi Google Sheet', net: !!j.net };
-  if (sid) await rd([['SET', P + 'sid', sid]]);
-  await rd([['SET', P + 'pullAt', String(Date.now())]]);
-  if (j.same) return { changed: false };
+  const base = []; if (sid) base.push(['SET', P + 'sid', sid]);
+  base.push(['SET', P + 'pullAt', String(Date.now())]);
+  if (j.same) { await rd(base); return { changed: false }; }
   // Không DEL cả hash (sẽ làm mất giao dịch vừa ghi nhanh xen giữa, và thiết bị khác thấy hash rỗng).
   // Thay bằng: HDEL những id không còn, HSET phần còn lại theo lô, rồi phủ lại hàng đợi một lần nữa để vá khe hở.
-  const [q, old] = await rd([['LRANGE', P + 'q', 0, -1], ['HKEYS', P + 'tx']]);
+  const r0 = await rd(base.concat([['LRANGE', P + 'q', 0, -1], ['HKEYS', P + 'tx']])), q = r0[r0.length - 2], old = r0[r0.length - 1];
   const tx = new Map((j.tx || []).map(t => [t.id, t]));
   overlay(q || [], tx);
   const misc = {}; MISC.forEach(k => { misc[k] = j[k] || []; });
@@ -168,6 +168,30 @@ async function drain(sid) {
     if (hard) await pull(sid, true);
     return { ok: true };
   } finally { await rd([['DEL', P + 'lock']]).catch(() => { }); }
+}
+
+// Chạy tiếp việc nền SAU KHI đã trả lời thiết bị (Vercel waitUntil). Không có thì trả false để nơi gọi tự chờ.
+function bg(p) {
+  try {
+    const c = globalThis[Symbol.for('@vercel/request-context')], x = c && c.get && c.get();
+    if (x && typeof x.waitUntil === 'function') { x.waitUntil(p); return true; }
+  } catch (e) { }
+  return false;
+}
+
+// Ghi Redis và Google Sheet SONG SONG: sau khi cả hai xong, nếu Sheet đã nhận thì gỡ việc khỏi hàng đợi (LREM).
+// Sheet lỗi/bận: việc vẫn nằm trong hàng đợi (đã có trong Redis) nên drain() sẽ gửi lại như cũ. Luôn nhả khóa ở cuối, không bao giờ throw.
+async function settle(redisP, sheetP, job, sid) {
+  let rok = true;
+  try { await redisP; } catch (e) { rok = false; }
+  try {
+    const j = await sheetP;
+    if (j.sess === false) await sessLost(sid);
+    else if (j.ok) { if (rok) await rd([['LREM', P + 'q', '1', job]]); }
+    else if (j.net || TRANSIENT.test(j.err || '')) await setMeta({ err: j.err || 'Google Sheet đang bận' });
+    // Sheet từ chối thật: giữ nguyên trong hàng đợi, drain() sẽ tách lô / chuyển sang "dead" như cũ
+  } catch (e) { }
+  finally { await rd([['DEL', P + 'lock']]).catch(() => { }); }
 }
 
 // ---- Chuyển thẳng sang Google Sheet (khi không có Redis, hoặc Redis lỗi trước khi ghi gì) ----
@@ -259,24 +283,39 @@ module.exports = async (req, res) => {
 
     // 0) Chỉ có thao tác phiên (đăng nhập / tham gia): chuyển thẳng, không cần kéo dữ liệu
     if (ops.length && ops.every(isSess)) {
-      const j = await sheet({ ops, rev: '', sid }, 15000);
+      const [j, hub] = await Promise.all([sheet({ ops, rev: '', sid }, 15000), status()]);
       if (j.ok && j.sess !== false) await sessMirror(ops, sid);
-      return res.status(200).json(Object.assign({}, j, { hub: await status() }));
+      return res.status(200).json(Object.assign({}, j, { hub }));
     }
 
-    // 1) Chỉ có thao tác giao dịch: ghi vào Redis ngay, đẩy sang Sheet sau
+    // 1) Chỉ có thao tác giao dịch: ghi Redis và gửi Google Sheet SONG SONG (không chờ xong cái này mới tới cái kia)
     if (ops.length && !hasAt && ops.every(x => TX.has(x.op))) {
-      if (!(await rd([['EXISTS', P + 'misc']]))[0]) {
+      const [has, got, qn] = await rd([['EXISTS', P + 'misc'], ['SET', P + 'lock', '1', 'NX', 'EX', '70'], ['LLEN', P + 'q']]);
+      if (!has) {
+        if (got === 'OK') await rd([['DEL', P + 'lock']]);
         const p = await pull(sid, true);
         if (p.sess === false) return res.status(200).json(sessFail());
         if (p.err) return res.status(200).json({ ok: false, err: 'Máy chủ đang bận: ' + p.err });
       }
-      const cmds = [];
+      const cmds = [], job = JSON.stringify({ t: Date.now(), ops });
       rowsOf(ops).forEach(r => cmds.push(['HSET', P + 'tx', r.id, JSON.stringify(r)]));
       delsOf(ops).forEach(id => cmds.push(['HDEL', P + 'tx', id]));
-      cmds.push(['RPUSH', P + 'q', JSON.stringify({ t: Date.now(), ops })], ['INCR', P + 'rev']);
+      cmds.push(['RPUSH', P + 'q', job], ['INCR', P + 'rev']);
+      // Giữ được khóa + hàng đợi đang rỗng (có Redis, không việc nào đi trước) => gửi thẳng sang Sheet cùng lúc với ghi Redis, đúng thứ tự.
+      if (has && got === 'OK' && !+qn) {
+        const redisP = rd(cmds), sheetP = sheet({ ops, rev: '', fast: true, sid });
+        const done = settle(redisP, sheetP, job, sid);
+        try { await redisP; } catch (e) { await done; throw e; }
+        const hub = await status();
+        if (!bg(done)) await done;          // không có waitUntil: chờ nốt Sheet trước khi trả lời để khỏi bị cắt giữa chừng
+        return res.status(200).json({ ok: true, fast: true, hub });
+      }
+      // Còn việc đi trước (hoặc đang có tiến trình đẩy khác): vẫn ghi Redis ngay + xếp hàng; tiến trình đang đẩy sẽ lấy tiếp, hoặc ta tự đẩy nền.
+      if (has && got === 'OK') cmds.push(['DEL', P + 'lock']);
       await rd(cmds);
-      return res.status(200).json({ ok: true, fast: true, hub: await status() });
+      const hub = await status();
+      if (has && got === 'OK') bg(drain(sid).catch(() => { }));
+      return res.status(200).json({ ok: true, fast: true, hub });
     }
 
     // 2) Thao tác khác (tài khoản, danh mục, hạn mức, phiên...): đẩy hết hàng đợi trước để giữ đúng thứ tự, rồi chuyển thẳng sang Sheet
@@ -287,26 +326,24 @@ module.exports = async (req, res) => {
       const j = await sheet({ ops, rev: '', fast: !!body.fast, sid }, 45000);
       if (j.sess === false) { await sessLost(sid); return res.status(200).json(sessFail()); }
       if (!j.ok) return res.status(200).json(j);
-      if (sid) await rd([['SET', P + 'sid', sid]]);
-      await sessMirror(ops, sid);
+      await Promise.all([sid ? rd([['SET', P + 'sid', sid]]) : null, sessMirror(ops, sid)]);
       await pull(sid, true);
-      const st = await readState();
-      return reply(res, st || { st: j, rev: String(j.rev || '') }, await status(), { sess: j.sess });
+      const [st, hub2] = await Promise.all([readState(), status()]);
+      return reply(res, st || { st: j, rev: String(j.rev || '') }, hub2, { sess: j.sess });
     }
 
-    // 3) Thiết bị hỏi (poll): đẩy hàng đợi nếu còn, kéo thay đổi từ Sheet nếu đã đến hạn, rồi trả về từ Redis
-    let st = await readState();
+    // 3) Thiết bị hỏi (poll): đọc trạng thái + hàng đợi cùng lúc; đẩy hàng đợi (nếu còn) rồi kéo thay đổi từ Sheet (nếu đến hạn); chỉ đọc lại Redis khi có gì đổi
+    let [st, hub] = await Promise.all([readState(), status()]), dirty = false;
     const sess = {};
-    if (!st) { const p = await pull(sid, true); if (p.sess === false) return res.status(200).json(sessFail()); if (p.err) return res.status(200).json({ ok: false, err: p.err }); st = await readState(); }
+    if (!st) { const p = await pull(sid, true); if (p.sess === false) return res.status(200).json(sessFail()); if (p.err) return res.status(200).json({ ok: false, err: p.err }); dirty = true; }
     else {
-      const hub0 = await status();
-      if (hub0.q) { const d = await drain(sid); if (d.sess === false) return res.status(200).json(sessFail()); }
+      if (hub.q) { const d = await drain(sid); if (d.sess === false) return res.status(200).json(sessFail()); dirty = true; }
       const p = await pull(sid, !body.rev);     // rev rỗng = mở app / bấm làm mới: kéo ngay từ Google Sheet
       if (p.sess === false) return res.status(200).json(sessFail());
-      st = await readState();
+      if (!p.skipped) dirty = true;
     }
+    if (dirty) [st, hub] = await Promise.all([readState(), status()]);
     if (!st) return res.status(200).json({ ok: false, err: 'Chưa có dữ liệu trên Redis' });
-    const hub = await status();
     if (body.rev && body.rev === st.rev) return res.status(200).json({ ok: true, same: true, rev: st.rev, hub });
     return reply(res, st, hub, sess);
   } catch (e) {
