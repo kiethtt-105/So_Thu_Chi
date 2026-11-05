@@ -42,6 +42,7 @@ const SYSTEM = [
   '- Không bịa. Trường nào không thấy thì để trống.'
 ].join('\n');
 
+const validDate = s => { if (!/^\d{4}-\d{2}-\d{2}$/.test(s || '')) return false; const d = new Date(s + 'T00:00:00Z'); return !isNaN(d) && d.toISOString().slice(0, 10) === s; };   // chặn 2026-02-31
 const clean = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n || 80);
 
 module.exports = async (req, res) => {
@@ -57,7 +58,7 @@ module.exports = async (req, res) => {
   const image = String(b.image || '');
   if (!image || image.length > 3.4e6) return res.status(400).json({ ok: false, err: 'Ảnh trống hoặc quá lớn' });
   const mime = /^image\/(jpeg|png|webp|gif)$/.test(b.mime) ? b.mime : 'image/jpeg';
-  const today = /^\d{4}-\d{2}-\d{2}$/.test(b.today || '') ? b.today : new Date().toISOString().slice(0, 10);
+  const today = validDate(b.today) ? b.today : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);   // mặc định giờ Việt Nam (UTC+7)
 
   const accounts = (Array.isArray(b.accounts) ? b.accounts : []).slice(0, 60).map(a => ({ n: clean(a && a.n, 60), t: clean(a && a.t, 30) })).filter(a => a.n);
   const cats = (Array.isArray(b.cats) ? b.cats : []).slice(0, 400).map(c => ({ t: c && c.t === 'Thu' ? 'Thu' : 'Chi', p: clean(c && c.p, 60), c: clean(c && c.c, 60) })).filter(c => c.p && c.c);
@@ -101,7 +102,7 @@ module.exports = async (req, res) => {
   if (type === 'Chuyển khoản' && (!acc || !accTo || acc === accTo)) type = 'Chi';
   if (type !== 'Chuyển khoản') accTo = '';
   const okCat = type !== 'Chuyển khoản' && catSet.has(type + '|' + o.category + '|' + o.detail);
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(o.date || '') && !isNaN(Date.parse(o.date)) ? o.date : '';
+  const date = validDate(o.date) ? o.date : '';
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(o.time || '') ? o.time : '';
   const unsure = new Set((Array.isArray(o.unsure) ? o.unsure : []).filter(x => ['amount', 'date', 'account', 'category'].includes(x)));
   if (!acc) unsure.add('account');

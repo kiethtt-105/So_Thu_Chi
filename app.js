@@ -312,7 +312,7 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { if (KICK) return; sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); }
+function lock() { if (KICK) return; try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); }
 let LOGIN_BUSY = false;
 document.addEventListener('click', e => {
     const b = e.target.closest('#pwt'); if (!b) return;
@@ -3234,9 +3234,20 @@ function fxEnter() {
 }
 
 const fxOn = () => !document.documentElement.classList.contains('fxoff');
-let _ac = null, _lastTap = 0;
+let _ac = null, _out = null, _lastTap = 0;
+const VOL = 5;   // hệ số âm lượng chung (1 = mức cũ). Muốn to/nhỏ thêm chỉ cần đổi số này, tối đa khoảng 8
 function audio() {
-    if (!_ac) { try { _ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (!_ac) {
+        try {
+            _ac = new (window.AudioContext || window.webkitAudioContext)();
+            // master: nén nhẹ để âm to không bị vỡ tiếng khi hai nốt chồng lên nhau
+            const cp = _ac.createDynamicsCompressor();
+            cp.threshold.value = -14; cp.knee.value = 12; cp.ratio.value = 4; cp.attack.value = 0.002; cp.release.value = 0.12;
+            const mg = _ac.createGain(); mg.gain.value = 1;
+            mg.connect(cp); cp.connect(_ac.destination);
+            _out = mg;
+        } catch (e) { _ac = null; return null; }
+    }
     if (_ac.state === 'suspended') _ac.resume().catch(() => { });
     return _ac;
 }
@@ -3248,18 +3259,18 @@ function tone(f, d, o = {}) {
     osc.frequency.setValueAtTime(f, t);
     if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + d);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(o.v || 0.05, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(Math.min(0.9, (o.v || 0.05) * VOL), t + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    osc.connect(g).connect(ac.destination);
+    osc.connect(g).connect(_out || ac.destination);
     osc.start(t);
     osc.stop(t + d + 0.02);
 }
 const buzz = p => { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { } };
 const sfx = {
-    tap: () => { tone(520, 0.05, { to: 380, v: 0.045 }); buzz(8); },
-    nav: () => { tone(660, 0.05, { to: 500, v: 0.045 }); buzz(8); },
-    ok: () => { tone(660, 0.09, { v: 0.05 }); tone(990, 0.14, { at: 0.08, v: 0.05 }); buzz(18); },
-    err: () => { tone(220, 0.14, { type: 'triangle', v: 0.07 }); tone(165, 0.18, { at: 0.12, type: 'triangle', v: 0.07 }); buzz([30, 40, 30]); }
+    tap: () => { tone(520, 0.07, { to: 380, v: 0.045 }); buzz(8); },
+    nav: () => { tone(660, 0.07, { to: 500, v: 0.045 }); buzz(8); },
+    ok: () => { tone(660, 0.11, { v: 0.05 }); tone(990, 0.18, { at: 0.09, v: 0.05 }); buzz(18); },
+    err: () => { tone(260, 0.16, { type: 'triangle', v: 0.06 }); tone(190, 0.22, { at: 0.14, type: 'triangle', v: 0.06 }); buzz([30, 40, 30]); }
 };
 function fxToggle() {
     const off = document.documentElement.classList.toggle('fxoff');

@@ -24,6 +24,7 @@ self.addEventListener('fetch', e => {
   const r = e.request;
   if (r.method !== 'GET') return;
   const u = new URL(r.url);
+  if (u.origin === location.origin && u.pathname.startsWith('/api/')) return;   // API luôn đi thẳng mạng, không cache
   if (u.origin === location.origin) {
 
     e.respondWith(caches.open(V).then(c => c.match(r, { ignoreSearch: true }).then(hit => {

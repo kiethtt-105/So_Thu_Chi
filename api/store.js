@@ -267,6 +267,8 @@ module.exports = async (req, res) => {
     if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });   // chặn gọi từ trang web khác
     body = typeof req.body === 'string' ? parse(req.body || '{}') || {} : (req.body || {});
 
+    // Khóa sổ: xóa cookie đăng nhập ngay ở server (không cần cookie hợp lệ)
+    if (body.logout) { res.setHeader('Set-Cookie', auth.clear()); return res.status(200).json({ ok: true }); }
     // Đăng nhập (chưa cần cookie)
     if (body.login !== undefined) return await doLogin(req, res, body, HAS_REDIS);
     // Mọi request còn lại phải có cookie hợp lệ
