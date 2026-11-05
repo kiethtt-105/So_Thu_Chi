@@ -384,7 +384,8 @@ addEventListener('online', () => { fails = 0; sync(false); });
 
 const mOf = t => t.date.slice(0, 7), inM = (t, m) => mOf(t) === m;
 let _own = null;
-const heldSet = () => new Set(S.acc.filter(a => a.type === HELD).map(a => a.name));
+const isSkip = a => a.type === HELD || !!a.skip;   // Giữ Hộ hoặc tài khoản bật "Không tính vào thu chi"
+const heldSet = () => new Set(S.acc.filter(isSkip).map(a => a.name));
 const stx = () => { if (_own && _own.t === S.tx && _own.a === S.acc && _own.n === S.tx.length)
     return _own.l; const h = heldSet(), l = h.size ? S.tx.filter(t => !h.has(t.acc) && !(t.accTo && h.has(t.accTo))) : S.tx; _own = { t: S.tx, a: S.acc, n: S.tx.length, l }; return l; };
 const ownAcc = () => S.acc.filter(a => a.type !== HELD);
@@ -521,7 +522,8 @@ function txs() {
     const ix = new Map(S.tx.map((t, i) => [t, i])), tk = t => t.date + ' ' + ((t.at || '').slice(11) || '23:59:59');
     l.sort({ dn: (a, b) => tk(b).localeCompare(tk(a)) || ix.get(b) - ix.get(a), do: (a, b) => tk(a).localeCompare(tk(b)) || ix.get(a) - ix.get(b), ah: (a, b) => b.amount - a.amount, al: (a, b) => a.amount - b.amount }[S.so]);
     const dsum = {};
-    l.forEach(t => { if (t.type === S.f && (S.f === 'Thu' || S.f === 'Chi'))
+    const hs0 = heldSet();
+    l.forEach(t => { if (t.type === S.f && (S.f === 'Thu' || S.f === 'Chi') && !hs0.has(t.acc))
         dsum[t.date] = (dsum[t.date] || 0) + t.amount; });
     const hs = heldSet(), isOwn = t => !hs.has(t.acc) && !(t.accTo && hs.has(t.accTo)), lo = hs.size ? l.filter(isOwn) : l, nHeld = l.length - lo.length;
     const thu = lo.filter(t => t.type === 'Thu').reduce((a, t) => a + t.amount, 0), chi = lo.filter(t => t.type === 'Chi').reduce((a, t) => a + t.amount, 0), dt = {};
@@ -1097,7 +1099,7 @@ function ed(kind, o, idx) {
     E = null;
     const F = { tk: [['name', 'Tên tài khoản', 'text', o.name], ['type', 'Loại', 'select', o.type || ACC_TYPES[0], ACC_TYPES], ['open', 'Số dư ban đầu', 'money', o.open ? num(o.open) : '']],
         dm: [['t', 'Loại', 'select', o.t || 'Chi', ['Chi', 'Thu']], ['p', 'Hạng mục cha', 'text', o.p, L], ['c', 'Chi tiết', 'text', o.c]] }[kind];
-    $('#sh').innerHTML = `<h3>${isN ? 'Thêm' : 'Sửa'} ${{ tk: 'tài khoản', dm: 'hạng mục' }[kind]}</h3><div class="f">${F.map(([id, lb, ty, v, ls]) => `<label class="${id === 'name' || id === 'c' ? 'w' : ''}">${lb}${ty === 'select' ? (ls.length <= 6 ? pkSel('e_' + id, ls.map(x => ({ v: x, t: x })), v) : `<select id="e_${id}">${ls.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`) : ty === 'money' ? `<input id="e_${id}" class="money" data-neg="1" inputmode="text" value="${esc(v)}" placeholder="0">` : `<input id="e_${id}" type="text" value="${esc(v ?? '')}" ${ls ? `list="dl_${id}"` : ''}>${ls ? `<datalist id="dl_${id}">${ls.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}`}</label>`).join('')}${kind === 'tk' ? `<div class="w"><span class="l" style="font-size:12px;color:var(--mut)">Biểu tượng (chỉ lưu trên máy này)</span><div class="cg" style="margin-top:6px"><button type="button" class="chip ${AI[o.name] ? '' : 'on'}" data-ico="">Tự động</button>${EM.map(e => `<button type="button" class="chip ${AI[o.name] === e ? 'on' : ''}" data-ico="${e}">${e}</button>`).join('')}</div></div>` : ''}</div><button class="btn p w" data-esave>Lưu</button>${kind === 'tk' && !isN ? '<button class="btn w" data-viewacc>Xem giao dịch của tài khoản này</button>' : ''}${isN ? '' : '<button class="btn d w" data-edel style="margin-top:2px">Chuyển vào Thùng rác</button>'}`;
+    $('#sh').innerHTML = `<h3>${isN ? 'Thêm' : 'Sửa'} ${{ tk: 'tài khoản', dm: 'hạng mục' }[kind]}</h3><div class="f">${F.map(([id, lb, ty, v, ls]) => `<label class="${id === 'name' || id === 'c' ? 'w' : ''}">${lb}${ty === 'select' ? (ls.length <= 6 ? pkSel('e_' + id, ls.map(x => ({ v: x, t: x })), v) : `<select id="e_${id}">${ls.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`) : ty === 'money' ? `<input id="e_${id}" class="money" data-neg="1" inputmode="text" value="${esc(v)}" placeholder="0">` : `<input id="e_${id}" type="text" value="${esc(v ?? '')}" ${ls ? `list="dl_${id}"` : ''}>${ls ? `<datalist id="dl_${id}">${ls.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}`}</label>`).join('')}${kind === 'tk' ? `<div class="w"><span class="l" style="font-size:12px;color:var(--mut)">Biểu tượng (chỉ lưu trên máy này)</span><div class="cg" style="margin-top:6px"><button type="button" class="chip ${AI[o.name] ? '' : 'on'}" data-ico="">Tự động</button>${EM.map(e => `<button type="button" class="chip ${AI[o.name] === e ? 'on' : ''}" data-ico="${e}">${e}</button>`).join('')}</div></div><label class="w" style="display:flex;gap:10px;align-items:flex-start;margin-top:4px"><input type="checkbox" id="e_skip" ${o.skip ? 'checked' : ''} style="margin-top:3px"><span><b>Không tính vào thu chi</b><br><small style="color:var(--mut)">Giao dịch của tài khoản này không cộng vào tổng thu, tổng chi, hạng mục, hạn mức. Số dư vẫn tính bình thường. Loại “Giữ Hộ” luôn không tính.</small></span></label>` : ''}</div><button class="btn p w" data-esave>Lưu</button>${kind === 'tk' && !isN ? '<button class="btn w" data-viewacc>Xem giao dịch của tài khoản này</button>' : ''}${isN ? '' : '<button class="btn d w" data-edel style="margin-top:2px">Chuyển vào Thùng rác</button>'}`;
     openSheet();
 }
 $('#ov').addEventListener('input', e => {
@@ -1239,7 +1241,7 @@ $('#ov').addEventListener('click', async (e) => {
                 const nm = v('name').trim(), old = o.name;
                 if (!nm)
                     return toast('Nhập tên tài khoản');
-                const r = act([{ op: 'acc.save', acc: { name: nm, type: v('type'), open: pm(v('open')) }, old: old || null }], 'Đã lưu');
+                const r = act([{ op: 'acc.save', acc: { name: nm, type: v('type'), open: pm(v('open')), skip: !!($('#e_skip') || {}).checked }, old: old || null }], 'Đã lưu');
                 r.then(x => { if (!x.ok)
                     return; if (old && nm !== old && typeof goalRename === 'function') goalRename(old, nm); if (ED && ED.ico !== undefined) {
                     if (ED.ico)
@@ -1670,7 +1672,7 @@ function accView() {
     const L = f.l.filter(t => S.vf === 'all' || t.type === S.vf), D = {};
     L.forEach(t => { const mine = t.acc === key, v = t.type === 'Thu' ? t.amount : t.type === 'Chi' ? -t.amount : t.type === 'Điều chỉnh' ? t.amount : t.type === 'Chuyển khoản' ? (mine ? -t.amount : t.amount) : 0; D[t.date] = (D[t.date] || 0) + (mine || t.accTo === key ? v : 0); });
     const hd = d => dayHd(d, D[d] ? 'ròng <b class="' + (D[d] < 0 ? 'chi' : 'thu') + '">' + sgn(D[d]) + '</b>' : '');
-    const det = dhead(aIco(a), esc(a.name), esc(a.type) + (a.type === HELD ? ' · không tính vào thống kê' : '') + ' · ' + mlabel(S.m), `<div class="dbal"><small>Số dư hiện tại</small><b class="sens ${b < 0 ? 'chi' : ''}">${vnd(b)}</b></div>`)
+    const det = dhead(aIco(a), esc(a.name), esc(a.type) + (isSkip(a) ? ' · không tính vào thu chi' : '') + ' · ' + mlabel(S.m), `<div class="dbal"><small>Số dư hiện tại</small><b class="sens ${b < 0 ? 'chi' : ''}">${vnd(b)}</b></div>`)
         + sKpis([kpi('Thu', vnd(f.thu), 'thu', 'Tiền vào'), kpi('Chi', vnd(f.chi), 'chi', 'Tiền ra'), kpi('Chuyển khoản ròng', sgn(f.tin - f.tout) + ' ₫', 'chuyen', 'vào ' + short(f.tin) + ' · ra ' + short(f.tout)), kpi('Biến động', sgn(f.net) + ' ₫', f.net < 0 ? 'chi' : 'thu', mlabel(S.m))])
         + `<div class="tb"><div class="chips">${['all', ...TYPES].map(t => `<button class="chip ${S.vf === t ? 'on' : ''}" data-pk="vf" data-pv="${t}">${t === 'all' ? 'Tất cả' : t}</button>`).join('')}</div><button class="btn" data-vgo="acc" data-pv="${esc(key)}">Xem toàn bộ thời gian</button></div>`
         + `<div class="card flush">${L.length ? dayList(L, hd, key) : empty('Không có giao dịch', 'Tài khoản này chưa có giao dịch trong ' + mlabel(S.m).toLowerCase() + '.')}</div>`;
@@ -1844,6 +1846,7 @@ function cfg() {
         rp: { on: true, at: '06:00', ...c.rp },
         rm: Array.isArray(c.rm) ? c.rm : [],
         adv: { max: 3, hist: 40, ...(c.adv || {}), f: { date: true, acc: true, cat: true, note: true, img: true, bal: true, ...((c.adv || {}).f) }, quiet: { on: false, from: '22:00', to: '06:00', ...((c.adv || {}).quiet) } },
+        scan: { ai: true, hint: true, ocr: true, auto: false, ...(c.scan || {}) },
         tg: { on: true, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
 }
@@ -2223,7 +2226,15 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
 <p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo. Cài đặt này lưu riêng trên từng thiết bị. Nếu nhiều thiết bị cùng bật gửi Telegram, bạn sẽ nhận tin trùng nên chỉ bật ở một thiết bị. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
     const A = c.adv, FL = [['date', '📅', 'Ngày'], ['acc', '🏦', 'Tài khoản và tài khoản đến'], ['cat', '📂', 'Hạng mục cha, con'], ['note', '📝', 'Ghi chú'], ['at', '🕒', 'Tạo lúc'], ['bal', '💰', 'Số dư cuối'], ['img', '📎', 'Ảnh (link)'], ['month', '🗓️', 'Tháng']];
     const segc = (act, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="adv:${act}:${v}" class="${cur === v ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
-    const pAdv = () => `<div class="sec">Nội dung thông báo</div>
+    const pScan = () => `<div class="sec">Quét ảnh bằng AI</div>
+<div class="menu">${sw('scan.ai', '✨', 'Dùng AI đọc ảnh', 'Gửi ảnh lên máy chủ của bạn để AI đọc hóa đơn, bill. Tắt nếu không muốn gửi ảnh cho AI', c.scan.ai)}
+${sw('scan.hint', '🏷️', 'Gợi ý tài khoản và hạng mục cho AI', 'AI chọn đúng tên tài khoản, hạng mục của bạn. Tắt thì AI chỉ đọc số tiền, ngày, ghi chú', c.scan.hint)}
+${sw('scan.ocr', '🔤', 'Dự phòng đọc chữ trên máy', 'Dùng khi AI lỗi hoặc đang tắt. Chậm hơn và kém chính xác hơn', c.scan.ocr)}
+${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem lại nếu AI chắc mọi trường. Có ô nghi ngờ thì vẫn hiện để bạn kiểm tra', c.scan.auto)}</div>
+<p class="hint">Các tùy chọn quét ảnh lưu riêng trên từng thiết bị.</p>
+<div class="sec">Không tính vào thu chi</div>
+<p class="hint">Để một tài khoản không cộng vào thu chi (tiền giữ hộ, quỹ chung, chuyển nội bộ…): vào tab Tài khoản, bấm tài khoản, bật “Không tính vào thu chi”. Cài đặt này lưu trong Google Sheet nên mọi thiết bị và trang TongQuan đều giống nhau.</p>`;
+    const pAdv = () => `${pScan()}<div class="sec">Nội dung thông báo</div>
 <div class="menu">${FL.map(([k, i, t]) => sw('adv.f:' + k, i, t, 'Hiện trong thông báo giao dịch', A.f[k] !== false)).join('')}</div>
 <p class="hint">Mã, số tiền và loại giao dịch luôn hiện. Web và Telegram dùng chung nội dung này nên luôn giống nhau.</p>
 <div class="sec">Thông báo gộp</div>
@@ -2256,7 +2267,7 @@ document.addEventListener('click', async (e) => {
         return openSettings();
     }
     if (k === 'adv-reset') {
-        try { const r = JSON.parse(localStorage.stcfg || '{}'); delete r.adv; if (r.tg) { delete r.tg.pfx; delete r.tg.retry; } localStorage.stcfg = JSON.stringify(r); } catch (e) { }
+        try { const r = JSON.parse(localStorage.stcfg || '{}'); delete r.adv; delete r.scan; if (r.tg) { delete r.tg.pfx; delete r.tg.retry; } localStorage.stcfg = JSON.stringify(r); } catch (e) { }
         toast('Đã khôi phục cấu hình nâng cao');
         return openSettings();
     }
@@ -2346,6 +2357,8 @@ document.addEventListener('change', e => {
             c.tg.retry = t.checked;
         else if (g === 'tg.pfx')
             c.tg.pfx = t.value.trim().slice(0, 20);
+        else if (g.startsWith('scan.'))
+            c.scan[g.slice(5)] = t.checked;
         else if (g.startsWith('adv.f:'))
             c.adv.f[g.slice(6)] = t.checked;
         else if (g === 'adv.quiet.on')
@@ -3840,12 +3853,14 @@ function ocrAcc(r) {
 }
 const SCAN_CANCEL = () => Object.assign(Error('Đã hủy'), { cancel: true });
 async function aiScan(blob, signal) {
+    const SC = cfg().scan;
+    if (!SC.ai) return null;
     const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 40000);
     if (signal) { if (signal.aborted) ctl.abort(); else signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
     try {
         const res = await fetch('/api/scan', {
             method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })), cats: S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) })
+            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: SC.hint ? S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })) : [], cats: SC.hint ? S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) : [] })
         });
         const j = await res.json();
         return j && j.ok && j.data ? Object.assign({}, j.data, { ai: true }) : null;
@@ -3870,10 +3885,10 @@ async function readOne(f, sig, o) {
     const st = { id: Math.random().toString(36).slice(2), blob: small, name: '', url: URL.createObjectURL(small), kb: Math.round(small.size / 1024) };
     if (o.onSt) o.onSt(st);
     if (sig.aborted) throw SCAN_CANCEL();
-    if (o.msg) o.msg('AI đang đọc ảnh…');
+    if (o.msg && cfg().scan.ai) o.msg('AI đang đọc ảnh…');
     let r = await aiScan(small, sig);
     if (r && r.notDoc) return { st, notDoc: true };
-    if (!r && o.ocr) {   // dự phòng: đọc chữ ngay trên máy
+    if (!r && o.ocr && cfg().scan.ocr) {   // dự phòng: đọc chữ ngay trên máy
         o.msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
         const w = await ocrWorker();
         _ocrLog = p => { if (p && p.status === 'recognizing text') o.msg('Đang đọc chữ ' + Math.round((p.progress || 0) * 100) + '%'); };
@@ -3943,6 +3958,12 @@ async function scanImg(f) {
         const d = r.d;
         if (E !== E0) { toast(d && d.amount ? 'Đã đọc ảnh: ' + num(d.amount) + ' ₫' : 'Đã đọc ảnh nhưng form đã đóng'); return; }
         if (!d || !d.amount) { renderScan(); toast('Không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)'); return; }
+        if (cfg().scan.auto && r.st && draftOk(d) && !d.unsure.length) {
+            (E0.staged = E0.staged || []).some(s => s === r.st) || E0.staged.push(r.st);
+            applyDraft(d); r.st.name = imgName(); E0.review = null;
+            toast('Đã tự điền ' + d.type + ' ' + num(d.amount) + ' ₫ — kiểm tra rồi bấm Lưu');
+            return;
+        }
         E0.review = { d, st: r.st };
         renderScan();
     }
