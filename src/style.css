@@ -1178,20 +1178,43 @@ html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
       `clip` vẫn chặn tràn ngang nhưng không biến body thành khung cuộn nên sticky chạy lại bình thường. */
 html,body{overflow-x:clip}
 
-/* 2. Máy tính: nút đóng (×) đang bị ẩn (#sx chỉ hiện < 960px) → không có cách đóng bằng chuột.
-      Hiện lại, nằm đè lên góc phải (đúng chỗ .tfh đã chừa padding-right:40px). */
+/* 2. Máy tính: nút đóng (×) đang bị ẩn (#sx chỉ hiện < 960px) → không có cách đóng bằng chuột. */
 @media(min-width:960px){
   #sx{display:grid;position:sticky;top:0;z-index:7;width:34px;height:34px;margin:-14px -12px -20px auto;
       font-size:22px;box-shadow:none;background:var(--soft);border:0}
   #sx:hover{background:var(--accl);color:var(--acc)}
 }
 
-/* 3. Form Thêm/Sửa giao dịch (máy tính): khung cao cố định 600px làm 2 cột hở một khoảng trống lớn.
-      Giữ khung cố định (không phình/co khi đổi tab) nhưng thấp lại cho vừa nội dung. */
+/* 3. Form Thêm/Sửa giao dịch (máy tính): cân đối 2 cột, bớt khoảng trống.
+      - Ô số tiền thành "thẻ" to, tự giãn cho cột trái cao bằng cột phải; ngày/giờ nằm dưới.
+      - Chiều cao khung theo loại: Chi/Thu/Chuyển 510px, Điều chỉnh (ít ô hơn) 430px, +76px khi có hàng "Quét ảnh" (giao dịch mới).
+      - Bỏ bớt khoảng đệm trên/dưới. Khung vẫn cố định nên không giật khi đổi ô; đổi loại thì co giãn mượt 0,2 giây. */
 @media(min-width:960px){
-  .ov.open .sheet:has(#fa){height:min(540px,calc(90dvh / var(--z,1)))}
+  .ov.open .sheet:has(#fa){
+    --hb:510px;--hs:0px;
+    height:min(calc(var(--hb) + var(--hs)),calc(90dvh / var(--z,1)));
+    padding-top:22px;transition:height .2s ease}
+  .ov.open .sheet:has(#fa.dc){--hb:430px}
+  .ov.open .sheet:has(#scanrow:not(:empty)){--hs:76px}
+
+  .sheet:has(#fa) .tfh{margin-bottom:14px}
   .sheet:has(#fa)>.tf{align-content:start}
-  .sheet:has(#fa) .tf-l{justify-content:flex-start}
+  .sheet:has(#fa) .tf-l{justify-content:flex-start;gap:8px}
+  .sheet:has(#fa) .tf-l>.f{flex:none}
+
+  .sheet:has(#fa) .amtw{
+    flex:1 1 auto;min-height:96px;align-items:center;justify-content:center;
+    margin:0 0 4px;padding:10px 18px;border-bottom:0;border-radius:18px;background:var(--soft);
+    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--tc,var(--line2)) 38%,transparent);
+    transition:box-shadow .15s}
+  .sheet:has(#fa) .amtw:focus-within{box-shadow:inset 0 0 0 2px var(--tc,var(--acc))}
+  .sheet:has(#fa) .amtw .amt{
+    field-sizing:content;flex:0 1 auto;width:auto;min-width:1ch;max-width:calc(100% - 30px);
+    text-align:right;font-size:clamp(38px,3.4vw,54px)}
+  .sheet:has(#fa) .amtw .cur{font-size:22px}
+
+  .sheet:has(#fa) .sfoot{margin:14px -32px 0;padding:12px 32px 16px}
+  .sheet:has(#fa) .sfoot>.btn.p,.sheet:has(#fa) .sec2 .btn{height:44px}
 }
 
 /* 4. Danh sách gợi ý Hạng mục/Chi tiết nằm trong vùng cuộn nên bị cắt đáy: chừa chỗ khi đang mở */
