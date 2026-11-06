@@ -17,7 +17,7 @@ const Store=(()=>{
   function view(){
     const m=new Map(S.tx.map(t=>[t.id,t])),P=new Set();
     jobs.forEach(j=>j.ops.forEach(o=>{if(o.op==='tx.save'&&o.row){m.set(o.row.id,Object.assign({},o.row,{amount:+o.row.amount}));P.add(o.row.id)}else if(o.op==='tx.del')m.delete(o.id)}));
-    return Object.assign({},S,{tx:sortTx([...m.values()]),pending:P,queued:jobs.length})
+    return Object.assign({},S,{tx:sortTx([...m.values()]),pending:P,queued:jobs.length,loaded:rev!==''})
   }
   const emit=()=>{const v=view();subs.forEach(f=>{try{f(v)}catch(e){console.error(e)}})};
   const status=(s,n)=>{window.UI&&UI.sync(s,n)};
@@ -51,12 +51,16 @@ const Store=(()=>{
     }catch(e){return fail(e,jobs.length)}
     finally{busy=false}
     pull()}
+  let pulling=false;
   async function pull(){
-    if(busy||!navigator.onLine)return;
+    if(busy||pulling||!navigator.onLine)return;
     if((await qAll()).length)return flush();
-    try{await join();const j=await post({ops:[],rev});if(j.same)return;
-      S={tx:j.tx||[],acc:j.acc||[],cat:j.cat||[],lim:j.lim||[],trash:j.trash||[],issues:j.issues||[]};rev=j.rev||'';await kvPut();jobs=[];emit();status('synced')}
-    catch(e){fail(e,jobs.length)}}
+    pulling=true;status('sending');
+    try{await join();const j=await post({ops:[],rev});if(j.same){status('synced');return}
+      if(!Array.isArray(j.tx)&&!Array.isArray(j.acc))throw{msg:'Phản hồi thiếu dữ liệu'};
+      S={tx:j.tx||[],acc:j.acc||[],cat:j.cat||[],lim:j.lim||[],trash:j.trash||[],issues:j.issues||[]};rev=j.rev||'ok';await kvPut();emit();status('synced')}
+    catch(e){console.error('pull',e);if(e.msg&&window.UI)UI.toast('Không tải được dữ liệu: '+e.msg);fail(e,jobs.length)}
+    finally{pulling=false}}
   /* ---- API cho giao diện ---- */
   const newId=()=>'G'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36);
   async function enqueue(ops){
@@ -94,8 +98,8 @@ const Store=(()=>{
 })();
 /* Nối vào Tổng quan: số liệu thật, tính theo tháng hiện tại */
 (function(){const money=n=>(Math.round(n)||0).toLocaleString('vi-VN')+' đ',ym=new Date().toISOString().slice(0,7);
-  Store.sub(v=>{const s=Store.stats(ym,v);[['a',s.assets],['t',s.thu],['c',s.chi],['l',s.left]].forEach(([k,x])=>{const e=document.querySelector('[data-k='+k+']');if(e)e.textContent=money(x)});
-    const sk=document.querySelector('.skel');sk&&(sk.style.display=v.acc.length?'none':'')});
+  Store.sub(v=>{const s=Store.stats(ym,v);[['a',s.assets],['t',s.thu],['c',s.chi],['l',s.left]].forEach(([k,x])=>{const e=document.querySelector('[data-k='+k+']');if(e)e.textContent=v.loaded?money(x):'—'});
+    const sk=document.querySelector('.skel');sk&&(sk.hidden=!!v.loaded)});
   Store.onAuth=()=>UI.toast('Phiên đăng nhập đã hết, cần đăng nhập lại (màn đăng nhập làm ở giai đoạn 3)');
   Store.onSess=m=>UI.toast(m||'Có thiết bị khác đăng nhập');
   Store.init()})();
