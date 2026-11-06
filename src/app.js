@@ -3924,9 +3924,11 @@ async function aiScan(blob, signal) {
             method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
             body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: SC.hint ? S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })) : [], cats: SC.hint ? S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) : [] })
         });
-        const j = await res.json();
-        return j && j.ok && j.data ? Object.assign({}, j.data, { ai: true }) : null;
-    } catch (e) { if (signal && signal.aborted) throw SCAN_CANCEL(); return null; }
+        let j = null;
+        try { j = await res.json(); } catch (e) { }
+        if (j && j.ok && j.data) return Object.assign({}, j.data, { ai: true });
+        return { aiFail: (j && j.err) || (res.status === 404 ? 'chưa có /api/scan, cần deploy lại thư mục api/' : 'máy chủ trả lỗi ' + res.status) };
+    } catch (e) { if (signal && signal.aborted) throw SCAN_CANCEL(); return { aiFail: e && e.name === 'AbortError' ? 'AI phản hồi quá chậm' : 'không kết nối được máy chủ AI' }; }
     finally { clearTimeout(tm); }
 }
 // Chuẩn hóa kết quả (AI hoặc OCR) về một "bản nháp" giao dịch
@@ -3935,7 +3937,7 @@ function scanDraft(r) {
     if (r.ai) d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: r.acc || '', accTo: r.accTo || '', cat: r.cat || '', sub: r.sub || '', note: r.note || '', unsure: (r.unsure || []).slice() };
     else {
         const g = (r.type === 'Chi' || r.type === 'Thu') ? ocrCat(r.type, r.tx) : null;
-        d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: ocrAcc(r) || '', accTo: '', cat: g ? g.p : '', sub: g ? g.c : '', note: r.note || '', unsure: ['account'] };
+        d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: ocrAcc(r) || '', accTo: '', cat: g ? g.p : '', sub: g ? g.c : '', note: r.note || '', unsure: ['account', 'amount'] };
         if (!g && d.type !== 'Chuyển khoản') d.unsure.push('category');
     }
     if (!d.amount && !d.unsure.includes('amount')) d.unsure.push('amount');
@@ -3949,7 +3951,8 @@ async function readOne(f, sig, o) {
     if (o.onSt) o.onSt(st);
     if (sig.aborted) throw SCAN_CANCEL();
     if (o.msg && cfg().scan.ai) o.msg('AI đang đọc ảnh…');
-    let r = await aiScan(small, sig);
+    let r = await aiScan(small, sig), aiErr = '';
+    if (r && r.aiFail) { aiErr = r.aiFail; r = null; }
     if (r && r.notDoc) return { st, notDoc: true };
     if (!r && o.ocr && cfg().scan.ocr) {   // dự phòng: đọc chữ ngay trên máy
         o.msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
@@ -3961,7 +3964,9 @@ async function readOne(f, sig, o) {
         if (sig.aborted) throw SCAN_CANCEL();
         r = ocrParse((res.data && res.data.text) || '');
     }
-    return { st, d: r ? scanDraft(r) : null };
+    const d = r ? scanDraft(r) : null;
+    if (d && !r.ai) { d.ocr = true; d.aiErr = aiErr; }
+    return { st, d, aiErr };
 }
 const dFmt = d => (d.date ? d.date.split('-').reverse().join('/') : 'chưa rõ ngày') + (d.time ? ' ' + d.time : '');
 function applyDraft(d) {
@@ -3987,7 +3992,7 @@ function scanCard() {
     const row = (l, v, k, d) => `<div class="rvr"><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></div>`;
     if (E.review) {
         const d = E.review.d, ck = d.type === 'Chuyển khoản';
-        return `<div class="rvc"><div class="rvh"><span>✨ AI đọc được — kiểm tra rồi bấm điền</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
+        return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được — kiểm tra rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
             + row('Loại', esc(d.type)) + row('Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount', d) + row('Ngày giờ', esc(dFmt(d)), 'date', d)
             + row('Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account', d)
             + (ck ? '' : row('Hạng mục', d.cat ? esc(d.cat + ' › ' + d.sub) : '—', 'category', d)) + (d.note ? row('Ghi chú', esc(d.note)) : '')
@@ -4020,7 +4025,7 @@ async function scanImg(f) {
         if (r.notDoc) { if (E === E0) renderScan(); toast('Ảnh này không giống hóa đơn hay bill giao dịch (ảnh vẫn được đính kèm)'); return; }
         const d = r.d;
         if (E !== E0) { toast(d && d.amount ? 'Đã đọc ảnh: ' + num(d.amount) + ' ₫' : 'Đã đọc ảnh nhưng form đã đóng'); return; }
-        if (!d || !d.amount) { renderScan(); toast('Không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)'); return; }
+        if (!d || !d.amount) { renderScan(); toast('Không nhận ra số tiền trong ảnh' + (r.aiErr ? ' — AI lỗi: ' + r.aiErr : '') + ', bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)'); return; }
         if (cfg().scan.auto && r.st && draftOk(d) && !d.unsure.length) {
             (E0.staged = E0.staged || []).some(s => s === r.st) || E0.staged.push(r.st);
             applyDraft(d); r.st.name = imgName(); E0.review = null;

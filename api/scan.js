@@ -8,10 +8,11 @@ const TYPES = ['Chi', 'Thu', 'Chuyển khoản'];
 
 const SCHEMA = {
   type: 'OBJECT',
-  propertyOrdering: ['is_financial_document', 'evidence', 'type', 'amount', 'date', 'time', 'account', 'account_to', 'category', 'detail', 'note', 'confidence', 'unsure'],
+  propertyOrdering: ['is_financial_document', 'evidence', 'amount_text', 'type', 'amount', 'date', 'time', 'account', 'account_to', 'category', 'detail', 'note', 'confidence', 'unsure'],
   properties: {
     evidence: { type: 'STRING', description: 'Chép đúng nhãn chữ nằm ngay cạnh hoặc ngay trên con số tiền đã chọn (ví dụ "Giao dịch thành công", "Số tiền", "Tổng thanh toán"). Rỗng nếu không phải chứng từ.' },
     is_financial_document: { type: 'BOOLEAN', description: 'false nếu ảnh không phải hóa đơn, bill ngân hàng, biên lai hay màn hình giao dịch' },
+    amount_text: { type: 'STRING', description: 'Chép NGUYÊN VĂN chuỗi số tiền chính như hiện trên ảnh, ví dụ "2.133.093đ" hoặc "-50,000 VND". Rỗng nếu không phải chứng từ.' },
     type: { type: 'STRING', enum: TYPES, description: 'Chi = tiền ra khỏi tài khoản của chủ sổ (kể cả chuyển tiền cho người khác). Thu = tiền vào. Chuyển khoản = chuyển giữa HAI tài khoản đều có trong danh sách của chủ sổ.' },
     amount: { type: 'INTEGER', description: 'Số tiền thực tế của giao dịch, đơn vị VND, số nguyên dương. Không lấy số dư, phí, VAT hay mã giao dịch.' },
     date: { type: 'STRING', description: 'YYYY-MM-DD, rỗng nếu không thấy' },
@@ -111,9 +112,13 @@ module.exports = async (req, res) => {
 
   // Kiểm chứng: chỉ nhận giá trị khớp danh sách của chủ sổ
   const evidence = clean(o.evidence, 120);
-  const badAmount = /tổng chi|chi tiêu|cùng kỳ|so với|số dư|dư nợ|hạn mức|^\s*(tổng\s+)?phí\b/i.test(evidence);   // AI tự khai lấy số ở khung thống kê / phí: bỏ, tốt hơn điền sai
+  const badAmount = /tổng chi|chi tiêu|quản lý|danh mục|cùng kỳ|so với|số dư|dư nợ|hạn mức|^\s*(tổng\s+)?phí\b/i.test(evidence);   // AI tự khai lấy số ở khung thống kê / phí: bỏ, tốt hơn điền sai
   let type = TYPES.includes(o.type) ? o.type : 'Chi';
-  const amount = badAmount ? 0 : Math.round(Math.abs(Number(o.amount) || 0));
+  // Số tiền AI "tính" có thể lệch so với chuỗi nó chép nguyên văn từ ảnh: nếu lệch thì tin chuỗi chép, và báo nghi ngờ
+  const txtAmt = Math.round(Number(String(o.amount_text || '').replace(/[^\d]/g, '')) || 0);
+  const rawAmt = Math.round(Math.abs(Number(o.amount) || 0));
+  const mismatch = txtAmt > 0 && rawAmt > 0 && txtAmt !== rawAmt;
+  const amount = badAmount ? 0 : (txtAmt > 0 && (mismatch || !rawAmt) ? txtAmt : rawAmt);
   const acc = accSet.has(o.account) ? o.account : '';
   let accTo = accSet.has(o.account_to) ? o.account_to : '';
   if (type === 'Chuyển khoản' && (!acc || !accTo || acc === accTo)) type = 'Chi';
@@ -126,7 +131,7 @@ module.exports = async (req, res) => {
   if (!acc) unsure.add('account');
   if (!date) unsure.add('date');
   if (type !== 'Chuyển khoản' && !okCat) unsure.add('category');
-  if (Number(o.confidence) < 0.6 || badAmount) unsure.add('amount');
+  if (Number(o.confidence) < 0.6 || badAmount || mismatch) unsure.add('amount');
   return res.status(200).json({
     ok: true,
     data: {
