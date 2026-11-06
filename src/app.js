@@ -574,7 +574,7 @@ function limPage() {
 <div class="card"><div class="ch">Đã vượt hạn mức trong ${mlabel(S.m).toLowerCase()} ${tot ? `<small class="chi sens">+${vnd(tot)}</small>` : ''}</div>${O.map(x => `<div class="row"><span class="dot">${x.cat ? emo(x.cat) : '∑'}</span><span class="m"><b>${esc(x.name)} · ${x.per === 'Ngày' ? 'ngày' : 'tháng'}</b><small>${x.per === 'Ngày' ? x.over + ' ngày vượt: ' + x.days.slice(0, 8).map(d => +d[0].slice(8)).join(', ') + (x.days.length > 8 ? '…' : '') : 'Vượt hạn mức tháng'}</small></span><b class="chi sens">+${vnd(x.excess)}</b></div>`).join('') || empty('Không có hạn mức nào bị vượt', 'Tháng này đang trong hạn mức.')}</div>
 `;
 }
-const diffs = () => S.acc.map(a => { const sys = bal(a), v = S.act[a.name], has = v !== undefined; return { a, sys, has, act: v, diff: has ? v - sys : 0 }; });
+const diffs = () => { const tol = +cfg().tx.tol || 0; return S.acc.map(a => { const sys = bal(a), v = S.act[a.name], has = v !== undefined, raw = has ? v - sys : 0; return { a, sys, has, act: v, diff: Math.abs(raw) <= tol ? 0 : raw }; }); };   // lệch ≤ ngưỡng (Cài đặt › Ghi chép) coi như khớp
 // Gợi ý chuyển khoản: tài khoản THIẾU tiền (thực tế < sổ) và tài khoản DƯ tiền (thực tế > sổ) thường là do đã chuyển giữa hai nơi mà chưa ghi.
 // Ghép đúng số tiền trước, sau đó ghép dần; phần không ghép được mới là "điều chỉnh" (lệch chưa rõ lý do).
 function balPlan(L) {
@@ -1056,7 +1056,7 @@ function catFields(ty, cat, sub) {
 <div class="cbw"><span class="l">Chi tiết</span><div class="cb"><input id="fs" data-cb="s" autocomplete="off" placeholder="Chọn hoặc gõ…" value="${esc(sub)}"><div class="cbl hide"></div></div></div>`;
 }
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-function defAcc() { let a = ''; try { a = localStorage.lastAcc || ''; } catch (e) { } return S.acc.some(x => x.name === a) ? a : ((S.acc.find(x => x.type !== HELD) || S.acc[0] || {}).name || ''); }
+function defAcc() { let a = ''; try { a = cfg().tx.acc || localStorage.lastAcc || ''; } catch (e) { } return S.acc.some(x => x.name === a) ? a : ((S.acc.find(x => x.type !== HELD) || S.acc[0] || {}).name || ''); }
 $('#ov').addEventListener('click', e => {
     const k = e.target.closest('[data-k]');
     if (k && E) { const a = $('#fa'); if (a && a.value.replace(/\D/g, '')) { a.value += k.dataset.k; fm(a); a.focus(); } return; }
@@ -1070,7 +1070,7 @@ function qdSync() {
     const f = $('#fd'); if (!f) return;
     $$('.qd3 [data-qd]').forEach(b => { const d = new Date(); d.setDate(d.getDate() + +b.dataset.qd); b.classList.toggle('on', ymd(d) === f.value); });
 }
-function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
+function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || cfg().tx.type || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
 // Ô chọn: màn hình rộng hiện thẻ (chip), màn hình hẹp/dài giữ thanh thả (CSS quyết định, xem .pk trong style.css)
 const pkSel = (id, opts, cur, extra) => `<span class="pk"><select id="${id}">${extra || ''}${opts.map(o => `<option value="${esc(o.v)}" ${o.v === cur ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select><span class="chips fw pkc">${opts.map(o => `<button type="button" class="chip${o.v === cur ? ' on' : ''}" data-pk="${id}" data-v="${esc(o.v)}">${esc(o.t)}</button>`).join('')}</span></span>`;
 function form() {
@@ -1343,6 +1343,11 @@ $('#ov').addEventListener('click', async (e) => {
             row.at = E.at;
         }
         const wasNew = !S.tx.some(t => t.id === row.id);
+        if (wasNew && cfg().tx.dup) {
+            const dp = S.tx.find(t => t.date === row.date && t.type === row.type && +t.amount === +row.amount && t.acc === row.acc && (t.accTo || '') === (row.accTo || '') && (!t.at || Date.now() - new Date(t.at).getTime() < 30 * 60000));
+            if (dp && !await ask('Có thể trùng giao dịch', 'Vừa có giao dịch ' + row.type + ' ' + num(Math.abs(row.amount)) + ' ở ' + row.acc + ' cùng ngày' + (dp.note ? ' (' + noteTxt(dp.note) + ')' : '') + '. Vẫn lưu thêm?', { icon: '🔁', ok: 'Vẫn lưu' }))
+                return;
+        }
         try { localStorage.lastAcc = E.acc; } catch (x) { }
         const stg = (E.staged || []).map(s => ({ name: s.name, blob: s.blob }));
         closeSheet();
@@ -1863,6 +1868,7 @@ function cfg() {
         rm: Array.isArray(c.rm) ? c.rm : [],
         adv: { max: 3, hist: 40, ...(c.adv || {}), f: { date: true, acc: true, cat: true, note: true, img: true, bal: true, ...((c.adv || {}).f) }, quiet: { on: false, from: '22:00', to: '06:00', ...((c.adv || {}).quiet) } },
         scan: { ai: true, hint: true, ocr: true, auto: false, ...(c.scan || {}) },
+        tx: { acc: '', type: 'Chi', dup: true, tol: 0, ...(c.tx || {}) },
         tg: { on: true, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
 }
@@ -2261,10 +2267,18 @@ ${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem 
 <div class="sec">Lịch sử thông báo</div>
 <div class="row"><span class="m"><b>Số thông báo lưu trên thiết bị</b><small>Cũ hơn sẽ tự xóa</small></span></div>${segc('hist', [20, 40, 100], A.hist, v => v + ' mục')}
 <div style="margin-top:16px"><button class="btn w" data-nt="adv-reset">Khôi phục mặc định phần nâng cao</button></div>`;
-    const tabs = [['ui', 'Giao diện'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['adv', 'Nâng cao']];
+    const T = c.tx, segx = (k, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="txs:${k}:${v}" class="${String(cur) === String(v) ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
+    const pTx = () => `<div class="sec">Khi thêm giao dịch mới</div>
+<div class="menu"><div class="row"><span class="m"><b>Tài khoản mặc định</b><small>Mặc định dùng tài khoản bạn vừa ghi gần nhất</small></span><select class="tx" data-cfg="tx.acc" aria-label="Tài khoản mặc định"><option value="">Lần ghi gần nhất</option>${S.acc.map(a => `<option value="${esc(a.name)}" ${T.acc === a.name ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>
+<div class="row"><span class="m"><b>Loại mặc định</b><small>Loại được chọn sẵn khi mở form</small></span></div>${segx('type', ['Chi', 'Thu'], T.type)}
+${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại nếu cùng ngày, loại, số tiền, tài khoản vừa ghi trong 30 phút', T.dup !== false)}</div>
+<div class="sec">Cân đối</div>
+<div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}
+<p class="hint">Các cài đặt này lưu riêng trên từng thiết bị.</p>`;
+    const tabs = [['ui', 'Giao diện'], ['tx', 'Ghi chép'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['adv', 'Nâng cao']];
     $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
 <div class="seg">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : pUi()}`;
+${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : SET_TAB === 'tx' ? pTx() : pUi()}`;
     openSheet();
 }
 document.addEventListener('click', async (e) => {
@@ -2274,6 +2288,11 @@ document.addEventListener('click', async (e) => {
     const [k, a, d] = b.dataset.nt.split(':'), c = cfg();
     if (k === 'stab') {
         SET_TAB = a;
+        return openSettings();
+    }
+    if (k === 'txs') {
+        c.tx[a] = a === 'tol' ? +d : d;
+        cfgSave(c);
         return openSettings();
     }
     if (k === 'adv') {
@@ -2367,6 +2386,10 @@ document.addEventListener('change', e => {
             c.kinds.report = t.checked;
             c.rp.on = t.checked;
         }
+        else if (g === 'tx.acc')
+            c.tx.acc = t.value;
+        else if (g === 'tx.dup')
+            c.tx.dup = t.checked;
         else if (g === 'tg.on')
             c.tg.on = t.checked;
         else if (g === 'tg.retry')

@@ -1015,3 +1015,158 @@ html.dark .kpis:not(.sm)>.kpi:not(.h){
 @media(prefers-reduced-motion:reduce){
   .empty .ill,.spk *{animation:none!important}
 }
+
+/* ═══════ layout (trước đây là layout.css) ═══════ */
+/* layout.css — nạp SAU style.css:  <link rel="stylesheet" href="layout.css">
+   Chỉ sửa bố cục, không đổi cấu trúc / app.js.
+   Mục tiêu: tự co giãn vừa mọi màn hình, không bị che / cắt / dồn ép. */
+
+/* ───────────── 1. Chữ không bị nén ───────────── */
+body{letter-spacing:0}
+.sheet h3,.ph h1,.kpi b,.amt{letter-spacing:-.01em}
+.btn,.pri,.seg button,.tabs button{white-space:nowrap}
+.btn{min-width:0;line-height:1.2}
+
+/* ───────────── 2. Form Thêm giao dịch — DÙNG CHUNG ───────────── */
+/* Bỏ toàn bộ phần gợi ý: "+000", "Gõ 50k, 1.5tr...", +10k +20k +50k +100k, khung hint */
+.sheet:has(#fa) .qk,
+.sheet:has(#fa) .qamt,
+.sheet:has(#fa) .hint{display:none!important}
+
+/* Không phần nào được tràn ngang */
+.sheet:has(#fa),.sheet:has(#fa) .tf,.sheet:has(#fa) .tf-l,.sheet:has(#fa) .tf-r,
+.sheet:has(#fa) .f,.sheet:has(#fa) .pk{min-width:0;max-width:100%;box-sizing:border-box}
+
+/* Các hàng thẻ chọn (tài khoản, hạng mục...) xuống dòng thay vì bị cắt / phải cuộn */
+.sheet:has(#fa) .chips,
+.sheet:has(#fa) .pk .pkc,
+.sheet:has(#fa) .pk>div{flex-wrap:wrap;overflow:visible;min-width:0}
+.sheet:has(#fa) .pk .chip,.sheet:has(#fa) .chips .chip{
+  flex:0 1 auto;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* Ngày + giờ: hai ô đều nhau, ô nào cũng đủ chỗ */
+.sheet:has(#fa) .tf-l .f{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.sheet:has(#fa) .tf-l .qd3{grid-column:1/-1}
+.sheet:has(#fa) input[type=date],.sheet:has(#fa) input[type=time]{
+  min-width:0;width:100%;font-size:16px;padding:0 10px;text-overflow:clip}
+
+/* Số tiền: to, rộng hết khung, không co lại */
+.sheet:has(#fa) .amtw{padding:8px 0 4px;margin-bottom:8px}
+.sheet:has(#fa) .amtw .amt{
+  flex:1 1 auto;width:100%;min-width:0;max-width:none;
+  field-sizing:fixed;text-align:right;font-size:clamp(30px,8vw,46px);line-height:1.1;padding:0}
+.sheet:has(#fa) .amtw .cur{font-size:clamp(18px,4.5vw,22px);padding-left:4px}
+
+/* Chân form: nút Lưu luôn thấy, nền kín */
+.sheet:has(#fa) .sfoot{flex-wrap:wrap}
+
+/* ───────────── 3. Điện thoại + tablet (< 960px): MỘT CỘT ───────────── */
+@media(max-width:959px){
+  .ov.open .sheet:has(#fa){width:min(640px,calc(100vw - 16px));max-width:100%}
+  .sheet:has(#fa) .tf{grid-template-columns:minmax(0,1fr)!important;gap:14px}
+  .sheet:has(#fa) .tf-l{padding-right:0;border-right:0}
+  .sheet:has(#fa) .tfh{flex-direction:column;align-items:stretch;gap:10px}
+  .sheet:has(#fa) .tfh .seg{max-width:none;margin-left:0}
+}
+@media(max-width:480px){
+  .ov.open .sheet:has(#fa){width:calc(100vw - 12px);padding-inline:14px}
+  .sheet:has(#fa) .sfoot .sec2{flex-wrap:wrap}
+  .sheet:has(#fa) .sec2 .btn{white-space:normal;padding:8px 10px;min-height:44px;height:auto}
+}
+
+/* ───────────── 4. Máy tính (≥ 960px): HAI CỘT cân nhau ───────────── */
+@media(min-width:960px){
+  .ov.open .sheet:has(#fa){width:min(900px,94vw);padding:28px 32px 0;max-height:92dvh}
+
+  .sheet:has(#fa) .tfh{margin-bottom:20px;gap:20px}
+  .sheet:has(#fa) .tfh h3{font-size:20px}
+  .sheet:has(#fa) .tfh .seg{max-width:460px}
+  .sheet:has(#fa) .seg button{min-height:40px;font-size:14px;padding:6px 14px}
+
+  .sheet:has(#fa) .tf{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:20px 36px;align-items:stretch}
+  .sheet:has(#fa) .tf-l{display:flex;flex-direction:column;gap:10px;padding-right:36px;border-right:1px solid var(--line)}
+  .sheet:has(#fa) .tf-r{padding-top:2px}
+
+  .sheet:has(#fa) .sfoot{margin:22px -32px 0;padding:16px 32px 20px;flex-wrap:nowrap}
+  .sheet:has(#fa) .sfoot>.btn.p{flex:1 1 auto;height:48px;font-size:15px}
+  .sheet:has(#fa) .sec2 .btn{height:48px;padding:0 20px}
+}
+@media(min-width:1600px){
+  .ov.open .sheet:has(#fa){width:min(960px,94vw)}
+  .sheet:has(#fa) .amtw .amt{font-size:52px}
+}
+
+/* ───────────── 5. Trang chủ / nội dung — máy tính ───────────── */
+@media(min-width:1280px){
+  main,#qb{max-width:1560px}
+  .grid.a{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+  .grid.c{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)}
+  .kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(min-width:960px){
+  .card{padding:22px}
+  .row .m small{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .row .m b{white-space:normal;overflow:visible}
+}
+
+/* ───────────── 6. Điện thoại: nút không bị xuống dòng xấu ───────────── */
+@media(max-width:699px){
+  .btn{padding-inline:12px}
+  .btn.wrapok,.btn[data-wrap]{white-space:normal}
+  .sec2,.rvb,.fb{align-items:stretch}
+  .sec2 .btn,.rvb .btn,.fb .btn{display:flex;align-items:center;justify-content:center;text-align:center;height:auto;min-height:46px}
+}
+
+/* ═══════ fixes (trước đây là fixes.css) ═══════ */
+/* fixes.css — nạp SAU layout.css. Chỉ vá các lỗi tràn/đè nhìn thấy trên điện thoại, không đổi giao diện cũ. */
+html,body{overflow-x:hidden}
+/* Cài đặt: nút "Thông báo" không bị nút đóng (×) đè */
+.sheet>.shh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding-right:48px}
+.sheet>.shh h3{margin:0;padding-right:0;flex:1 1 auto}
+/* Nhắc nhở: ô giờ giữ 104px, không phình 100% làm tràn khung */
+.sheet .rem-t{flex-wrap:nowrap}
+.sheet .rem-t input.tm{width:104px;max-width:104px;flex:none;padding:0 8px}
+.sheet .rem-t input.tx{flex:1 1 0;width:auto}
+.sheet .rem,.sheet .rem-t>*{min-width:0}
+/* Thanh tab trong popup: cuộn ngang gọn, không cắt chữ */
+.sheet .tabs{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.sheet .tabs::-webkit-scrollbar{display:none}
+.sheet .tabs button{flex:1 0 auto;white-space:nowrap}
+/* Thanh tiến trình đồng bộ: gọn, bỏ hàng "Thiết bị > Redis > Google Sheet" bị cắt nửa chữ */
+#pg .pgs{display:none}
+#pg .pgt{padding:6px 14px}
+
+/* ───────────── Form Thêm/Sửa giao dịch: KHUNG CỐ ĐỊNH ─────────────
+   Trước đây khung cao theo nội dung nên đổi tab Chi/Thu/Chuyển/Điều chỉnh hoặc mở danh sách chọn là khung phình/co.
+   Giờ khung có chiều cao cố định; phần nhập cuộn bên trong, tiêu đề và nút Lưu luôn nằm yên. */
+.ov.open .sheet:has(#fa){
+  display:flex;flex-direction:column;overflow:hidden;
+  height:min(680px,calc(90dvh / var(--z,1)));max-height:calc(92dvh / var(--z,1))}
+.sheet:has(#fa)>*{flex:none}
+.sheet:has(#fa)>.tf{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;align-content:start;
+  overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:6px}
+@media(min-width:960px){
+  .ov.open .sheet:has(#fa){height:min(600px,calc(90dvh / var(--z,1)))}
+  .sheet:has(#fa)>.tf{align-content:stretch}
+}
+
+/* ───────────── Bỏ viền: dùng nền dịu thay đường kẻ ───────────── */
+.sheet,#cf .box,.card,.mi,.rem,.sum span,.qp,.tip,#qb .qrow,.cbl,#sx,
+.ib,.live,.usr,.mn,.btn,.chip,.seg,.tabs,.days button,#cf .bt button,
+html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
+#sd,.top,.sfoot,#pg,.sheet:has(#fa) .tf-l{border-color:transparent}
+/* Ô nhập: nền xám nhạt, chỉ hiện viền màu khi đang gõ */
+.sheet :where(input:not([type=checkbox]),select),.f input,.f select,.fp input,.fp select,.fpn .fp2 input,.fpn .fp2 select,.ba,.search{
+  border-color:transparent;background:var(--soft)}
+.sheet :where(input:not([type=checkbox]),select):focus,.f input:focus,.f select:focus,.fp input:focus,.fp select:focus,.ba:focus,.search:focus{
+  border-color:var(--acc);background:var(--field)}
+/* Thẻ chọn & nút phụ: nền soft để vẫn nhìn ra khi không có viền */
+.chip:not(.on),.btn:not(.p):not(.d),.ib,.live,.usr,.mn,.sum span{background:var(--soft)}
+.seg,.tabs{background:var(--soft)}
+/* Đường kẻ giữa các dòng danh sách: mờ hẳn, chỉ còn đủ để phân nhóm */
+.row,.rr,.li,.iss,.kr,.an,.dh{border-bottom-color:color-mix(in srgb,var(--line) 35%,transparent)}
+.sheet:has(#fa) .tf-l{border-right:0}
+.sfoot{border-top:0}
+
+/* Cài đặt › Ghi chép: ô chọn tài khoản trong dòng cài đặt không chiếm hết chiều ngang */
+.row select.tx{flex:0 1 200px;max-width:50%;min-width:0}
