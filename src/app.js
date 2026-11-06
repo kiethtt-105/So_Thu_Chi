@@ -3916,7 +3916,6 @@ function ocrAcc(r) {
 const SCAN_CANCEL = () => Object.assign(Error('Đã hủy'), { cancel: true });
 async function aiScan(blob, signal) {
     const SC = cfg().scan;
-    if (!SC.ai) return null;
     const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 40000);
     if (signal) { if (signal.aborted) ctl.abort(); else signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
     try {
@@ -3954,7 +3953,7 @@ async function readOne(f, sig, o) {
     let r = await aiScan(small, sig), aiErr = '';
     if (r && r.aiFail) { aiErr = r.aiFail; r = null; }
     if (r && r.notDoc) return { st, notDoc: true };
-    if (!r && o.ocr && cfg().scan.ocr) {   // dự phòng: đọc chữ ngay trên máy
+    if (false) {   // đã tắt: bắt buộc dùng AI, không dự phòng OCR
         o.msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
         const w = await ocrWorker();
         _ocrLog = p => { if (p && p.status === 'recognizing text') o.msg('Đang đọc chữ ' + Math.round((p.progress || 0) * 100) + '%'); };
@@ -4025,7 +4024,7 @@ async function scanImg(f) {
         if (r.notDoc) { if (E === E0) renderScan(); toast('Ảnh này không giống hóa đơn hay bill giao dịch (ảnh vẫn được đính kèm)'); return; }
         const d = r.d;
         if (E !== E0) { toast(d && d.amount ? 'Đã đọc ảnh: ' + num(d.amount) + ' ₫' : 'Đã đọc ảnh nhưng form đã đóng'); return; }
-        if (!d || !d.amount) { renderScan(); toast('Không nhận ra số tiền trong ảnh' + (r.aiErr ? ' — AI lỗi: ' + r.aiErr : '') + ', bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)'); return; }
+        if (!d || !d.amount) { renderScan(); toast(r.aiErr ? 'AI lỗi: ' + r.aiErr + '. Thử quét lại sau (ảnh vẫn được đính kèm)' : 'AI không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)'); return; }
         if (cfg().scan.auto && r.st && draftOk(d) && !d.unsure.length) {
             (E0.staged = E0.staged || []).some(s => s === r.st) || E0.staged.push(r.st);
             applyDraft(d); r.st.name = imgName(); E0.review = null;

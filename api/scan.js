@@ -3,7 +3,7 @@
 // Khóa API chỉ nằm ở server. Chỉ người đã đăng nhập (cookie) mới gọi được.
 const auth = require('./_auth');
 const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
-const KEY = env('GEMINI_API_KEY'), MODEL = env('SCAN_MODEL') || 'gemini-2.5-flash';
+const KEY = env('GEMINI_API_KEY'), MODEL = env('SCAN_MODEL') || 'gemini-flash-latest';
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản'];
 
 const SCHEMA = {
@@ -93,7 +93,8 @@ module.exports = async (req, res) => {
       const msg = j && j.error && j.error.message;
       console.warn('scan: Gemini', r.status, msg);
       return res.status(200).json({ ok: false, err:
-        r.status === 429 ? 'AI đang quá tải hoặc hết hạn mức, thử lại sau'
+        r.status === 404 ? 'Model AI không tồn tại: ' + MODEL + ' (kiểm tra SCAN_MODEL trên Vercel)'
+        : r.status === 429 ? 'AI đang quá tải hoặc hết hạn mức, thử lại sau'
         : (r.status === 400 && /API key/i.test(msg || '')) || r.status === 401 || r.status === 403 ? 'GEMINI_API_KEY không hợp lệ'
         : 'AI lỗi ' + r.status });
     }
