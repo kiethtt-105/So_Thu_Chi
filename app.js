@@ -102,7 +102,8 @@ function aIco(a) {
 }
 if (!window.CONFIG)
     $('#lerr').textContent = 'Thiếu file config.js';
-const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: location.hash.slice(1) || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: {}, ready: false, busy: 0, err: '', pg: 100 };
+const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: location.hash.slice(1) || (() => { try { return localStorage.tab; } catch (e) { return ''; } })() || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: {}, ready: false, busy: 0, err: '', pg: 100 };
+if (location.hash) history.replaceState(null, '', location.pathname + location.search);   // ẩn #tab khỏi thanh địa chỉ
 let E = null, ED = null;
 if (!TABS.some(t => t[0] === S.tab))
     S.tab = 'home';
@@ -792,7 +793,7 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : 
     document.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('cin')) setTimeout(() => { try { e.target.select(); } catch (x) { } }, 0); });
 })();
 
-const go = t => { S.tab = t; if (location.hash.slice(1) !== t) location.hash = t; scrollTo(0, 0); closeSheet(); render(); };
+const go = t => { S.tab = t; try { localStorage.tab = t; } catch (e) { } if (location.hash) history.replaceState(null, '', location.pathname + location.search); scrollTo(0, 0); closeSheet(); render(); };
 document.addEventListener('click', e => {
     if (e.target.closest('[data-a3="print"]')) { setTimeout(() => window.print(), 150); return; }
     const t = e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-a],[data-bdo],[data-ed],[data-rs]');
