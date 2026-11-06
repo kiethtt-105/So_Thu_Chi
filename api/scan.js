@@ -4,6 +4,7 @@
 const auth = require('./_auth');
 const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
 const KEY = env('GEMINI_API_KEY'), MODEL = env('SCAN_MODEL') || 'gemini-flash-latest';
+const FALLBACKS = (env('SCAN_MODEL_FALLBACK') || 'gemini-2.5-flash-lite,gemini-flash-lite-latest').split(',').map(x => x.trim()).filter(Boolean);
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản'];
 
 const SCHEMA = {
@@ -73,30 +74,43 @@ module.exports = async (req, res) => {
     + '\n\nĐọc ảnh đính kèm và trả về JSON giao dịch theo schema.';
 
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 28000);
-  let j;
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: SYSTEM }] },
+    contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: image } }, { text: ctx }] }],
+    generationConfig: {
+      temperature: 0, maxOutputTokens: 3072,
+      responseMimeType: 'application/json', responseSchema: SCHEMA,
+      thinkingConfig: { thinkingBudget: 1024 }   // cho AI nghĩ một chút: ảnh nhiều con số rất dễ nhầm số tiền / ngày giờ
+    }
+  });
+  // Google hay trả 503/429 khi quá tải: thử lại một lần, rồi chuyển sang model AI dự phòng (vẫn là AI)
+  const plan = [MODEL, MODEL, ...FALLBACKS.filter(m => m !== MODEL)];
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let j, last = null;
   try {
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(MODEL) + ':generateContent', {
-      method: 'POST', signal: ac.signal,
-      headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM }] },
-        contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: image } }, { text: ctx }] }],
-        generationConfig: {
-          temperature: 0, maxOutputTokens: 3072,
-          responseMimeType: 'application/json', responseSchema: SCHEMA,
-          thinkingConfig: { thinkingBudget: 1024 }   // cho AI nghĩ một chút: ảnh nhiều con số rất dễ nhầm số tiền / ngày giờ
-        }
-      })
-    });
-    j = await r.json();
-    if (!r.ok) {
-      const msg = j && j.error && j.error.message;
-      console.warn('scan: Gemini', r.status, msg);
+    for (let i = 0; i < plan.length; i++) {
+      if (ac.signal.aborted) break;
+      if (i === 1 || (i > 1 && plan[i] !== plan[i - 1])) await sleep(i === 1 ? 1200 : 300);
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(plan[i]) + ':generateContent', {
+        method: 'POST', signal: ac.signal,
+        headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' }, body
+      });
+      let jj = null; try { jj = await r.json(); } catch (e) { }
+      if (r.ok && jj) { j = jj; last = null; break; }
+      const msg = jj && jj.error && jj.error.message;
+      console.warn('scan: Gemini', plan[i], r.status, msg);
+      last = { status: r.status, msg, model: plan[i] };
+      if (![429, 500, 503, 504, 404].includes(r.status)) break;   // lỗi khóa / dữ liệu: thử lại cũng vô ích
+    }
+    if (!j) {
+      const st = last && last.status, msg = (last && last.msg) || '';
       return res.status(200).json({ ok: false, err:
-        r.status === 404 ? 'Model AI không tồn tại: ' + MODEL + ' (kiểm tra SCAN_MODEL trên Vercel)'
-        : r.status === 429 ? 'AI đang quá tải hoặc hết hạn mức, thử lại sau'
-        : (r.status === 400 && /API key/i.test(msg || '')) || r.status === 401 || r.status === 403 ? 'GEMINI_API_KEY không hợp lệ'
-        : 'AI lỗi ' + r.status });
+        !last ? 'AI phản hồi quá chậm'
+        : st === 404 ? 'Model AI không tồn tại: ' + last.model + ' (kiểm tra SCAN_MODEL trên Vercel)'
+        : st === 429 ? 'AI đang hết hạn mức, thử lại sau ít phút'
+        : st === 503 || st === 500 || st === 504 ? 'AI của Google đang quá tải, thử lại sau ít phút'
+        : (st === 400 && /API key/i.test(msg)) || st === 401 || st === 403 ? 'GEMINI_API_KEY không hợp lệ'
+        : 'AI lỗi ' + st });
     }
   } catch (e) {
     return res.status(200).json({ ok: false, err: e && e.name === 'AbortError' ? 'AI phản hồi quá chậm' : 'Không kết nối được AI' });
