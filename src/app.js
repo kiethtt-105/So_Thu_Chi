@@ -3914,6 +3914,21 @@ function ocrAcc(r) {
     return hit ? hit.name : null;
 }
 const SCAN_CANCEL = () => Object.assign(Error('Đã hủy'), { cancel: true });
+// "Dạy" AI bằng chính lịch sử của người dùng: các giao dịch đã lưu (kể cả đã sửa tay) là ví dụ mẫu
+function scanExamples() {
+    const seen = new Set(), out = [];
+    const rows = S.tx.filter(t => (t.type === 'Chi' || t.type === 'Thu') && t.cat && t.sub)
+        .sort((a, b) => String(b.at || b.date).localeCompare(String(a.at || a.date)));
+    for (const t of rows) {
+        const note = String(noteTxt(t.note) || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        if (!note) continue;
+        const k = note.toLowerCase() + '|' + t.cat + '|' + t.sub;
+        if (seen.has(k)) continue; seen.add(k);
+        out.push({ t: t.type, n: note, a: t.acc, p: t.cat, c: t.sub, m: Math.round(t.amount) });
+        if (out.length >= 80) break;
+    }
+    return out;
+}
 async function aiScan(blob, signal) {
     const SC = cfg().scan;
     const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 40000);
@@ -3921,7 +3936,7 @@ async function aiScan(blob, signal) {
     try {
         const res = await fetch('/api/scan', {
             method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: SC.hint ? S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })) : [], cats: SC.hint ? S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) : [] })
+            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: SC.hint ? S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })) : [], cats: SC.hint ? S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) : [], examples: SC.hint ? scanExamples() : [] })
         });
         let j = null;
         try { j = await res.json(); } catch (e) { }
