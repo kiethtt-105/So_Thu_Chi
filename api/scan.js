@@ -8,7 +8,9 @@ const TYPES = ['Chi', 'Thu', 'Chuyển khoản'];
 
 const SCHEMA = {
   type: 'OBJECT',
+  propertyOrdering: ['is_financial_document', 'evidence', 'type', 'amount', 'date', 'time', 'account', 'account_to', 'category', 'detail', 'note', 'confidence', 'unsure'],
   properties: {
+    evidence: { type: 'STRING', description: 'Chép đúng nhãn chữ nằm ngay cạnh hoặc ngay trên con số tiền đã chọn (ví dụ "Giao dịch thành công", "Số tiền", "Tổng thanh toán"). Rỗng nếu không phải chứng từ.' },
     is_financial_document: { type: 'BOOLEAN', description: 'false nếu ảnh không phải hóa đơn, bill ngân hàng, biên lai hay màn hình giao dịch' },
     type: { type: 'STRING', enum: TYPES, description: 'Chi = tiền ra khỏi tài khoản của chủ sổ (kể cả chuyển tiền cho người khác). Thu = tiền vào. Chuyển khoản = chuyển giữa HAI tài khoản đều có trong danh sách của chủ sổ.' },
     amount: { type: 'INTEGER', description: 'Số tiền thực tế của giao dịch, đơn vị VND, số nguyên dương. Không lấy số dư, phí, VAT hay mã giao dịch.' },
@@ -29,7 +31,12 @@ const SYSTEM = [
   'Bạn đọc ảnh chụp hóa đơn, bill, biên lai và màn hình giao dịch ngân hàng / ví điện tử của người Việt, rồi điền vào sổ thu chi cá nhân.',
   'Quy tắc:',
   '- Số tiền kiểu 1.250.000 hoặc 1,250,000 là một triệu hai trăm năm mươi nghìn đồng. Ngày dạng dd/mm/yyyy. Nếu ảnh chỉ có ngày không năm thì dùng năm của "hôm nay".',
-  '- Lấy số tiền thanh toán cuối cùng (tổng cộng / số tiền chuyển), không lấy số dư, phí, thuế, tiền thừa, mã giao dịch, số tài khoản, số điện thoại.',
+  '- Lấy số tiền của CHÍNH giao dịch này: con số lớn nhất, nằm ở phần đầu chứng từ, cạnh chữ "thành công" / "số tiền" / "tổng thanh toán". Không lấy số dư, phí ("Tổng phí" là phí, không phải số tiền), thuế, tiền thừa, mã giao dịch, số tài khoản, số điện thoại.',
+  '- Ảnh chụp cả màn hình thường có thêm các khung phía dưới như "Quản lý chi tiêu", "Tổng chi tháng", "So với cùng kỳ", quảng cáo, đánh giá dịch vụ. Đó là thống kê của app, KHÔNG phải giao dịch: bỏ qua toàn bộ các số ở đó.',
+  '- Ngày giờ trên MoMo, ZaloPay, ngân hàng thường viết "HH:mm - dd/MM/yyyy" hoặc "HH:mm dd/MM/yyyy": phần giờ (có dấu hai chấm) đứng trước, phần ngày (có dấu gạch chéo) đứng sau. Không được đảo hoặc trộn hai phần. Ngày phải hợp lý, gần với "hôm nay".',
+  '- Ghi chú chỉ gồm tên nơi nhận / cửa hàng / nội dung thanh toán (ví dụ "F88 trả khoản vay"). Tuyệt đối không chép chữ giao diện như "Giao dịch thành công", "Chia sẻ", "Mã giao dịch", tên nút.',
+  '- Thanh toán khoản vay, trả góp, trả nợ (F88, Home Credit, FE Credit, thẻ tín dụng...) là Chi: chọn hạng mục liên quan đến vay / nợ / tài chính nếu có trong danh sách, không có thì để trống.',
+  '- Hạng mục "Khác" không phải lựa chọn mặc định. Không khớp rõ ràng thì để trống category và detail.',
   '- Biên lai "chuyển tiền thành công", "thanh toán thành công", hóa đơn mua hàng => Chi. "Nhận tiền", "ghi có", tiền vào, lương, hoàn tiền => Thu.',
   '- Chỉ chọn Chuyển khoản khi cả tài khoản nguồn lẫn tài khoản nhận đều khớp rõ ràng với danh sách tài khoản của chủ sổ. Chuyển cho người khác là Chi.',
   '- Tài khoản: nhận biết theo ngân hàng hoặc ví hiển thị trên ảnh (logo, tên app, tên ngân hàng) rồi chọn tên khớp nhất trong danh sách. Không chắc thì để trống, không đoán.',
@@ -74,9 +81,9 @@ module.exports = async (req, res) => {
         systemInstruction: { parts: [{ text: SYSTEM }] },
         contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: image } }, { text: ctx }] }],
         generationConfig: {
-          temperature: 0, maxOutputTokens: 1024,
+          temperature: 0, maxOutputTokens: 3072,
           responseMimeType: 'application/json', responseSchema: SCHEMA,
-          thinkingConfig: { thinkingBudget: 0 }   // tắt "suy nghĩ" để nhanh, rẻ và không ăn vào token trả lời
+          thinkingConfig: { thinkingBudget: 1024 }   // cho AI nghĩ một chút: ảnh nhiều con số rất dễ nhầm số tiền / ngày giờ
         }
       })
     });
@@ -103,27 +110,30 @@ module.exports = async (req, res) => {
   if (o.is_financial_document === false) return res.status(200).json({ ok: true, data: { amount: 0, notDoc: true } });
 
   // Kiểm chứng: chỉ nhận giá trị khớp danh sách của chủ sổ
+  const evidence = clean(o.evidence, 120);
+  const badAmount = /tổng chi|chi tiêu|cùng kỳ|so với|số dư|dư nợ|hạn mức|^\s*(tổng\s+)?phí\b/i.test(evidence);   // AI tự khai lấy số ở khung thống kê / phí: bỏ, tốt hơn điền sai
   let type = TYPES.includes(o.type) ? o.type : 'Chi';
-  const amount = Math.round(Math.abs(Number(o.amount) || 0));
+  const amount = badAmount ? 0 : Math.round(Math.abs(Number(o.amount) || 0));
   const acc = accSet.has(o.account) ? o.account : '';
   let accTo = accSet.has(o.account_to) ? o.account_to : '';
   if (type === 'Chuyển khoản' && (!acc || !accTo || acc === accTo)) type = 'Chi';
   if (type !== 'Chuyển khoản') accTo = '';
-  const okCat = type !== 'Chuyển khoản' && catSet.has(type + '|' + o.category + '|' + o.detail);
-  const date = validDate(o.date) ? o.date : '';
+  const okCat = type !== 'Chuyển khoản' && !/^khác$/i.test(String(o.detail || '').trim()) && catSet.has(type + '|' + o.category + '|' + o.detail);   // "Khác" do AI tự chọn thì bỏ, để người dùng chọn
+  const nowMs = Date.now() + 7 * 3600e3, dMs = validDate(o.date) ? Date.parse(o.date + 'T00:00:00Z') : NaN;
+  const date = !isNaN(dMs) && dMs <= nowMs + 86400e3 && dMs >= nowMs - 400 * 86400e3 ? o.date : '';   // chặn ngày tương lai hoặc cũ quá 13 tháng (vd 2011)
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(o.time || '') ? o.time : '';
   const unsure = new Set((Array.isArray(o.unsure) ? o.unsure : []).filter(x => ['amount', 'date', 'account', 'category'].includes(x)));
   if (!acc) unsure.add('account');
   if (!date) unsure.add('date');
   if (type !== 'Chuyển khoản' && !okCat) unsure.add('category');
-  if (Number(o.confidence) < 0.6) unsure.add('amount');
+  if (Number(o.confidence) < 0.6 || badAmount) unsure.add('amount');
   return res.status(200).json({
     ok: true,
     data: {
       unsure: [...unsure],
       type, amount: amount >= 1 && amount < 1e11 ? amount : 0, date, time, acc, accTo,
       cat: okCat ? o.category : '', sub: okCat ? o.detail : '',
-      note: clean(o.note, 120), conf: Math.max(0, Math.min(1, Number(o.confidence) || 0))
+      note: clean(String(o.note || '').replace(/giao dịch thành công|chia sẻ|mã giao dịch/gi, ' ').replace(/\s{2,}/g, ' '), 120), conf: Math.max(0, Math.min(1, Number(o.confidence) || 0))
     }
   });
 };
