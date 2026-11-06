@@ -36,6 +36,8 @@ const SYSTEM = [
   '- Số tiền kiểu 1.250.000 hoặc 1,250,000 là một triệu hai trăm năm mươi nghìn đồng. Ngày dạng dd/mm/yyyy. Nếu ảnh chỉ có ngày không năm thì dùng năm của "hôm nay".',
   '- Lấy số tiền của CHÍNH giao dịch này: con số lớn nhất, nằm ở phần đầu chứng từ, cạnh chữ "thành công" / "số tiền" / "tổng thanh toán". Không lấy số dư, phí ("Tổng phí" là phí, không phải số tiền), thuế, tiền thừa, mã giao dịch, số tài khoản, số điện thoại.',
   '- Ảnh chụp cả màn hình thường có thêm các khung phía dưới như "Quản lý chi tiêu", "Tổng chi tháng", "So với cùng kỳ", quảng cáo, đánh giá dịch vụ. Đó là thống kê của app, KHÔNG phải giao dịch: bỏ qua toàn bộ các số ở đó.',
+  '- Ngày kiểu "6 thg 11, 2026 lúc 7:31" (Techcombank và một số ngân hàng) nghĩa là ngày 6 tháng 11 năm 2026, 07:31.',
+  '- Ảnh có thể nhỏ, mờ (ví dụ ảnh chụp bản xem trước ứng dụng): đọc kỹ từng dòng; chữ nào không đọc được thì bỏ qua, không ghi ký tự lạ vào ghi chú.',
   '- Ngày giờ trên MoMo, ZaloPay, ngân hàng thường viết "HH:mm - dd/MM/yyyy" hoặc "HH:mm dd/MM/yyyy": phần giờ (có dấu hai chấm) đứng trước, phần ngày (có dấu gạch chéo) đứng sau. Không được đảo hoặc trộn hai phần. Ngày phải hợp lý, gần với "hôm nay".',
   '- Ghi chú chỉ gồm tên nơi nhận / cửa hàng / nội dung thanh toán (ví dụ "Highlands Coffee" hoặc "Nguyễn Văn A - tiền trọ"). Tuyệt đối không chép chữ giao diện như "Giao dịch thành công", "Chia sẻ", "Mã giao dịch", tên nút.',
   '- Hạng mục "Khác" không phải lựa chọn mặc định. Không khớp rõ ràng thì để trống category và detail.',
@@ -83,23 +85,31 @@ module.exports = async (req, res) => {
     generationConfig: {
       temperature: 0, maxOutputTokens: 3072,
       responseMimeType: 'application/json', responseSchema: SCHEMA,
-      thinkingConfig: { thinkingBudget: 1024 }   // cho AI nghĩ một chút: ảnh nhiều con số rất dễ nhầm số tiền / ngày giờ
+      thinkingConfig: { thinkingBudget: 256 }   // cho AI nghĩ một chút: ảnh nhiều con số rất dễ nhầm số tiền / ngày giờ
     }
   });
   // Google hay trả 503/429 khi quá tải: thử lại một lần, rồi chuyển sang model AI dự phòng (vẫn là AI)
-  const plan = [MODEL, MODEL, ...FALLBACKS.filter(m => m !== MODEL)];
+  const plan = [MODEL, ...FALLBACKS.filter(m => m !== MODEL)];   // không thử lại cùng model: quá tải thì sang model khác ngay
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  let j, last = null;
+  let j, last = null, used = '';
   try {
     for (let i = 0; i < plan.length; i++) {
       if (ac.signal.aborted) break;
-      if (i === 1 || (i > 1 && plan[i] !== plan[i - 1])) await sleep(i === 1 ? 1200 : 300);
-      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(plan[i]) + ':generateContent', {
-        method: 'POST', signal: ac.signal,
-        headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' }, body
-      });
-      let jj = null; try { jj = await r.json(); } catch (e) { }
-      if (r.ok && jj) { j = jj; last = null; break; }
+      // mỗi model chỉ được chờ tối đa 11 giây (model cuối được chờ hết phần còn lại): chậm quá thì sang model khác
+      const sub = new AbortController(), onAbort = () => sub.abort(), st = setTimeout(() => sub.abort(), i < plan.length - 1 ? 11000 : 28000);
+      ac.signal.addEventListener('abort', onAbort, { once: true });
+      let r, jj = null;
+      try {
+        r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(plan[i]) + ':generateContent', {
+          method: 'POST', signal: sub.signal,
+          headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' }, body
+        });
+        try { jj = await r.json(); } catch (e) { }
+      } catch (e) {
+        if (ac.signal.aborted) throw e;
+        last = { status: 504, msg: 'timeout', model: plan[i] }; continue;   // model này chậm: thử model kế tiếp
+      } finally { clearTimeout(st); ac.signal.removeEventListener('abort', onAbort); }
+      if (r.ok && jj) { j = jj; used = plan[i]; last = null; break; }
       const msg = jj && jj.error && jj.error.message;
       console.warn('scan: Gemini', plan[i], r.status, msg);
       last = { status: r.status, msg, model: plan[i] };
@@ -154,7 +164,7 @@ module.exports = async (req, res) => {
   return res.status(200).json({
     ok: true,
     data: {
-      unsure: [...unsure],
+      model: used, unsure: [...unsure],
       type, amount: amount >= 1 && amount < 1e11 ? amount : 0, date, time, acc, accTo,
       cat, sub,
       note: clean(String(o.note || '').replace(/giao dịch thành công|chia sẻ|mã giao dịch/gi, ' ').replace(/\s{2,}/g, ' '), 120), conf: Math.max(0, Math.min(1, Number(o.confidence) || 0))

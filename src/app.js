@@ -2499,6 +2499,7 @@ async function squeeze(f) {
     catch (e) { if (!isHeic(f)) throw e; im = await loadBmp(await heicToJpg(f)); }
     const w = im.width || im.naturalWidth, h = im.height || im.naturalHeight;
     let k = Math.min(1, IMG_MAX / Math.max(w, h)), q = .82, b;
+    if (Math.max(w, h) < 1000) k = Math.min(3, 1000 / Math.max(w, h));   // ảnh nhỏ/mờ: phóng lên để AI có đủ điểm ảnh đọc chữ
     for (let i = 0; i < 10; i++) {
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(w * k));
@@ -3954,6 +3955,7 @@ function scanDraft(r) {
         d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: ocrAcc(r) || '', accTo: '', cat: g ? g.p : '', sub: g ? g.c : '', note: r.note || '', unsure: ['account', 'amount'] };
         if (!g && d.type !== 'Chuyển khoản') d.unsure.push('category');
     }
+    if (r.ai && r.model) d.model = r.model;
     if (!d.amount && !d.unsure.includes('amount')) d.unsure.push('amount');
     if (!d.date && !d.unsure.includes('date')) d.unsure.push('date');
     return d;
@@ -4006,7 +4008,7 @@ function scanCard() {
     const row = (l, v, k, d) => `<div class="rvr"><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></div>`;
     if (E.review) {
         const d = E.review.d, ck = d.type === 'Chuyển khoản';
-        return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được — kiểm tra rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
+        return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được' + (d.model ? ' (' + esc(d.model) + ')' : '') + ' — kiểm tra rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
             + row('Loại', esc(d.type)) + row('Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount', d) + row('Ngày giờ', esc(dFmt(d)), 'date', d)
             + row('Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account', d)
             + (ck ? '' : row('Hạng mục', d.cat ? esc(d.cat + ' › ' + d.sub) : '—', 'category', d)) + (d.note ? row('Ghi chú', esc(d.note)) : '')
