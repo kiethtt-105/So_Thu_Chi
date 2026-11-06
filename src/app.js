@@ -3930,18 +3930,18 @@ function scanExamples() {
     }
     return out;
 }
-async function aiScan(blob, signal) {
+async function aiScan(blob, signal, full) {   // full = quét nhiều ảnh (cần tự phân loại để lưu thẳng); quét một ảnh chỉ đọc số tiền + thời gian
     const SC = cfg().scan;
     const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 40000);
     if (signal) { if (signal.aborted) ctl.abort(); else signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
     try {
         const res = await fetch('/api/scan', {
             method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: SC.hint ? S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })) : [], cats: SC.hint ? S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) : [], examples: SC.hint ? scanExamples() : [] })
+            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: SC.hint ? S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })) : [], cats: full && SC.hint ? S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) : [], examples: SC.hint ? scanExamples() : [] })
         });
         let j = null;
         try { j = await res.json(); } catch (e) { }
-        if (j && j.ok && j.data) return Object.assign({}, j.data, { ai: true });
+        if (j && j.ok && j.data) return Object.assign({}, j.data, { ai: true, full: !!full });
         return { aiFail: (j && j.err) || (res.status === 404 ? 'chưa có /api/scan, cần deploy lại thư mục api/' : 'máy chủ trả lỗi ' + res.status) };
     } catch (e) { if (signal && signal.aborted) throw SCAN_CANCEL(); return { aiFail: e && e.name === 'AbortError' ? 'AI phản hồi quá chậm' : 'không kết nối được máy chủ AI' }; }
     finally { clearTimeout(tm); }
@@ -3949,7 +3949,7 @@ async function aiScan(blob, signal) {
 // Chuẩn hóa kết quả (AI hoặc OCR) về một "bản nháp" giao dịch
 function scanDraft(r) {
     let d;
-    if (r.ai) d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: r.acc || '', accTo: r.accTo || '', cat: r.cat || '', sub: r.sub || '', note: r.note || '', unsure: (r.unsure || []).slice(), ask: r.ask || [] };
+    if (r.ai) d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: r.acc || '', accTo: r.accTo || '', cat: r.cat || '', sub: r.sub || '', note: r.note || '', unsure: (r.unsure || []).filter(k => r.full || k === 'amount' || k === 'date' || k === 'account'), ask: (r.ask || []).filter(a => a.f === 'account') };
     else {
         const g = (r.type === 'Chi' || r.type === 'Thu') ? ocrCat(r.type, r.tx) : null;
         d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: ocrAcc(r) || '', accTo: '', cat: g ? g.p : '', sub: g ? g.c : '', note: r.note || '', unsure: ['account', 'amount'] };
@@ -3967,7 +3967,7 @@ async function readOne(f, sig, o) {
     if (o.onSt) o.onSt(st);
     if (sig.aborted) throw SCAN_CANCEL();
     if (o.msg && cfg().scan.ai) o.msg('AI đang đọc ảnh…');
-    let r = await aiScan(small, sig), aiErr = '';
+    let r = await aiScan(small, sig, !!o.batch), aiErr = '';
     if (r && r.aiFail) { aiErr = r.aiFail; r = null; }
     if (r && r.notDoc) return { st, notDoc: true };
     if (false) {   // đã tắt: bắt buộc dùng AI, không dự phòng OCR
@@ -4010,8 +4010,7 @@ function scanCard() {
         const d = E.review.d, ck = d.type === 'Chuyển khoản';
         return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được' + (d.model ? ' (' + esc(d.model) + ')' : '') + ' — kiểm tra rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
             + row('Loại', esc(d.type)) + row('Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount', d) + row('Ngày giờ', esc(dFmt(d)), 'date', d)
-            + row('Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account', d)
-            + (ck ? '' : row('Hạng mục', d.cat ? esc(d.cat + ' › ' + d.sub) : '—', 'category', d)) + (d.note ? row('Ghi chú', esc(d.note)) : '')
+            + row('Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account', d) + (d.note ? row('Ghi chú', esc(d.note)) : '')
             + (d.ask || []).filter(a => a.f === 'category' ? !ck && !d.cat : !d.acc).map(a => `<div class="rvq"><div style="font-weight:600;margin-top:8px">🤔 ${esc(a.q)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">` + a.opts.map((o, i) => `<button type="button" class="btn" data-rvq="${a.f}" data-oi="${i}">${esc(a.f === 'category' ? o.p + ' › ' + o.c : o)}</button>`).join('') + '</div></div>').join('')
             + `<div class="rvb"><button type="button" class="btn p" data-rv="ok">Điền vào form</button><button type="button" class="btn" data-rv="no">Bỏ qua</button></div></div>`;
     }
@@ -4067,7 +4066,7 @@ async function scanMany(fs) {
     const work = async () => {
         while (k < fs.length && !ctl.signal.aborted) {
             const i = k++;
-            try { const r = await readOne(fs[i], ctl.signal, {}); if (r.d && !r.notDoc) out[i] = r; else bad++; }
+            try { const r = await readOne(fs[i], ctl.signal, { batch: true }); if (r.d && !r.notDoc) out[i] = r; else bad++; }
             catch (e) { if (e.cancel) return; bad++; }
             done++; show();
         }

@@ -38,6 +38,7 @@ const SCHEMA = {
 const SYSTEM = [
   'Bạn đọc ảnh chụp hóa đơn, bill, biên lai và màn hình giao dịch ngân hàng / ví điện tử của người Việt, rồi điền vào sổ thu chi cá nhân.',
   'Quy tắc:',
+  '- CHỦ SỔ CHỈ CẦN BA THỨ: số tiền, ngày giờ và tài khoản. Dồn sự chú ý để đọc chính xác ba thứ này; hạng mục có thể để trống.',
   '- Số tiền kiểu 1.250.000 hoặc 1,250,000 là một triệu hai trăm năm mươi nghìn đồng. Ngày dạng dd/mm/yyyy. Nếu ảnh chỉ có ngày không năm thì dùng năm của "hôm nay".',
   '- Lấy số tiền của CHÍNH giao dịch này: con số lớn nhất, nằm ở phần đầu chứng từ, cạnh chữ "thành công" / "số tiền" / "tổng thanh toán". Không lấy số dư, phí ("Tổng phí" là phí, không phải số tiền), thuế, tiền thừa, mã giao dịch, số tài khoản, số điện thoại.',
   '- Ảnh chụp cả màn hình thường có thêm các khung phía dưới như "Quản lý chi tiêu", "Tổng chi tháng", "So với cùng kỳ", quảng cáo, đánh giá dịch vụ. Đó là thống kê của app, KHÔNG phải giao dịch: bỏ qua toàn bộ các số ở đó.',
@@ -84,13 +85,13 @@ module.exports = async (req, res) => {
     + '\n\nĐọc ảnh đính kèm và trả về JSON giao dịch theo schema.';
 
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 28000);
-  const body = JSON.stringify({
+  const mkBody = m => JSON.stringify({
     systemInstruction: { parts: [{ text: SYSTEM }] },
     contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: image } }, { text: ctx }] }],
     generationConfig: {
       temperature: 0, maxOutputTokens: 3072,
       responseMimeType: 'application/json', responseSchema: SCHEMA,
-      thinkingConfig: { thinkingBudget: 256 }   // cho AI nghĩ một chút: ảnh nhiều con số rất dễ nhầm số tiền / ngày giờ
+      thinkingConfig: { thinkingBudget: /lite/i.test(m) ? 512 : 256 }   // cho AI nghĩ một chút: ảnh nhiều con số rất dễ nhầm số tiền / ngày giờ
     }
   });
   // Google hay trả 503/429 khi quá tải: thử lại một lần, rồi chuyển sang model AI dự phòng (vẫn là AI)
@@ -107,7 +108,7 @@ module.exports = async (req, res) => {
       try {
         r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(plan[i]) + ':generateContent', {
           method: 'POST', signal: sub.signal,
-          headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' }, body
+          headers: { 'x-goog-api-key': KEY, 'content-type': 'application/json' }, body: mkBody(plan[i])
         });
         try { jj = await r.json(); } catch (e) { }
       } catch (e) {
@@ -145,10 +146,10 @@ module.exports = async (req, res) => {
 
   // Kiểm chứng: chỉ nhận giá trị khớp danh sách của chủ sổ
   const evidence = clean(o.evidence, 120);
-  const badAmount = /tổng chi|chi tiêu|quản lý|danh mục|cùng kỳ|so với|số dư|dư nợ|hạn mức|^\s*(tổng\s+)?phí\b/i.test(evidence);   // AI tự khai lấy số ở khung thống kê / phí: bỏ, tốt hơn điền sai
+  const badAmount = /tổng chi|chi tiêu|quản lý|danh mục|cùng kỳ|so với|số dư|dư nợ|hạn mức|^\s*(tổng\s+)?phí(?![\p{L}\d])/iu.test(evidence);   // AI tự khai lấy số ở khung thống kê / phí: bỏ, tốt hơn điền sai
   let type = TYPES.includes(o.type) ? o.type : 'Chi';
   // Số tiền AI "tính" có thể lệch so với chuỗi nó chép nguyên văn từ ảnh: nếu lệch thì tin chuỗi chép, và báo nghi ngờ
-  const txtAmt = Math.round(Number(String(o.amount_text || '').replace(/[^\d]/g, '')) || 0);
+  const txtAmt = Math.round(Number(((String(o.amount_text || '').match(/\d[\d.,]*/) || [''])[0]).replace(/\D/g, '')) || 0);   // chỉ lấy con số ĐẦU TIÊN, không ghép các số khác trong chuỗi
   const rawAmt = Math.round(Math.abs(Number(o.amount) || 0));
   const mismatch = txtAmt > 0 && rawAmt > 0 && txtAmt !== rawAmt;
   const amount = badAmount ? 0 : (txtAmt > 0 && (mismatch || !rawAmt) ? txtAmt : rawAmt);
