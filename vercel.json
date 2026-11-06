@@ -3,7 +3,7 @@
   "outputDirectory": "public",
   "headers": [
     {
-      "source": "/(sw.js|app.js|style.css|index.html|config.js|)",
+      "source": "/(|sw.js|app.js|style.css|layout.css|fixes.css|index.html|config.js|manifest.webmanifest)",
       "headers": [
         {
           "key": "Cache-Control",

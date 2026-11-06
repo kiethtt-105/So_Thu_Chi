@@ -15,3 +15,35 @@ html,body{overflow-x:hidden}
 /* Thanh tiến trình đồng bộ: gọn, bỏ hàng "Thiết bị > Redis > Google Sheet" bị cắt nửa chữ */
 #pg .pgs{display:none}
 #pg .pgt{padding:6px 14px}
+
+/* ───────────── Form Thêm/Sửa giao dịch: KHUNG CỐ ĐỊNH ─────────────
+   Trước đây khung cao theo nội dung nên đổi tab Chi/Thu/Chuyển/Điều chỉnh hoặc mở danh sách chọn là khung phình/co.
+   Giờ khung có chiều cao cố định; phần nhập cuộn bên trong, tiêu đề và nút Lưu luôn nằm yên. */
+.ov.open .sheet:has(#fa){
+  display:flex;flex-direction:column;overflow:hidden;
+  height:min(680px,calc(90dvh / var(--z,1)));max-height:calc(92dvh / var(--z,1))}
+.sheet:has(#fa)>*{flex:none}
+.sheet:has(#fa)>.tf{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;align-content:start;
+  overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:6px}
+@media(min-width:960px){
+  .ov.open .sheet:has(#fa){height:min(600px,calc(90dvh / var(--z,1)))}
+  .sheet:has(#fa)>.tf{align-content:stretch}
+}
+
+/* ───────────── Bỏ viền: dùng nền dịu thay đường kẻ ───────────── */
+.sheet,#cf .box,.card,.mi,.rem,.sum span,.qp,.tip,#qb .qrow,.cbl,#sx,
+.ib,.live,.usr,.mn,.btn,.chip,.seg,.tabs,.days button,#cf .bt button,
+html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
+#sd,.top,.sfoot,#pg,.sheet:has(#fa) .tf-l{border-color:transparent}
+/* Ô nhập: nền xám nhạt, chỉ hiện viền màu khi đang gõ */
+.sheet :where(input:not([type=checkbox]),select),.f input,.f select,.fp input,.fp select,.fpn .fp2 input,.fpn .fp2 select,.ba,.search{
+  border-color:transparent;background:var(--soft)}
+.sheet :where(input:not([type=checkbox]),select):focus,.f input:focus,.f select:focus,.fp input:focus,.fp select:focus,.ba:focus,.search:focus{
+  border-color:var(--acc);background:var(--field)}
+/* Thẻ chọn & nút phụ: nền soft để vẫn nhìn ra khi không có viền */
+.chip:not(.on),.btn:not(.p):not(.d),.ib,.live,.usr,.mn,.sum span{background:var(--soft)}
+.seg,.tabs{background:var(--soft)}
+/* Đường kẻ giữa các dòng danh sách: mờ hẳn, chỉ còn đủ để phân nhóm */
+.row,.rr,.li,.iss,.kr,.an,.dh{border-bottom-color:color-mix(in srgb,var(--line) 35%,transparent)}
+.sheet:has(#fa) .tf-l{border-right:0}
+.sfoot{border-top:0}

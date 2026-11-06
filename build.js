@@ -1,5 +1,5 @@
 const fs = require('fs'), path = require('path');
-const ROOT = __dirname, OUT = path.join(ROOT, 'public');
+const ROOT = __dirname, SRC = path.join(ROOT, 'src'), OUT = path.join(ROOT, 'public');   // mã nguồn giao diện nằm trong src/
 
 // Đọc biến môi trường: bỏ khoảng trắng thừa và dấu nháy bao quanh (hay bị dính khi dán từ file .env)
 const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
@@ -32,12 +32,12 @@ const configJs = 'self.CONFIG = ' + JSON.stringify(cfg, null, 4) + ';\n';
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 for (const f of ['index.html', 'style.css', 'layout.css', 'fixes.css', 'app.js', 'sw.js', 'manifest.webmanifest']) {
-  const src = path.join(ROOT, f);
+  const src = path.join(SRC, f);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(OUT, f));
-  else console.warn('Cảnh báo: không thấy ' + f + ', bỏ qua');
+  else console.warn('Cảnh báo: không thấy src/' + f + ', bỏ qua');
 }
-if (fs.existsSync(path.join(ROOT, 'icons'))) fs.cpSync(path.join(ROOT, 'icons'), path.join(OUT, 'icons'), { recursive: true });
-else console.warn('Cảnh báo: không thấy thư mục icons, bỏ qua');
+if (fs.existsSync(path.join(SRC, 'icons'))) fs.cpSync(path.join(SRC, 'icons'), path.join(OUT, 'icons'), { recursive: true });
+else console.warn('Cảnh báo: không thấy thư mục src/icons, bỏ qua');
 fs.writeFileSync(path.join(OUT, 'config.js'), configJs);
 
 // Mỗi lần deploy đổi tên cache của service worker => thiết bị luôn nhận bản mới, không dính CSS/JS cũ
