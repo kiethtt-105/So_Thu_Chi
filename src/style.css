@@ -1170,3 +1170,29 @@ html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
 
 /* Cài đặt › Ghi chép: ô chọn tài khoản trong dòng cài đặt không chiếm hết chiều ngang */
 .row select.tx{flex:0 1 200px;max-width:50%;min-width:0}
+
+
+/* fixes2.css — DÁN VÀO CUỐI style.css (index.html chỉ nạp style.css), rồi tăng V trong sw.js lên 'stc-v41' */
+
+/* 1. Header/tiêu đề ngày/thanh tab dính (sticky) bị hỏng vì overflow-x:hidden đặt trên cả html và body.
+      `clip` vẫn chặn tràn ngang nhưng không biến body thành khung cuộn nên sticky chạy lại bình thường. */
+html,body{overflow-x:clip}
+
+/* 2. Máy tính: nút đóng (×) đang bị ẩn (#sx chỉ hiện < 960px) → không có cách đóng bằng chuột.
+      Hiện lại, nằm đè lên góc phải (đúng chỗ .tfh đã chừa padding-right:40px). */
+@media(min-width:960px){
+  #sx{display:grid;position:sticky;top:0;z-index:7;width:34px;height:34px;margin:-14px -12px -20px auto;
+      font-size:22px;box-shadow:none;background:var(--soft);border:0}
+  #sx:hover{background:var(--accl);color:var(--acc)}
+}
+
+/* 3. Form Thêm/Sửa giao dịch (máy tính): khung cao cố định 600px làm 2 cột hở một khoảng trống lớn.
+      Giữ khung cố định (không phình/co khi đổi tab) nhưng thấp lại cho vừa nội dung. */
+@media(min-width:960px){
+  .ov.open .sheet:has(#fa){height:min(540px,calc(90dvh / var(--z,1)))}
+  .sheet:has(#fa)>.tf{align-content:start}
+  .sheet:has(#fa) .tf-l{justify-content:flex-start}
+}
+
+/* 4. Danh sách gợi ý Hạng mục/Chi tiết nằm trong vùng cuộn nên bị cắt đáy: chừa chỗ khi đang mở */
+.sheet:has(#fa)>.tf:has(.cbl:not(.hide)){padding-bottom:210px}
