@@ -1100,12 +1100,19 @@ $('#ov').addEventListener('click', e => {
 function pull() { const g = i => ($(i) || {}).value; E.date = g('#fd') || E.date; if ($('#fh'))
     E.time = g('#fh'); E.acc = g('#fc') || E.acc; E.note = g('#fn') || ''; if ($('#ft'))
     E.accTo = g('#ft'); E.amount = amtVal($('#fa').value) || 0; }
+// Gợi ý hạn mức từ 3 tháng đã trọn vẹn gần nhất: tháng = trung bình + 10%, ngày = trung bình ngày + 50% (chi tiêu theo ngày thường dồn cục), làm tròn lên 10.000
+function limSuggest() {
+    const cur = ymd(new Date()).slice(0, 7), ms = [shift(cur, -1), shift(cur, -2), shift(cur, -3)], chi = stx().filter(t => t.type === 'Chi' && ms.includes(t.date.slice(0, 7)));
+    const up = v => Math.max(10000, Math.ceil(v / 10000) * 10000), avg = c => { const by = {}; chi.forEach(t => { if (!c || t.cat === c) by[t.date.slice(0, 7)] = (by[t.date.slice(0, 7)] || 0) + t.amount; }); const v = Object.values(by); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
+    return c => { const m = avg(c); return m > 0 ? { Tháng: up(m * 1.1), Ngày: up(m / 30 * 1.5) } : null; };
+}
 function openLim() {
     ED = null;
     E = null;
     const pars = [...new Set(S.cat.filter(c => c.t === 'Chi').map(c => c.p))], orph = [...new Set(S.lim.filter(l => l.cat && !pars.includes(l.cat)).map(l => l.cat))], all = ['', ...pars, ...orph];
     const list = per => all.map(p => `<label class="${p === '' ? 'w' : ''}">${p === '' ? '∑ Tổng chi (tất cả hạng mục)' : emo(p) + ' ' + esc(p) + (orph.includes(p) ? ' ⚠️ hạng mục này không còn tồn tại' : '')}<input class="lm money" data-per="${per}" data-cat="${esc(p)}" inputmode="numeric" placeholder="Để trống = không đặt" title="Để trống hoặc nhập 0 để bỏ hạn mức" value="${limOf(per, p) ? num(limOf(per, p)) : ''}"></label>`).join('');
     $('#sh').innerHTML = `<h3>Thiết lập hạn mức chi <span class="tip" tabindex="0" role="note" aria-label="Hướng dẫn" data-tip="Để trống hoặc nhập 0 để bỏ hạn mức. Chỉ tính các giao dịch loại Chi.">ⓘ</span></h3><div class="tabs" style="margin-bottom:12px"><button type="button" class="on" data-lt="gd">Theo ngày</button><button type="button" data-lt="gc">Theo tháng</button></div>
+<button type="button" class="btn w" data-lsuggest style="margin-bottom:12px">✨ Gợi ý từ 3 tháng gần nhất</button>
 <div class="f" id="gd">${list('Ngày')}</div><div class="f hide" id="gc">${list('Tháng')}</div><button class="btn p w" data-lsave>Lưu hạn mức</button>`;
     openSheet();
 }
@@ -1240,6 +1247,11 @@ $('#ov').addEventListener('click', async (e) => {
         $('#gd').classList.toggle('hide', b.dataset.lt !== 'gd');
         $('#gc').classList.toggle('hide', b.dataset.lt !== 'gc');
         return;
+    }
+    if (q('[data-lsuggest]')) {
+        const sg = limSuggest(); let n = 0;
+        $$('.lm').forEach(i => { if (pm(i.value) > 0) return; const r = sg(i.dataset.cat); if (!r) return; i.value = num(r[i.dataset.per]); n++; });
+        return toast(n ? 'Đã điền gợi ý vào ' + n + ' ô còn trống. Kiểm tra rồi bấm Lưu hạn mức' : 'Chưa đủ dữ liệu chi tiêu 3 tháng gần nhất để gợi ý');
     }
     if (q('[data-lsave]')) {
         const ops = [];
