@@ -1178,26 +1178,32 @@ html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
       `clip` vẫn chặn tràn ngang nhưng không biến body thành khung cuộn nên sticky chạy lại bình thường. */
 html,body{overflow-x:clip}
 
-/* 2. Máy tính: nút đóng (×) đang bị ẩn (#sx chỉ hiện < 960px) → không có cách đóng bằng chuột. */
-@media(min-width:960px){
-  #sx{display:grid;position:sticky;top:0;z-index:7;width:34px;height:34px;margin:-14px -12px -20px auto;
-      font-size:22px;box-shadow:none;background:var(--soft);border:0}
-  #sx:hover{background:var(--accl);color:var(--acc)}
+/* 2. Ô nhập số tiền: bỏ vòng viền focus bao quanh số (trông như một khung đen méo quanh chữ "0") */
+.sheet:has(#fa) .amtw .amt:focus,
+.sheet:has(#fa) .amtw .amt:focus-visible{outline:0;box-shadow:none}
+
+/* 3. Điện thoại/tablet: nút × không đè lên khung "Quét ảnh" của giao dịch mới */
+@media(max-width:959px){
+  .sheet:has(#fa) #scanrow:not(:empty){margin-right:40px}
 }
 
-/* 3. Form Thêm/Sửa giao dịch (máy tính): cân đối 2 cột, bớt khoảng trống.
-      - Ô số tiền thành "thẻ" to, tự giãn cho cột trái cao bằng cột phải; ngày/giờ nằm dưới.
-      - Chiều cao khung theo loại: Chi/Thu/Chuyển 510px, Điều chỉnh (ít ô hơn) 430px, +76px khi có hàng "Quét ảnh" (giao dịch mới).
-      - Bỏ bớt khoảng đệm trên/dưới. Khung vẫn cố định nên không giật khi đổi ô; đổi loại thì co giãn mượt 0,2 giây. */
+/* 4. Máy tính: form Thêm/Sửa giao dịch cân đối 2 cột, bớt khoảng trống.
+      - Không dùng nút × (bấm ra ngoài / Esc là đóng) nên bỏ phần chừa chỗ bên phải hàng loại giao dịch.
+      - Ô số tiền là "thẻ" lớn tự giãn cho cột trái cao bằng cột phải; ngày/giờ nằm dưới.
+      - Chiều cao khung tự khớp: Chi/Thu/Chuyển 470px, Điều chỉnh 390px,
+        +40px khi đã có ảnh đính kèm, +76px khi có hàng "Quét ảnh" (giao dịch mới), +190px khi đang xem kết quả AI.
+        Khung vẫn cố định lúc gõ nên không giật; đổi loại/đính kèm thì co giãn mượt 0,2 giây. */
 @media(min-width:960px){
   .ov.open .sheet:has(#fa){
-    --hb:510px;--hs:0px;
-    height:min(calc(var(--hb) + var(--hs)),calc(90dvh / var(--z,1)));
+    --hb:470px;--hs:0px;--ha:0px;
+    height:min(calc(var(--hb) + var(--hs) + var(--ha)),calc(90dvh / var(--z,1)));
     padding-top:22px;transition:height .2s ease}
-  .ov.open .sheet:has(#fa.dc){--hb:430px}
+  .ov.open .sheet:has(#fa.dc){--hb:390px}
+  .ov.open .sheet:has(#fa .thg>:not(.add)){--ha:40px}
   .ov.open .sheet:has(#scanrow:not(:empty)){--hs:76px}
+  .ov.open .sheet:has(#scanrow .rvc){--hs:190px}
 
-  .sheet:has(#fa) .tfh{margin-bottom:14px}
+  .sheet:has(#fa) .tfh{margin-bottom:14px;padding-right:0}
   .sheet:has(#fa)>.tf{align-content:start}
   .sheet:has(#fa) .tf-l{justify-content:flex-start;gap:8px}
   .sheet:has(#fa) .tf-l>.f{flex:none}
@@ -1217,5 +1223,15 @@ html,body{overflow-x:clip}
   .sheet:has(#fa) .sfoot>.btn.p,.sheet:has(#fa) .sec2 .btn{height:44px}
 }
 
-/* 4. Danh sách gợi ý Hạng mục/Chi tiết nằm trong vùng cuộn nên bị cắt đáy: chừa chỗ khi đang mở */
+/* 5. Danh sách gợi ý Hạng mục/Chi tiết nằm trong vùng cuộn nên bị cắt đáy: chừa chỗ khi đang mở */
 .sheet:has(#fa)>.tf:has(.cbl:not(.hide)){padding-bottom:210px}
+
+/* 6. Thẻ "AI đọc được": có ảnh gốc thu nhỏ để đối chiếu (bấm để phóng to); máy tính chia 2 cột cho gọn */
+.rvh{display:flex;align-items:center;gap:10px}
+.rvt{margin-left:auto;flex:none;width:38px;height:38px;border-radius:8px;overflow:hidden;border:1px solid var(--line2);cursor:zoom-in}
+.rvt img{width:100%;height:100%;object-fit:cover;display:block}
+@media(min-width:700px){
+  .rvc:has(.rvr){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+  .rvc:has(.rvr)>.rvh,.rvc:has(.rvr)>.rvb{grid-column:1/-1}
+}
+@media(min-width:960px){.ov.open .sheet:has(#scanrow .rvc){--hs:190px}}

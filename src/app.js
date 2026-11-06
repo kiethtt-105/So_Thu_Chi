@@ -3939,6 +3939,7 @@ function scanDraft(r) {
         if (!g && d.type !== 'Chuyển khoản') d.unsure.push('category');
     }
     if (!d.amount && !d.unsure.includes('amount')) d.unsure.push('amount');
+    if (!d.date && !d.unsure.includes('date')) d.unsure.push('date');
     return d;
 }
 const draftOk = d => d.amount > 0 && (d.type === 'Chuyển khoản' ? !!(d.acc && d.accTo) : !!(d.cat && d.sub));
@@ -3986,7 +3987,7 @@ function scanCard() {
     const row = (l, v, k, d) => `<div class="rvr"><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></div>`;
     if (E.review) {
         const d = E.review.d, ck = d.type === 'Chuyển khoản';
-        return `<div class="rvc"><div class="rvh">✨ AI đọc được — kiểm tra rồi bấm điền</div>`
+        return `<div class="rvc"><div class="rvh"><span>✨ AI đọc được — kiểm tra rồi bấm điền</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
             + row('Loại', esc(d.type)) + row('Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount', d) + row('Ngày giờ', esc(dFmt(d)), 'date', d)
             + row('Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account', d)
             + (ck ? '' : row('Hạng mục', d.cat ? esc(d.cat + ' › ' + d.sub) : '—', 'category', d)) + (d.note ? row('Ghi chú', esc(d.note)) : '')
