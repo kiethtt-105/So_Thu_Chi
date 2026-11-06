@@ -1,0 +1,17 @@
+/* fixes.css — nạp SAU layout.css. Chỉ vá các lỗi tràn/đè nhìn thấy trên điện thoại, không đổi giao diện cũ. */
+html,body{overflow-x:hidden}
+/* Cài đặt: nút "Thông báo" không bị nút đóng (×) đè */
+.sheet>.shh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding-right:48px}
+.sheet>.shh h3{margin:0;padding-right:0;flex:1 1 auto}
+/* Nhắc nhở: ô giờ giữ 104px, không phình 100% làm tràn khung */
+.sheet .rem-t{flex-wrap:nowrap}
+.sheet .rem-t input.tm{width:104px;max-width:104px;flex:none;padding:0 8px}
+.sheet .rem-t input.tx{flex:1 1 0;width:auto}
+.sheet .rem,.sheet .rem-t>*{min-width:0}
+/* Thanh tab trong popup: cuộn ngang gọn, không cắt chữ */
+.sheet .tabs{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.sheet .tabs::-webkit-scrollbar{display:none}
+.sheet .tabs button{flex:1 0 auto;white-space:nowrap}
+/* Thanh tiến trình đồng bộ: gọn, bỏ hàng "Thiết bị > Redis > Google Sheet" bị cắt nửa chữ */
+#pg .pgs{display:none}
+#pg .pgt{padding:6px 14px}

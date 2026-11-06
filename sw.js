@@ -2,7 +2,7 @@
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
 const V = 'stc-v40';
-const SHELL = ['./', 'index.html', 'app.css', 'ui.js', 'data.js', 'screens.js', 'config.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
+const SHELL = ['./', 'index.html', 'style.css', 'layout.css', 'fixes.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
