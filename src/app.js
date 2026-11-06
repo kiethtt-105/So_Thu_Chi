@@ -3949,7 +3949,7 @@ async function aiScan(blob, signal) {
 // Chuẩn hóa kết quả (AI hoặc OCR) về một "bản nháp" giao dịch
 function scanDraft(r) {
     let d;
-    if (r.ai) d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: r.acc || '', accTo: r.accTo || '', cat: r.cat || '', sub: r.sub || '', note: r.note || '', unsure: (r.unsure || []).slice() };
+    if (r.ai) d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: r.acc || '', accTo: r.accTo || '', cat: r.cat || '', sub: r.sub || '', note: r.note || '', unsure: (r.unsure || []).slice(), ask: r.ask || [] };
     else {
         const g = (r.type === 'Chi' || r.type === 'Thu') ? ocrCat(r.type, r.tx) : null;
         d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: ocrAcc(r) || '', accTo: '', cat: g ? g.p : '', sub: g ? g.c : '', note: r.note || '', unsure: ['account', 'amount'] };
@@ -4012,6 +4012,7 @@ function scanCard() {
             + row('Loại', esc(d.type)) + row('Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount', d) + row('Ngày giờ', esc(dFmt(d)), 'date', d)
             + row('Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account', d)
             + (ck ? '' : row('Hạng mục', d.cat ? esc(d.cat + ' › ' + d.sub) : '—', 'category', d)) + (d.note ? row('Ghi chú', esc(d.note)) : '')
+            + (d.ask || []).filter(a => a.f === 'category' ? !ck && !d.cat : !d.acc).map(a => `<div class="rvq"><div style="font-weight:600;margin-top:8px">🤔 ${esc(a.q)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">` + a.opts.map((o, i) => `<button type="button" class="btn" data-rvq="${a.f}" data-oi="${i}">${esc(a.f === 'category' ? o.p + ' › ' + o.c : o)}</button>`).join('') + '</div></div>').join('')
             + `<div class="rvb"><button type="button" class="btn p" data-rv="ok">Điền vào form</button><button type="button" class="btn" data-rv="no">Bỏ qua</button></div></div>`;
     }
     const n = E.batch.filter(x => x.on).length;
@@ -4090,6 +4091,16 @@ $('#ov').addEventListener('click', e => {
     if (!E) return;
     const q = s => e.target.closest(s);
     if (q('[data-scancancel]')) { if (E.ctl) E.ctl.abort(); return; }
+    const rq = q('[data-rvq]');
+    if (rq && E.review) {
+        const d = E.review.d, a = (d.ask || []).find(x => x.f === rq.dataset.rvq), o = a && a.opts[+rq.dataset.oi];
+        if (o) {
+            if (a.f === 'category') { d.cat = o.p; d.sub = o.c; d.unsure = d.unsure.filter(k => k !== 'category'); }
+            else { d.acc = o; d.unsure = d.unsure.filter(k => k !== 'account'); }
+            renderScan();
+        }
+        return;
+    }
     const rv = q('[data-rv]');
     if (rv) {
         const x = E.review; E.review = null;
