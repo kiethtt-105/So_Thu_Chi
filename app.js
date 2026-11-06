@@ -575,9 +575,17 @@ function limPage() {
 `;
 }
 const diffs = () => S.acc.map(a => { const sys = bal(a), v = S.act[a.name], has = v !== undefined; return { a, sys, has, act: v, diff: has ? v - sys : 0 }; });
+// Gợi ý chuyển khoản: tài khoản THIẾU tiền (thực tế < sổ) và tài khoản DƯ tiền (thực tế > sổ) thường là do đã chuyển giữa hai nơi mà chưa ghi.
+// Ghép đúng số tiền trước, sau đó ghép dần; phần không ghép được mới là "điều chỉnh" (lệch chưa rõ lý do).
 function balPlan(L) {
-
-    return { T: [], A: L.map(x => ({ n: x.a.name, d: x.diff })).filter(x => x.d !== 0) };
+    const neg = L.filter(x => x.diff < 0).map(x => ({ n: x.a.name, d: -x.diff })),
+        pos = L.filter(x => x.diff > 0).map(x => ({ n: x.a.name, d: x.diff })), T = [];
+    const mv = (f, t, v) => { T.push({ from: f.n, to: t.n, amount: v }); f.d -= v; t.d -= v; };
+    neg.forEach(f => { const t = pos.find(p => p.d === f.d && f.d > 0); if (t) mv(f, t, f.d); });
+    neg.sort((x, y) => y.d - x.d); pos.sort((x, y) => y.d - x.d);
+    neg.forEach(f => pos.forEach(t => { if (f.d > 0 && t.d > 0) mv(f, t, Math.min(f.d, t.d)); }));
+    const A = neg.filter(x => x.d > 0).map(x => ({ n: x.n, d: -x.d })).concat(pos.filter(x => x.d > 0).map(x => ({ n: x.n, d: x.d })));
+    return { T, A };
 }
 function recon() {
     const D = diffs();
@@ -596,9 +604,15 @@ function reconUpdate() {
     $('#r_n').textContent = has.length ? (bad.length ? bad.length + '/' + has.length + ' tài khoản lệch' : 'Tất cả khớp') : '';
     $('#r_s').textContent = vnd((has.length ? has : D).reduce((s, x) => s + x.sys, 0));
     $('#r_a').textContent = has.length ? vnd(has.reduce((s, x) => s + x.act, 0)) : '–';
-    const pos = bad.some(x => x.diff > 0), neg = bad.some(x => x.diff < 0);
-    const PL = balPlan(bad), sgn = n => (n > 0 ? '+' : '−') + num(Math.abs(n));
-    $('#rbtn').innerHTML = (bad.length ? `<button class="btn p w" data-bdo="bal" style="margin-top:0">Cân đối ${PL.T.length ? PL.T.length + ' chuyển khoản' : ''}${PL.T.length && PL.A.length ? ' + ' : ''}${PL.A.length ? PL.A.length + ' điều chỉnh' : ''}</button><p class="note">Mỗi tài khoản lệch được ghi <b>1 dòng “Điều chỉnh”</b> đúng số lệch, không tự chuyển khoản giữa các tài khoản${PL.A.length ? ':<br>' + PL.A.map(x => '• ' + esc(x.n) + ': <b>' + sgn(x.d) + '</b>').join('<br>') : ''}</p><button class="btn w" data-bdo="adj">Chỉ ghi điều chỉnh (không chuyển khoản)</button>` : has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px"> </p>') + `<button class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>`;
+    const PL = balPlan(bad), sgn = n => (n > 0 ? '+' : '−') + num(Math.abs(n)), cnt = PL.T.length + PL.A.length;
+    const rowH = (ico, title, sub, key, label) => `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">${ico} ${title}</b><small class="sens" style="display:block">${sub}</small></span><button type="button" class="btn" data-bdo="${key}">${label}</button></div>`;
+    let h = '';
+    if (bad.length) {
+        if (PL.T.length) h += '<div class="ch" style="margin-top:0">Gợi ý chuyển khoản <small>không bắt buộc</small></div>' + PL.T.map((t, i) => rowH('⇄', esc(t.from) + ' → ' + esc(t.to), num(t.amount), 't:' + i, 'Ghi')).join('') + '<p class="note">Một nơi thiếu tiền và một nơi dư tiền thường là do đã chuyển giữa hai nơi mà chưa ghi sổ. Không đúng thì bỏ qua, không sao cả.</p>';
+        if (PL.A.length) h += '<div class="ch"' + (PL.T.length ? '' : ' style="margin-top:0"') + '>Còn lệch, chưa rõ lý do</div>' + PL.A.map((x, i) => rowH('⚖️', esc(x.n), sgn(x.d), 'a:' + i, 'Ghi điều chỉnh')).join('') + '<p class="note"><b>Điều chỉnh</b> chỉ sửa số dư của đúng 1 tài khoản cho khớp thực tế, không tính là thu hay chi. <b>Chuyển khoản</b> là tiền đi từ tài khoản này sang tài khoản kia, tổng tiền không đổi.</p>';
+        if (cnt > 1) h += '<button type="button" class="btn p w" data-bdo="all">Ghi tất cả (' + cnt + ')</button>';
+    } else h += has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px">Nhập số dư thực tế ở bên trái để so với sổ.</p>';
+    $('#rbtn').innerHTML = h + '<button type="button" class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>';
 }
 async function doBal(k) {
     if (k === 'form')
@@ -606,20 +620,22 @@ async function doBal(k) {
     const today = ymd(new Date()), L = diffs().filter(x => x.has && x.diff !== 0);
     if (!L.length)
         return;
+    const P = balPlan(L);
     const adjRow = (n, amt, i) => ({ id: newId(i), date: today, type: 'Điều chỉnh', amount: amt, acc: n, accTo: '', cat: '', sub: '', note: 'Chênh lệch không xác định (cân đối)' });
-    let rows;
-    if (k === 'adj') {
-        if (!await ask('Ghi ' + L.length + ' giao dịch điều chỉnh?', L.map(x => x.a.name + ': ' + (x.diff > 0 ? '+' : '−') + num(Math.abs(x.diff))).join('\n'), { icon: '⚖️', ok: 'Ghi' }))
+    const trRow = (t, i) => ({ id: newId(i), date: today, type: 'Chuyển khoản', amount: t.amount, acc: t.from, accTo: t.to, cat: '', sub: '', note: 'Cân đối: chuyển giữa tài khoản' });
+    let rows = [];
+    if (k === 'all') {
+        if (!await ask('Ghi ' + (P.T.length + P.A.length) + ' giao dịch cân đối?', P.T.map(t => '⇄ ' + t.from + ' → ' + t.to + ': ' + num(t.amount)).concat(P.A.map(x => '⚖️ ' + x.n + ': ' + (x.d > 0 ? '+' : '−') + num(Math.abs(x.d)))).join('\n'), { icon: '⚖️', ok: 'Ghi' }))
             return;
-        rows = L.map((x, i) => adjRow(x.a.name, x.diff, i));
+        rows = P.T.map(trRow).concat(P.A.map((x, i) => adjRow(x.n, x.d, P.T.length + i)));
+    } else {
+        const [w, i] = String(k).split(':'), n = +i;
+        if (w === 't' && P.T[n]) rows = [trRow(P.T[n], 0)];
+        else if (w === 'a' && P.A[n]) rows = [adjRow(P.A[n].n, P.A[n].d, 0)];
     }
-    else {
-        const P = balPlan(L);
-        if (!await ask('Xác nhận cân đối', (P.T.length ? P.T.map(t => '⇄ ' + t.from + ' → ' + t.to + ': ' + num(t.amount)).join('\n') : '(không có chuyển khoản)') + (P.A.length ? '\n\nĐiều chỉnh phần còn lại:\n' + P.A.map(x => x.n + ': ' + (x.d > 0 ? '+' : '−') + num(Math.abs(x.d))).join('\n') : ''), { icon: '⇄', ok: 'Cân đối' }))
-            return;
-        rows = P.T.map((t, i) => ({ id: newId(i), date: today, type: 'Chuyển khoản', amount: t.amount, acc: t.from, accTo: t.to, cat: '', sub: '', note: 'Cân đối: chuyển giữa tài khoản' })).concat(P.A.map((x, i) => adjRow(x.n, x.d, P.T.length + i)));
-    }
-    S.act = {};
+    if (!rows.length)
+        return;
+    // Giữ nguyên số dư thực tế đã nhập: ghi xong thì dòng đó tự về "Khớp", các dòng còn lại vẫn để người dùng quyết định
     commit(rows.map(row => ({ op: 'tx.save', row })), { ok: 'Đã ghi ' + rows.length + ' giao dịch cân đối', local: () => { S.tx = S.tx.concat(rows); } });
 }
 function accs() {
@@ -721,9 +737,9 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : 
     let cur = -1;
     let cnt = {};
 
-    const load = name => { try { return (JSON.parse(localStorage[KEY] || '{}'))[name] || {}; } catch (e) { return {}; } };
-    const save = name => { try { const all = JSON.parse(localStorage[KEY] || '{}'); all[name] = cnt; localStorage[KEY] = JSON.stringify(all); } catch (e) { } };
-    const total = () => DEN.reduce((s, d) => s + d * (+cnt[d] || 0), 0);
+    try { localStorage.removeItem(KEY); } catch (e) { }   // bỏ dữ liệu đếm tiền cũ đã lưu
+    const load = () => ({});   // mỗi lần mở là một bảng kê mới, không nhớ lần trước
+        const total = () => DEN.reduce((s, d) => s + d * (+cnt[d] || 0), 0);
     const sheets = () => DEN.reduce((s, d) => s + (+cnt[d] || 0), 0);
 
     function refresh() {
@@ -753,7 +769,6 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : 
         const a = S.acc[cur];
         if (!a) return closeSheet();
         const t = total();
-        save(a.name);
         S.act[a.name] = t;
         const el = $('.ba[data-i="' + cur + '"]');
         if (el) el.value = num(t);
