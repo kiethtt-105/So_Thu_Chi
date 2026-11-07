@@ -102,9 +102,18 @@ function aIco(a) {
 }
 if (!window.CONFIG)
     $('#lerr').textContent = 'Thiếu file config.js';
-const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: location.hash.slice(1) || (() => { try { return localStorage.tab; } catch (e) { return ''; } })() || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: {}, ready: false, busy: 0, err: '', pg: 100 };
+// Nháp theo TỪNG TAB trình duyệt (sessionStorage): F5 không mất, chỉ mất khi đóng tab hoặc khóa sổ.
+const DR = (() => { try { const d = JSON.parse(sessionStorage.stc_draft || 'null'); return d && typeof d === 'object' ? d : {}; } catch (e) { return {}; } })();
+const DR_ACT = (() => { const o = {}; try { Object.keys(DR.act || {}).forEach(k => { const v = DR.act[k]; if (typeof v === 'number' && isFinite(v)) o[k] = Math.round(v); }); } catch (e) { } return o; })();
+const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: location.hash.slice(1) || (typeof DR.tab === 'string' ? DR.tab : '') || (() => { try { return localStorage.tab; } catch (e) { return ''; } })() || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: DR_ACT, ready: false, busy: 0, err: '', pg: 100 };
 if (location.hash) history.replaceState(null, '', location.pathname + location.search);   // ẩn #tab khỏi thanh địa chỉ
 let E = null, ED = null;
+try {
+    const v = DR.v || {};
+    ['f', 'q', 'rg', 'so', 'xa', 'xc', 'mn', 'mx', 'd1', 'd2'].forEach(k => { if (typeof v[k] === 'string') S[k] = v[k]; });
+    if (/^\d{4}-\d{2}$/.test(v.m || '')) S.m = v.m;
+    if (typeof v.fo === 'boolean') S.fo = v.fo;
+} catch (e) { }
 if (!TABS.some(t => t[0] === S.tab))
     S.tab = 'home';
 try {
@@ -536,7 +545,7 @@ function monthAgg() {
     return m;
 }
 const sums = m => { const o = monthAgg()[m]; return o ? { thu: o.thu, chi: o.chi } : { thu: 0, chi: 0 }; };
-const bal = a => { balMap(); const v = _bk.B[a.name]; return v === undefined ? (+a.open || 0) : v; };
+const bal = a => { balMap(); const v = _bk.B[a.name]; return Math.round(v === undefined ? (+a.open || 0) : v); };
 const mlabel = m => 'Tháng ' + m.slice(5) + '/' + m.slice(0, 4), shift = (m, d) => ymd(new Date(+m.slice(0, 4), +m.slice(5) - 1 + d, 1)).slice(0, 7);
 const group = (l, f) => { const o = {}; l.forEach(t => { const k = f(t); o[k] = (o[k] || 0) + t.amount; }); return Object.entries(o).sort((a, b) => b[1] - a[1]); };
 const chiM = m => stx().filter(t => t.type === 'Chi' && inM(t, m));
@@ -568,11 +577,11 @@ function balMap() {
     if (_bk && _bk.t === S.tx && _bk.a === S.acc && _bk.n === S.tx.length && _bk.d === ymd(new Date()))
         return _bk.m;
     const B = {};
-    S.acc.forEach(a => B[a.name] = +a.open || 0);
+    S.acc.forEach(a => B[a.name] = Math.round(+a.open || 0));
     const N = Object.assign({}, B), today = ymd(new Date());
     const tm = t => (t.at || '').slice(11) || '23:59:59', m = {};
     S.tx.map((t, i) => [t, i]).sort((x, y) => x[0].date.localeCompare(y[0].date) || tm(x[0]).localeCompare(tm(y[0])) || x[1] - y[1]).forEach(([t]) => {
-        const x = t.amount;
+        const x = Math.round(+t.amount || 0);
         B[t.acc] = (B[t.acc] || 0) + (t.type === 'Thu' || t.type === 'Điều chỉnh' ? x : -x);
         if (t.type === 'Chuyển khoản' && t.accTo)
             B[t.accTo] = (B[t.accTo] || 0) + x;
@@ -1146,6 +1155,7 @@ function closeSheet() {
         try { _opener.focus({ preventScroll: true }); } catch (e) { }
     }
     _opener = null;
+    try { draftSave(); } catch (e) { }
 }
 document.addEventListener('keydown', e => {
     if (e.key !== 'Tab')
@@ -1480,7 +1490,7 @@ $('#ov').addEventListener('click', async (e) => {
             return toast(er);
         if (E.up)
             return toast('Đang nén ảnh, vui lòng chờ…');
-        const x = ty === 'Chuyển khoản' || ty === 'Điều chỉnh', row = { id: E.id, date: E.date, type: ty, amount: E.amount, acc: E.acc, accTo: ty === 'Chuyển khoản' ? E.accTo : '', cat: x ? '' : E.cat, sub: x ? '' : E.sub, note: joinImg(E.note, E.imgs) };
+        const x = ty === 'Chuyển khoản' || ty === 'Điều chỉnh', row = { id: E.id, date: E.date, type: ty, amount: Math.round(+E.amount || 0), acc: E.acc, accTo: ty === 'Chuyển khoản' ? E.accTo : '', cat: x ? '' : E.cat, sub: x ? '' : E.sub, note: joinImg(E.note, E.imgs) };
         if (E.time) {
             row.at = E.date + 'T' + E.time + ':00';
         }
@@ -3770,6 +3780,7 @@ async function upStaged(job) {
     return job.urls;
 }
 function commit(ops, o = {}) {
+    ops.forEach(x => { if (x.op === 'tx.save' && x.row) x.row.amount = Math.round(Number(x.row.amount) || 0); });   // số tiền luôn nguyên
     const pend = o.pend || 'Đang lưu…', safe = ops.every(x => SAFE_OPS.has(x.op));
     const job = { id: o.jid || 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ops, pend, files: o.files || null, urls: o.urls || [], t: Date.now() };
     OB.parked.delete(job.id);
@@ -4726,4 +4737,51 @@ document.addEventListener('paste', e => {
   decorate();
   ptr();
   window.UX = { dlt, spark, hap };
+})();
+
+// ───────────── Nháp theo tab: giao dịch đang nhập, số dư thực tế ở Cân đối, tab/bộ lọc đang xem ─────────────
+// Lưu vào sessionStorage: F5 vẫn còn, đóng tab là mất (đúng ý muốn). Khóa sổ sẽ xóa luôn (lock() gọi sessionStorage.clear()).
+function draftSave() {
+    try {
+        const app = $('#app');
+        if (!app || app.classList.contains('hide')) return;   // đang ở màn đăng nhập: không ghi lại
+        const d = { tab: S.tab, act: S.act, v: { m: S.m, f: S.f, q: S.q, rg: S.rg, so: S.so, xa: S.xa, xc: S.xc, mn: S.mn, mx: S.mx, d1: S.d1, d2: S.d2, fo: S.fo } };
+        const ov = $('#ov'), g = i => { const el = $(i); return el ? el.value : undefined; };
+        if (ov && ov.classList.contains('open') && E && $('#fa')) {
+            const e = {
+                id: E.id, type: E.type, date: g('#fd') || E.date, time: $('#fh') ? g('#fh') : E.time, acc: g('#fc') || E.acc,
+                accTo: $('#ft') ? g('#ft') : E.accTo, cat: E.cat || '', sub: E.sub || '', note: g('#fn') || '', amount: E.amount || 0,
+                imgs: (E.imgs || []).filter(x => typeof x === 'string'), at: E.at || '', isNew: !!E.isNew
+            };
+            const fa = g('#fa') || '';
+            if (!(e.isNew && !fa && !e.note && !e.cat && !e.imgs.length)) d.f = { fa, E: e };   // form mới tinh chưa nhập gì thì không cần giữ
+        }
+        sessionStorage.setItem('stc_draft', JSON.stringify(d));
+    } catch (e) { }
+}
+(function () {
+    let tm = 0, done = false;
+    const later = () => { clearTimeout(tm); tm = setTimeout(draftSave, 250); };
+    ['input', 'change', 'click', 'keyup'].forEach(t => document.addEventListener(t, later, true));
+    window.addEventListener('pagehide', draftSave);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') draftSave(); });
+    function restore() {
+        if (done || !S.ready) return;
+        const app = $('#app');
+        if (!app || app.classList.contains('hide')) return;   // chưa đăng nhập: đợi
+        done = true;
+        const f = DR.f;
+        if (!f || !f.E) return;
+        setTimeout(() => {
+            try {
+                if ($('#ov').classList.contains('open')) return;
+                const e = f.E;
+                E = { ...e, imgs: Array.isArray(e.imgs) ? e.imgs.filter(x => typeof x === 'string') : [] };
+                ED = null; form(); openSheet();
+                const a = $('#fa'); if (a && typeof f.fa === 'string') a.value = f.fa;
+            } catch (x) { }
+        }, 0);
+    }
+    const r0 = render;
+    render = function () { const r = r0.apply(this, arguments); later(); restore(); return r; };
 })();
