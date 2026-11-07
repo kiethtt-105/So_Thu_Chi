@@ -79,3 +79,8 @@ html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
 .rvc:has(.rvr)>.rvdup,.rvc:has(.rvr)>.rvall{grid-column:1/-1}
 .rvall{display:flex;gap:8px;margin:2px 0 0}
 .rvall .chip{min-height:30px;padding:4px 12px;font-size:12.5px}
+
+/* Bộ lọc lịch sử thông báo: cuộn ngang gọn trên màn hình hẹp */
+.sheet .seg.nf{display:flex;overflow-x:auto;scrollbar-width:none;margin:0 0 6px}
+.sheet .seg.nf::-webkit-scrollbar{display:none}
+.sheet .seg.nf button{flex:1 0 auto;white-space:nowrap;padding:6px 12px}

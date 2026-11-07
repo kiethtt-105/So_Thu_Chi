@@ -1890,7 +1890,10 @@ const cfgSave = c => { try {
 }
 catch (e) { } };
 const kindOn = k => !k || cfg().kinds[k] !== false;
+const snzUntil = () => { const v = +localStorage.snz || 0; return v > Date.now() ? v : 0; };
+const hhmm = t => { const d = new Date(t); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
 const inQuiet = () => {
+    if (snzUntil()) return true;
     const q = cfg().adv.quiet;
     if (!q.on) return false;
     const a = toMin(q.from), b = toMin(q.to), d = new Date(), n = d.getHours() * 60 + d.getMinutes();
@@ -2027,7 +2030,7 @@ function notify(body, o) {
     const a = nlog();
     if (o.tag === 'sync' && a[0] && a[0].tag === 'sync')
         a.shift();
-    a.unshift({ t: Date.now(), title, body, ico, err: !!o.err, tab: o.tab || '', tag: o.tag || '' });
+    a.unshift({ t: Date.now(), title, body, ico, err: !!o.err, tab: o.tab || '', tag: o.tag || '', kind: o.kind || '' });
     nsave(a);
     nbUpdate();
     toast(body, o.undo, { title, ico, err: o.err, sticky: o.sticky });
@@ -2213,13 +2216,17 @@ function openNotif() {
     E = null;
     localStorage.nseen = Date.now();
     nbUpdate();
-    const L = feedAll();
+    const L0 = feedAll(), L = L0.filter(n => NTF === 'all' || nGroup(n) === NTF);
     $('#sh').innerHTML = `<div class="shh"><h3>Thông báo</h3><button class="chip" data-nt="settings">${ic('set')}Cài đặt</button></div>
-${L.length ? `<div class="shh sub"><b>Gần đây</b><button class="chip" data-nt="clear">Xóa hết</button></div>` : ''}
-<div class="menu">${L.map(n => `<div class="row"><span class="dot">${esc(n.ico)}</span><span class="m"><b>${esc(n.title)}</b><small style="white-space:pre-line">${esc(n.body)}</small></span><small class="mut">${ago(n.t)}</small></div>`).join('') || empty('Chưa có thông báo', 'Giao dịch, bội chi, nhắc nhở và báo cáo sẽ xuất hiện ở đây.')}</div>`;
+${L0.length ? `<div class="seg nf">${NTF_TABS.map(([k, l]) => `<button type="button" data-nt="nf:${k}" class="${NTF === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}
+${L0.length ? `<div class="shh sub"><b>Gần đây</b><button class="chip" data-nt="clear">Xóa hết</button></div>` : ''}
+<div class="menu">${L.map(n => `<div class="row"><span class="dot">${esc(n.ico)}</span><span class="m"><b>${esc(n.title)}</b><small style="white-space:pre-line">${esc(n.body)}</small></span><small class="mut">${ago(n.t)}</small></div>`).join('') || (L0.length ? empty('Không có thông báo loại này', 'Thử chọn loại khác ở trên.') : empty('Chưa có thông báo', 'Giao dịch, bội chi, nhắc nhở và báo cáo sẽ xuất hiện ở đây.'))}</div>`;
     openSheet();
 }
-let SET_TAB = 'ui';
+let SET_TAB = 'ui', NTF = 'all';
+const kindOf = n => n.kind || (/Báo cáo/.test(n.title || '') ? 'report' : /Nhắc nhở|đến hạn/i.test(n.title || '') ? 'remind' : /bội chi|Hạn mức/i.test(n.title || '') ? 'limit' : /Giao dịch/.test(n.title || '') ? 'tx' : '');
+const nGroup = n => { const k = kindOf(n); return k === 'sync' ? 'tx' : k; };
+const NTF_TABS = [['all', 'Tất cả'], ['tx', 'Giao dịch'], ['limit', 'Bội chi'], ['remind', 'Nhắc nhở'], ['report', 'Báo cáo'], ['err', 'Lỗi']];
 function openSettings() {
     ED = null;
     E = null;
@@ -2241,6 +2248,10 @@ ${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="ro
 ${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
 ${p === 'granted' ? sw('fg', '📲', 'Hiện cả khi đang mở ứng dụng', 'Mặc định chỉ hiện khi bạn ở ứng dụng hoặc tab khác', c.fg) : ''}</div>
 ${hint ? `<p class="hint">${hint}</p>` : ''}
+
+<div class="sec">Tạm im lặng</div>
+<div class="menu"><div class="row"><span class="dot">🔕</span><span class="m"><b>${snzUntil() ? 'Đang im lặng đến ' + hhmm(snzUntil()) : 'Tạm dừng popup và chuông'}</b><small>Không popup hệ thống, Telegram gửi im lặng. Thông báo vẫn được lưu trong ứng dụng</small></span></div>
+<div class="seg" style="grid-template-columns:repeat(3,1fr);margin:8px 0 0"><button type="button" data-nt="snz:60">1 giờ</button><button type="button" data-nt="snz:morning">Đến 7 giờ sáng</button><button type="button" data-nt="snz:off" class="${snzUntil() ? 'on' : ''}">Bật lại</button></div></div>
 
 <div class="sec">Thông báo về</div>
 <div class="menu">${Object.entries(CFG_KINDS).map(([k, [i, t, s]]) => sw('k:' + k, i, t, s, c.kinds[k] !== false)).join('')}</div>
@@ -2333,6 +2344,17 @@ document.addEventListener('click', async (e) => {
             st.textContent = r.ok ? '✅ Đã gửi, hãy kiểm tra Telegram' : '❌ ' + r.err;
         return;
     }
+    if (k === 'snz') {
+        if (a === 'off') { localStorage.removeItem('snz'); toast('Đã bật lại thông báo'); }
+        else {
+            let t = Date.now() + 60 * 6e4;
+            if (a === 'morning') { const d = new Date(); d.setHours(7, 0, 0, 0); if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1); t = d.getTime(); }
+            localStorage.snz = t;
+            toast('Im lặng đến ' + hhmm(t));
+        }
+        return openSettings();
+    }
+    if (k === 'nf') { NTF = a; return openNotif(); }
     if (k === 'open')
         return openNotif();
     if (k === 'settings')
@@ -3963,6 +3985,25 @@ async function aiScan(blob, signal, full) {   // full = quét nhiều ảnh (c�
     finally { clearTimeout(tm); }
 }
 // Chuẩn hóa kết quả (AI hoặc OCR) về một "bản nháp" giao dịch
+const VN_STOP = new Set(['chuyen', 'khoan', 'tien', 'thanh', 'toan', 'nguyen', 'tran', 'huynh', 'pham', 'hoang', 'phan', 'dang', 'bui', 'duong', 'ngo', 'van', 'thi', 'cho', 'cua', 'nhan', 'gui', 'noi', 'dung', 'ngan', 'hang', 'bank', 'the', 'and']);
+const vnTok = s => [...new Set(String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !/^\d+$/.test(w) && !VN_STOP.has(w)))];
+function histAsk(d) {
+    if ((d.type !== 'Chi' && d.type !== 'Thu') || (d.cat && d.sub)) return;
+    const tk = vnTok(d.note), nk = tk.join(' '), agg = new Map();
+    S.tx.forEach(t => {
+        if (t.type !== d.type || !t.cat || !t.sub) return;
+        const tt = vnTok(noteTxt(t.note));
+        let sc = 0;
+        if (nk && tt.join(' ') === nk) sc += 3;
+        sc += tt.filter(w => tk.includes(w)).length;
+        if (d.amount && t.amount === d.amount) sc += 1;
+        if (sc < 1 || (!tk.length && sc < 1)) return;
+        const k = t.cat + '\u0001' + t.sub, a = agg.get(k) || { p: t.cat, c: t.sub, s: 0, n: 0 };
+        a.s += sc; a.n++; agg.set(k, a);
+    });
+    const opts = [...agg.values()].sort((a, b) => b.s - a.s || b.n - a.n).slice(0, 3).map(a => ({ p: a.p, c: a.c }));
+    if (opts.length) d.ask = (d.ask || []).concat({ f: 'category', q: 'Hạng mục nào hợp? (gợi ý từ lịch sử của bạn)', opts });
+}
 function scanDraft(r) {
     let d;
     if (r.ai) d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: r.acc || '', accTo: r.accTo || '', cat: r.cat || '', sub: r.sub || '', note: r.note || '', unsure: (r.unsure || []).filter(k => r.full || k === 'amount' || k === 'date' || k === 'account'), ask: (r.ask || []).filter(a => a.f === 'account') };
@@ -3974,6 +4015,7 @@ function scanDraft(r) {
     if (r.ai && r.model) d.model = r.model;
     if (!d.amount && !d.unsure.includes('amount')) d.unsure.push('amount');
     if (!d.date && !d.unsure.includes('date')) d.unsure.push('date');
+    try { histAsk(d); } catch (e) { }
     return d;
 }
 const draftOk = d => d.amount > 0 && (d.type === 'Chuyển khoản' ? !!(d.acc && d.accTo) : !!(d.cat && d.sub));
