@@ -178,6 +178,7 @@ async function call(ops, rev, ms, fast) {
         throw x;
     }
     if (j.hub) hubSet(j.hub);
+    if (j.crev !== undefined) csSee(j.crev);
     if (j.sess === false && !pendOf()) {
         kick();
         throw Error('Phiên đã bị khóa vì có thiết bị khác đăng nhập');
@@ -193,6 +194,138 @@ async function call(ops, rev, ms, fast) {
     return j;
 }
 function stamp() { }
+// ===== Đồng bộ cài đặt giữa các thiết bị (lưu ở Redis qua /api/store, trường "cfg") =====
+// localStorage chỉ còn là bản sao để dùng offline. Sửa ở đâu cũng được: máy khác nhận trong vài giây.
+// Hai máy sửa cùng lúc: gộp 3 chiều (so với bản gốc đã đồng bộ lần trước), nên không đè mất thay đổi của nhau.
+const CS_KEYS = ['stcfg', 'stcx', 'tpl', 'goals', 'rvpref', 'lastAcc', 'snz'];
+const CS = { crev: '', busy: false, again: false, tm: 0, off: false };
+const csObj = k => { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } };
+const csPut = (k, o) => { try { localStorage.setItem(k, JSON.stringify(o)); } catch (e) { } };
+const csD = () => { try { const a = JSON.parse(localStorage.getItem('cs_d') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+const csJ = s => { try { return JSON.parse(s); } catch (e) { return undefined; } };
+const csEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function csSet(k, v) {
+    const nv = v == null ? null : String(v);
+    try {
+        if (localStorage.getItem(k) === nv) return;
+        if (nv === null) localStorage.removeItem(k); else localStorage.setItem(k, nv);
+    } catch (e) { }
+    const d = new Set(csD()); d.add(k);
+    try { localStorage.setItem('cs_d', JSON.stringify([...d])); } catch (e) { }
+    clearTimeout(CS.tm); CS.tm = setTimeout(csRun, 700);
+}
+function csMg(l, r, b) {   // gộp 3 chiều: l = bản trên máy, r = bản máy chủ, b = bản gốc lần đồng bộ trước (undefined = chưa có)
+    const isO = x => x && typeof x === 'object';
+    if (Array.isArray(l) && Array.isArray(r)) {
+        const id = x => isO(x) && !Array.isArray(x) && x.id != null ? 'i' + x.id : null;
+        if (l.concat(r).every(x => id(x) !== null)) {
+            const bm = new Map((Array.isArray(b) ? b : []).filter(x => id(x) !== null).map(x => [id(x), x])), lm = new Map(l.map(x => [id(x), x])), rm = new Map(r.map(x => [id(x), x]));
+            const out = [];
+            new Set([...rm.keys(), ...lm.keys()]).forEach(k => {
+                const L = lm.get(k), R = rm.get(k), B = bm.get(k);
+                if (L && R) out.push(csMg(L, R, B));
+                else if (L) { if (!B || !csEq(L, B)) out.push(L); }      // mới ở máy này, hoặc máy chủ đã xóa nhưng máy này có sửa: giữ
+                else if (R) { if (!B || !csEq(R, B)) out.push(R); }      // mới ở máy chủ, hoặc máy này đã xóa nhưng máy chủ có sửa: giữ
+            });
+            return out;
+        }
+        return b !== undefined && !csEq(l, b) ? l : r;
+    }
+    if (isO(l) && isO(r) && !Array.isArray(l) && !Array.isArray(r)) {
+        const o = {};
+        new Set([...Object.keys(r), ...Object.keys(l)]).forEach(k => {
+            const bk = isO(b) ? b[k] : undefined;
+            if (!(k in l)) { if (bk !== undefined && csEq(r[k], bk)) return; o[k] = r[k]; }
+            else if (!(k in r)) { if (bk !== undefined && csEq(l[k], bk)) return; o[k] = l[k]; }
+            else o[k] = csMg(l[k], r[k], bk);
+        });
+        return o;
+    }
+    if (b === undefined) return r;
+    return csEq(l, b) ? r : l;
+}
+function csMerge(loc, rem, base) {   // chuỗi -> chuỗi
+    if (loc == null) return rem;
+    const l = csJ(loc), r = csJ(rem), b = base == null ? undefined : csJ(base);
+    if (!(l && r && typeof l === 'object' && typeof r === 'object')) return base == null ? rem : (loc !== base ? loc : rem);
+    return JSON.stringify(csMg(l, r, b));
+}
+async function csReq(cfg) {
+    if (!STORE) return null;
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 20000);
+    try {
+        const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ cfg, sid: SID }) });
+        const j = await r.json();
+        if (j && j.ok && j.off) { CS.off = true; return null; }
+        return j && j.ok ? j : null;
+    } catch (e) { return null; } finally { clearTimeout(tm); }
+}
+function csApply(j, sent) {
+    const T = csObj('cs_t'), B = csObj('cs_b'), R = j.cfg || {}, saved = new Set(j.saved || []), conf = new Set(j.conflict || []);
+    const dirty = new Set(csD()), changed = [];
+    CS_KEYS.forEach(k => {
+        const r = R[k], s = sent[k], loc = localStorage.getItem(k);
+        if (saved.has(k)) {
+            if (r) { T[k] = r.t; B[k] = r.v; } else { delete T[k]; delete B[k]; }
+            if (loc === (s && s.v != null ? s.v : null)) dirty.delete(k); else CS.again = true;   // lại sửa trong lúc đang gửi
+            return;
+        }
+        if (!r) {
+            if (T[k] && !dirty.has(k)) { try { localStorage.removeItem(k); } catch (e) { } delete T[k]; delete B[k]; changed.push(k); }   // máy khác đã xóa
+            else if (!T[k] && loc != null) { dirty.add(k); CS.again = true; }                                                              // lần đầu: đưa bản trên máy lên
+            return;
+        }
+        if (conf.has(k) || dirty.has(k)) {
+            if (conf.has(k) || T[k] !== r.t) {
+                const m = csMerge(loc, r.v, T[k] ? B[k] : null);
+                if (m !== loc) { try { localStorage.setItem(k, m); } catch (e) { } changed.push(k); }
+                B[k] = r.v; T[k] = r.t;
+                if (m !== r.v) { dirty.add(k); CS.again = true; } else dirty.delete(k);
+            }
+            return;
+        }
+        if (T[k] === r.t) return;
+        let nv = r.v;
+        if (loc != null && loc !== r.v && !T[k]) {        // thiết bị này chưa từng đồng bộ khóa này: gộp, giữ bản cũ để phòng mất dữ liệu
+            try { localStorage.setItem('bak_' + k, loc); } catch (e) { }
+            nv = csMerge(loc, r.v, null);
+        }
+        if (nv !== loc) { try { localStorage.setItem(k, nv); } catch (e) { } changed.push(k); }
+        B[k] = r.v; T[k] = r.t;
+        if (nv !== r.v) { dirty.add(k); CS.again = true; }
+    });
+    csPut('cs_t', T); csPut('cs_b', B);
+    try { localStorage.setItem('cs_d', JSON.stringify([...dirty])); } catch (e) { }
+    if (j.crev !== undefined) CS.crev = String(j.crev);
+    if (changed.length) csChanged(changed);
+}
+function csChanged(keys) {
+    try {
+        if (keys.includes('tpl')) { try { TPL = JSON.parse(localStorage.getItem('tpl') || '[]'); } catch (e) { TPL = []; } }
+        if (keys.includes('goals')) { try { GOALS = JSON.parse(localStorage.getItem('goals') || '[]'); } catch (e) { GOALS = []; } }
+        if (keys.includes('stcx') && window.__xReload) window.__xReload();
+        if (typeof nbUpdate === 'function') nbUpdate();
+        if (!$('#ov.open') && !typing() && !$('#app').classList.contains('hide')) render();
+    } catch (e) { }
+}
+async function csRun() {
+    if (CS.off || !STORE) return;
+    if (CS.busy) { CS.again = true; return; }
+    CS.busy = true;
+    try {
+        let n = 0;
+        do {
+            CS.again = false;
+            const dirty = csD(), T = csObj('cs_t'), set = {};
+            dirty.forEach(k => { if (CS_KEYS.includes(k)) { const v = localStorage.getItem(k); set[k] = { v: v == null ? null : v, base: T[k] || 0 }; } });
+            const j = await csReq(Object.keys(set).length ? { set } : { get: true });
+            if (!j) { if (csD().length && !CS.off) setTimeout(csRun, 15000); break; }
+            csApply(j, set);
+        } while (CS.again && ++n < 5);
+    } finally { CS.busy = false; }
+}
+function csSee(c) { if (CS.off || c == null) return; if (String(c) !== CS.crev || csD().length) csRun(); }
+addEventListener('online', () => { if (csD().length) csRun(); });
 function apply(j) {
     stamp();
     if (j.same)
@@ -1360,7 +1493,7 @@ $('#ov').addEventListener('click', async (e) => {
             if (dp && !await ask('Có thể trùng giao dịch', 'Vừa có giao dịch ' + row.type + ' ' + num(Math.abs(row.amount)) + ' ở ' + row.acc + ' cùng ngày' + (dp.note ? ' (' + noteTxt(dp.note) + ')' : '') + '. Vẫn lưu thêm?', { icon: '🔁', ok: 'Vẫn lưu' }))
                 return;
         }
-        try { localStorage.lastAcc = E.acc; } catch (x) { }
+        try { csSet('lastAcc', E.acc); } catch (x) { }
         const stg = (E.staged || []).map(s => ({ name: s.name, blob: s.blob }));
         closeSheet();
         txSave(row, null, stg).then(r => { if (r && !r.ok && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });
@@ -1423,7 +1556,7 @@ try {
 catch (e) { }
 let tplMg = false;
 const tplSaveLS = () => { try {
-    localStorage.tpl = JSON.stringify(TPL);
+    csSet('tpl', JSON.stringify(TPL));
 }
 catch (e) { } };
 const short = n => n >= 1e6 ? +(n / 1e6).toFixed(2) + 'tr' : n >= 1e3 ? +(n / 1e3).toFixed(1) + 'k' : String(n);
@@ -1882,11 +2015,11 @@ function cfg() {
         adv: { max: 3, hist: 40, ...(c.adv || {}), f: { date: true, acc: true, cat: true, note: true, img: true, bal: true, ...((c.adv || {}).f) }, quiet: { on: false, from: '22:00', to: '06:00', ...((c.adv || {}).quiet) } },
         scan: { ai: true, hint: true, ocr: true, auto: false, ...(c.scan || {}) },
         tx: { acc: '', type: 'Chi', dup: true, tol: 0, ...(c.tx || {}) },
-        tg: { on: false, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, sync: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
+        tg: { on: true, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, sync: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
 }
 const cfgSave = c => { try {
-    localStorage.stcfg = JSON.stringify(c);
+    csSet('stcfg', JSON.stringify(c));
 }
 catch (e) { } };
 const kindOn = k => !k || cfg().kinds[k] !== false;
@@ -2267,14 +2400,14 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
 <p class="hint">Nhắc nhở và báo cáo chạy khi ứng dụng đang mở (kể cả ở tab nền hoặc ứng dụng đã cài). Nếu bạn mở lại sau giờ hẹn, ứng dụng sẽ nhắc bù.</p>`;
     const tgSw = (key, ico, t, sub, on) => sw(key, ico, t, sub, on);
     const pTg = () => `<div class="sec">Gửi thông báo qua Telegram</div>
-<div class="menu">${tgSw('tg.on', '✈️', 'Gửi qua Telegram từ thiết bị này', 'Chỉ nên bật ở một thiết bị để không nhận tin trùng', c.tg.on)}
+<div class="menu">${tgSw('tg.on', '✈️', 'Gửi thông báo qua Telegram', 'Nhiều thiết bị cùng mở vẫn chỉ gửi một tin', c.tg.on)}
 <div class="row"><span class="dot">🧪</span><span class="m"><b>Gửi tin thử</b><small id="tgst">Kiểm tra kết nối tới bot Telegram</small></span><button class="chip" data-nt="tg-test">Gửi thử</button></div></div>
 <div class="sec">Loại thông báo gửi qua Telegram</div>
 <div class="menu">${[['tx', '🧾', 'Giao dịch tạo, sửa, xóa', 'Từ thao tác trên thiết bị này'], ['sync', '🔄', 'Giao dịch từ thiết bị khác', 'Dễ trùng tin nếu nhiều máy cùng gửi'], ['limit', '⚠️', 'Hạng mục bội chi', 'Vượt hạn mức ngày hoặc tháng'], ['report', '📒', 'Báo cáo hằng ngày', 'Tổng thu, chi mỗi ngày'], ['remind', '⏰', 'Nhắc nhở và đến hạn', 'Nhắc ghi chép, thẻ tín dụng, khoản nợ'], ['err', '❗', 'Lỗi đồng bộ', 'Thay đổi bị từ chối, đã hủy']].map(([k, i, t, s]) => tgSw('tg:' + k, i, t, s, c.tg.kinds[k] !== false)).join('')}</div>
 <div class="sec">Tùy chọn gửi</div>
 <div class="menu">${tgSw('tg.retry', '🔁', 'Tự thử lại khi gửi lỗi', 'Thử lại tối đa 2 lần nếu mạng chập chờn', c.tg.retry !== false)}
 <div class="row"><span class="m"><b>Tiền tố tiêu đề</b><small>Ví dụ [Sổ nhà]. Để trống để giống web 100%</small></span><input class="tx" data-cfg="tg.pfx" value="${esc(c.tg.pfx || '')}" maxlength="20" placeholder="Không có"></div></div>
-<p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo, và bạn có thể tắt riêng từng loại ở trên. Cài đặt này lưu riêng trên từng thiết bị. Nếu nhiều thiết bị cùng bật gửi Telegram, bạn sẽ nhận tin trùng nên chỉ bật ở một thiết bị. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
+<p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo, và bạn có thể tắt riêng từng loại ở trên. Cài đặt này đồng bộ trên mọi thiết bị, và máy chủ chỉ gửi một tin dù nhiều thiết bị cùng mở. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
     const A = c.adv, FL = [['date', '📅', 'Ngày'], ['acc', '🏦', 'Tài khoản và tài khoản đến'], ['cat', '📂', 'Hạng mục cha, con'], ['note', '📝', 'Ghi chú'], ['at', '🕒', 'Tạo lúc'], ['bal', '💰', 'Số dư cuối'], ['img', '📎', 'Ảnh (link)'], ['month', '🗓️', 'Tháng']];
     const segc = (act, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="adv:${act}:${v}" class="${cur === v ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
     const pScan = () => `<div class="sec">Quét ảnh bằng AI</div>
@@ -2282,7 +2415,7 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
 ${sw('scan.hint', '🏷️', 'Gợi ý tài khoản và hạng mục cho AI', 'AI chọn đúng tên tài khoản, hạng mục của bạn. Tắt thì AI chỉ đọc số tiền, ngày, ghi chú', c.scan.hint)}
 ${sw('scan.ocr', '🔤', 'Dự phòng đọc chữ trên máy', 'Dùng khi AI lỗi hoặc đang tắt. Chậm hơn và kém chính xác hơn', c.scan.ocr)}
 ${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem lại nếu AI chắc mọi trường. Có ô nghi ngờ thì vẫn hiện để bạn kiểm tra', c.scan.auto)}</div>
-<p class="hint">Các tùy chọn quét ảnh lưu riêng trên từng thiết bị.</p>
+<p class="hint">Các tùy chọn quét ảnh được đồng bộ trên mọi thiết bị.</p>
 <div class="sec">Không tính vào thu chi</div>
 <p class="hint">Để một tài khoản không cộng vào thu chi (tiền giữ hộ, quỹ chung, chuyển nội bộ…): vào tab Tài khoản, bấm tài khoản, bật “Không tính vào thu chi”. Cài đặt này lưu trong Google Sheet nên mọi thiết bị và trang TongQuan đều giống nhau.</p>`;
     const pAdv = () => `${pScan()}<div class="sec">Nội dung thông báo</div>
@@ -2303,7 +2436,7 @@ ${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem 
 ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại nếu cùng ngày, loại, số tiền, tài khoản vừa ghi trong 30 phút', T.dup !== false)}</div>
 <div class="sec">Cân đối</div>
 <div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}
-<p class="hint">Các cài đặt này lưu riêng trên từng thiết bị.</p>`;
+<p class="hint">Các cài đặt này được đồng bộ trên mọi thiết bị.</p>`;
     const tabs = [['ui', 'Giao diện'], ['tx', 'Ghi chép'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['adv', 'Nâng cao']];
     $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
 <div class="seg">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -2331,7 +2464,7 @@ document.addEventListener('click', async (e) => {
         return openSettings();
     }
     if (k === 'adv-reset') {
-        try { const r = JSON.parse(localStorage.stcfg || '{}'); delete r.adv; delete r.scan; if (r.tg) { delete r.tg.pfx; delete r.tg.retry; } localStorage.stcfg = JSON.stringify(r); } catch (e) { }
+        try { const r = JSON.parse(localStorage.stcfg || '{}'); delete r.adv; delete r.scan; if (r.tg) { delete r.tg.pfx; delete r.tg.retry; } csSet('stcfg', JSON.stringify(r)); } catch (e) { }
         toast('Đã khôi phục cấu hình nâng cao');
         return openSettings();
     }
@@ -2339,17 +2472,17 @@ document.addEventListener('click', async (e) => {
         const st = $('#tgst');
         if (st)
             st.textContent = 'Đang gửi…';
-        const r = await tgSend('Sổ Thu Chi', 'Tin nhắn thử: kết nối Telegram hoạt động tốt.');
+        const r = await tgSend('Sổ Thu Chi', 'Tin nhắn thử: kết nối Telegram hoạt động tốt.', false, true);
         if (st)
             st.textContent = r.ok ? '✅ Đã gửi, hãy kiểm tra Telegram' : '❌ ' + r.err;
         return;
     }
     if (k === 'snz') {
-        if (a === 'off') { localStorage.removeItem('snz'); toast('Đã bật lại thông báo'); }
+        if (a === 'off') { csSet('snz', null); toast('Đã bật lại thông báo'); }
         else {
             let t = Date.now() + 60 * 6e4;
             if (a === 'morning') { const d = new Date(); d.setHours(7, 0, 0, 0); if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1); t = d.getTime(); }
-            localStorage.snz = t;
+            csSet('snz', t);
             toast('Im lặng đến ' + hhmm(t));
         }
         return openSettings();
@@ -2720,7 +2853,7 @@ document.addEventListener('click', e => {
 
 let GOALS = [], GE = { i: null };
 try { GOALS = JSON.parse(localStorage.goals || '[]'); } catch (e) { }
-const goalsSave = () => { try { localStorage.goals = JSON.stringify(GOALS); } catch (e) { } };
+const goalsSave = () => { try { csSet('goals', JSON.stringify(GOALS)); } catch (e) { } };
 const goalAcc = g => S.acc.find(a => a.name === g.acc);
 const monthDiff = due => {
     const n = new Date();
@@ -2942,7 +3075,8 @@ document.addEventListener('click', e => {
     const DAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
     let XD = { rec: [], debt: [], card: {}, flt: [] };
     try { Object.assign(XD, JSON.parse(localStorage.stcx || '{}')); } catch (e) { }
-    const xsave = () => { try { localStorage.stcx = JSON.stringify(XD); } catch (e) { } };
+    const xsave = () => { try { csSet('stcx', JSON.stringify(XD)); } catch (e) { } };
+    window.__xReload = () => { XD = { rec: [], debt: [], card: {}, flt: [] }; try { Object.assign(XD, JSON.parse(localStorage.getItem('stcx') || '{}')); } catch (e) { } };
     const xid = () => Math.random().toString(36).slice(2, 8);
     const dayOf = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const addD = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
@@ -3389,13 +3523,13 @@ document.addEventListener('pointermove', e => {
         c.style.setProperty('--my', e.clientY - r.top + 'px');
     });
 }, { passive: true });
-async function tgSend(title, text, silent) {
+async function tgSend(title, text, silent, nodup) {
     const t = cfg().tg, pfx = String(t.pfx || '').trim(), tries = t.retry === false ? 1 : 3;
     let last = { ok: false, err: 'Không có kết nối mạng' };
     for (let i = 0; i < tries; i++) {
         if (i) await new Promise(r => setTimeout(r, 1500 * i));
         try {
-            const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: (pfx ? pfx + ' ' : '') + title + '\n' + String(text || ''), silent: !!silent }) });
+            const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: (pfx ? pfx + ' ' : '') + title + '\n' + String(text || ''), silent: !!silent, nodup: !!nodup }) });
             let j = {};
             try {
                 j = await r.json();
@@ -4055,7 +4189,7 @@ const rvRemember = x => {
     const h = rvHas(x.d), uk = { amount: 'amount', dt: 'date', acc: 'account', cat: 'category' };
     let p = {}; try { p = JSON.parse(localStorage.rvpref || '{}') || {}; } catch (e) { }
     Object.keys(h).forEach(k => { if (h[k] && !x.d.unsure.includes(uk[k])) p[k] = !!x.sel[k]; });
-    try { localStorage.rvpref = JSON.stringify(p); } catch (e) { }
+    try { csSet('rvpref', JSON.stringify(p)); } catch (e) { }
 };
 const rvN = rv => { const h = rvHas(rv.d); return Object.keys(h).filter(f => h[f] && rv.sel[f]).length; };
 function applyDraft(d, sel) {

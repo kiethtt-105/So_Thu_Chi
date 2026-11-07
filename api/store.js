@@ -64,12 +64,12 @@ function overlay(q, tx, keepDel) {
 
 // ---- đọc trạng thái ----
 async function readState() {
-  const [h, m, rev] = await rd([['HVALS', P + 'tx'], ['GET', P + 'misc'], ['GET', P + 'rev']]);
+  const [h, m, rev, crev] = await rd([['HVALS', P + 'tx'], ['GET', P + 'misc'], ['GET', P + 'rev'], ['GET', P + 'cfgrev']]);
   if (!m) return null;
   const misc = parse(m) || {};
   const st = { tx: (h || []).map(parse).filter(Boolean) };
   MISC.forEach(k => { st[k] = misc[k] || []; });
-  return { st, rev: String(rev || '0') };
+  return { st, rev: String(rev || '0'), crev: String(crev || '0') };
 }
 async function status() {
   const [q, pullAt, meta] = await rd([['LRANGE', P + 'q', 0, -1], ['GET', P + 'pullAt'], ['GET', P + 'meta']]);
@@ -242,8 +242,42 @@ async function doLogin(req, res, body, has) {
   return res.status(200).json({ ok: true });
 }
 
+// ---- Cài đặt đồng bộ giữa các thiết bị: mỗi khóa là một chuỗi, lưu ở Redis (hash stc:cfg) kèm thời điểm sửa ----
+// Ghi có kiểm tra phiên bản: thiết bị gửi kèm "base" (thời điểm bản nó đang giữ). Nếu máy chủ đã có bản mới hơn thì từ chối khóa đó
+// (conflict) và trả bản hiện tại để thiết bị tự gộp rồi gửi lại, nên hai máy sửa cùng lúc không đè mất nhau.
+const CFG_KEYS = new Set(['stcfg', 'stcx', 'tpl', 'goals', 'rvpref', 'lastAcc', 'snz']);
+async function cfgApi(res, body, has) {
+  if (!has) return res.status(200).json({ ok: true, off: true });
+  const c = body.cfg && typeof body.cfg === 'object' ? body.cfg : {};
+  const sid = typeof body.sid === 'string' ? body.sid.slice(0, 64) : '';
+  if (await sessBlocked(sid)) return res.status(200).json(sessFail());
+  const saved = [], conflict = [];
+  if (c.set && typeof c.set === 'object') {
+    const keys = Object.keys(c.set).filter(k => CFG_KEYS.has(k));
+    if (keys.length) {
+      const cur = await rd(keys.map(k => ['HGET', P + 'cfg', k])), cmds = [];
+      keys.forEach((k, i) => {
+        const it = c.set[k] || {}, ex = parse(cur[i]), base = +it.base || 0;
+        if (ex && ex.t > base) { conflict.push(k); return; }
+        if (it.v === null) cmds.push(['HDEL', P + 'cfg', k]);
+        else {
+          const v = String(it.v);
+          if (v.length > 200000) return;
+          cmds.push(['HSET', P + 'cfg', k, JSON.stringify({ v, t: Math.max(Date.now(), ex ? ex.t + 1 : 0) })]);
+        }
+        saved.push(k);
+      });
+      if (cmds.length) { cmds.push(['INCR', P + 'cfgrev']); await rd(cmds); }
+    }
+  }
+  const [h, crev] = await rd([['HGETALL', P + 'cfg'], ['GET', P + 'cfgrev']]), cfg = {};
+  if (Array.isArray(h)) { for (let i = 0; i + 1 < h.length; i += 2) { const o = parse(h[i + 1]); if (o) cfg[h[i]] = o; } }
+  else if (h && typeof h === 'object') Object.keys(h).forEach(k => { const o = parse(h[k]); if (o) cfg[k] = o; });
+  return res.status(200).json({ ok: true, cfg, saved, conflict, crev: String(crev || '0') });
+}
+
 function reply(res, state, hub, extra) {
-  return res.status(200).json(Object.assign({ ok: true }, state.st, { rev: state.rev, hub }, extra || {}));
+  return res.status(200).json(Object.assign({ ok: true }, state.st, { rev: state.rev, crev: state.crev, hub }, extra || {}));
 }
 
 module.exports = async (req, res) => {
@@ -276,6 +310,7 @@ module.exports = async (req, res) => {
 
     // Tải ảnh: chuyển sang Apps Script (KEY nằm ở server)
     if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));
+    if (body.cfg) return await cfgApi(res, body, HAS_REDIS);   // cài đặt đồng bộ giữa các thiết bị (chỉ lưu trên Redis)
     if (!HAS_REDIS) return res.status(200).json(await proxy(body));
     
     const ops = Array.isArray(body.ops) ? body.ops : [], sid = typeof body.sid === 'string' ? body.sid.slice(0, 64) : '';
@@ -346,7 +381,7 @@ module.exports = async (req, res) => {
     }
     if (dirty) [st, hub] = await Promise.all([readState(), status()]);
     if (!st) return res.status(200).json({ ok: false, err: 'Chưa có dữ liệu trên Redis' });
-    if (body.rev && body.rev === st.rev) return res.status(200).json({ ok: true, same: true, rev: st.rev, hub });
+    if (body.rev && body.rev === st.rev) return res.status(200).json({ ok: true, same: true, rev: st.rev, crev: st.crev, hub });
     return reply(res, st, hub, sess);
   } catch (e) {
     // Redis lỗi trước khi ghi gì sang Sheet: chuyển thẳng sang Google Sheet như chế độ không có Redis

@@ -1,4 +1,20 @@
 const auth = require('./_auth');
+const crypto = require('crypto');
+const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+// Nhiều thiết bị cùng mở sẽ cùng gửi một thông báo: chỉ cho tin ĐẦU TIÊN đi trong 90 giây.
+// Bỏ qua các dòng số dư (💰) và giờ tạo (🕒) vì mỗi máy tính ra hơi khác nhau. Redis lỗi thì cứ gửi (không chặn nhầm).
+async function firstOf(text) {
+  if (!RU || !RT) return true;
+  const norm = text.split('\n').filter(l => !/^(💰|🕒)/u.test(l.trim())).join('\n');
+  const key = 'stc:tgd:' + crypto.createHash('sha1').update(norm).digest('hex');
+  try {
+    const r = await fetch(RU + '/pipeline', { method: 'POST', headers: { Authorization: 'Bearer ' + RT, 'Content-Type': 'application/json' }, body: JSON.stringify([['SET', key, '1', 'NX', 'EX', '90']]) });
+    const j = await r.json();
+    return !(Array.isArray(j) && j[0] && !j[0].error && j[0].result === null);
+  } catch (e) { return true; }
+}
 
 const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
 
@@ -14,6 +30,7 @@ module.exports = async (req, res) => {
   try { body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) { return res.status(400).json({ ok: false, err: 'Dữ liệu không hợp lệ' }); }
   const text = String(body.text || '').slice(0, 4000);
   if (!text) return res.status(400).json({ ok: false, err: 'Thiếu nội dung' });
+  if (!body.nodup && !(await firstOf(text))) return res.status(200).json({ ok: true, dup: true });
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 15000);
   try {
     const r = await fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
