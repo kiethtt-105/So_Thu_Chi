@@ -1882,7 +1882,7 @@ function cfg() {
         adv: { max: 3, hist: 40, ...(c.adv || {}), f: { date: true, acc: true, cat: true, note: true, img: true, bal: true, ...((c.adv || {}).f) }, quiet: { on: false, from: '22:00', to: '06:00', ...((c.adv || {}).quiet) } },
         scan: { ai: true, hint: true, ocr: true, auto: false, ...(c.scan || {}) },
         tx: { acc: '', type: 'Chi', dup: true, tol: 0, ...(c.tx || {}) },
-        tg: { on: false, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
+        tg: { on: false, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, sync: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
 }
 const cfgSave = c => { try {
@@ -2258,10 +2258,12 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
     const pTg = () => `<div class="sec">Gửi thông báo qua Telegram</div>
 <div class="menu">${tgSw('tg.on', '✈️', 'Gửi qua Telegram từ thiết bị này', 'Chỉ nên bật ở một thiết bị để không nhận tin trùng', c.tg.on)}
 <div class="row"><span class="dot">🧪</span><span class="m"><b>Gửi tin thử</b><small id="tgst">Kiểm tra kết nối tới bot Telegram</small></span><button class="chip" data-nt="tg-test">Gửi thử</button></div></div>
+<div class="sec">Loại thông báo gửi qua Telegram</div>
+<div class="menu">${[['tx', '🧾', 'Giao dịch tạo, sửa, xóa', 'Từ thao tác trên thiết bị này'], ['sync', '🔄', 'Giao dịch từ thiết bị khác', 'Dễ trùng tin nếu nhiều máy cùng gửi'], ['limit', '⚠️', 'Hạng mục bội chi', 'Vượt hạn mức ngày hoặc tháng'], ['report', '📒', 'Báo cáo hằng ngày', 'Tổng thu, chi mỗi ngày'], ['remind', '⏰', 'Nhắc nhở và đến hạn', 'Nhắc ghi chép, thẻ tín dụng, khoản nợ'], ['err', '❗', 'Lỗi đồng bộ', 'Thay đổi bị từ chối, đã hủy']].map(([k, i, t, s]) => tgSw('tg:' + k, i, t, s, c.tg.kinds[k] !== false)).join('')}</div>
 <div class="sec">Tùy chọn gửi</div>
 <div class="menu">${tgSw('tg.retry', '🔁', 'Tự thử lại khi gửi lỗi', 'Thử lại tối đa 2 lần nếu mạng chập chờn', c.tg.retry !== false)}
 <div class="row"><span class="m"><b>Tiền tố tiêu đề</b><small>Ví dụ [Sổ nhà]. Để trống để giống web 100%</small></span><input class="tx" data-cfg="tg.pfx" value="${esc(c.tg.pfx || '')}" maxlength="20" placeholder="Không có"></div></div>
-<p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo. Cài đặt này lưu riêng trên từng thiết bị. Nếu nhiều thiết bị cùng bật gửi Telegram, bạn sẽ nhận tin trùng nên chỉ bật ở một thiết bị. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
+<p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo, và bạn có thể tắt riêng từng loại ở trên. Cài đặt này lưu riêng trên từng thiết bị. Nếu nhiều thiết bị cùng bật gửi Telegram, bạn sẽ nhận tin trùng nên chỉ bật ở một thiết bị. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
     const A = c.adv, FL = [['date', '📅', 'Ngày'], ['acc', '🏦', 'Tài khoản và tài khoản đến'], ['cat', '📂', 'Hạng mục cha, con'], ['note', '📝', 'Ghi chú'], ['at', '🕒', 'Tạo lúc'], ['bal', '💰', 'Số dư cuối'], ['img', '📎', 'Ảnh (link)'], ['month', '🗓️', 'Tháng']];
     const segc = (act, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="adv:${act}:${v}" class="${cur === v ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
     const pScan = () => `<div class="sec">Quét ảnh bằng AI</div>
@@ -3393,7 +3395,7 @@ async function tgSend(title, text, silent) {
 }
 function tgPush(kind, title, text, silent) {
     const t = cfg().tg;
-    if (!kind || !/^https?:$/.test(location.protocol) || !t.on)
+    if (!kind || !/^https?:$/.test(location.protocol) || !t.on || t.kinds[kind] === false)
         return;
     try {
         const key = title + '|' + text, now = Date.now(), m = JSON.parse(localStorage.tgdup || '{}');
@@ -3999,8 +4001,20 @@ async function readOne(f, sig, o) {
     return { st, d, aiErr };
 }
 const dFmt = d => (d.date ? d.date.split('-').reverse().join('/') : 'chưa rõ ngày') + (d.time ? ' ' + d.time : '');
+const dupOf = d => (d && d.amount && d.date) ? S.tx.find(t => t.amount === d.amount && t.type === d.type && t.date === d.date && (!d.acc || t.acc === d.acc)) : null;
 const rvHas = d => ({ type: true, amount: !!d.amount, dt: !!(d.date || d.time), acc: !!d.acc, note: !!d.note, cat: d.type !== 'Chuyển khoản' && !!(d.cat && d.sub) });
-const rvSel = d => { const u = k => !d.unsure.includes(k); return { type: true, amount: u('amount'), dt: u('date'), acc: u('account'), note: true, cat: u('category') }; };
+const rvSel = d => {
+    const u = k => !d.unsure.includes(k);
+    let p = {}; try { p = JSON.parse(localStorage.rvpref || '{}') || {}; } catch (e) { }
+    const f = (k, sure) => sure && p[k] !== false;
+    return { type: f('type', true), amount: f('amount', u('amount')), dt: f('dt', u('date')), acc: f('acc', u('account')), note: f('note', true), cat: f('cat', u('category')) };
+};
+const rvRemember = x => {
+    const h = rvHas(x.d), uk = { amount: 'amount', dt: 'date', acc: 'account', cat: 'category' };
+    let p = {}; try { p = JSON.parse(localStorage.rvpref || '{}') || {}; } catch (e) { }
+    Object.keys(h).forEach(k => { if (h[k] && !x.d.unsure.includes(uk[k])) p[k] = !!x.sel[k]; });
+    try { localStorage.rvpref = JSON.stringify(p); } catch (e) { }
+};
 const rvN = rv => { const h = rvHas(rv.d); return Object.keys(h).filter(f => h[f] && rv.sel[f]).length; };
 function applyDraft(d, sel) {
     pull();
@@ -4028,15 +4042,16 @@ function scanCard() {
         const d = E.review.d, ck = d.type === 'Chuyển khoản', sel = E.review.sel, has = rvHas(d);
         const fr = (f, l, v, k) => `<label class="rvr${has[f] ? '' : ' off'}"><input type="checkbox" data-rvf="${f}" ${sel[f] && has[f] ? 'checked' : ''} ${has[f] ? '' : 'disabled'}><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></label>`;
         return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được' + (d.model ? ' (' + esc(d.model) + ')' : '') + ' — tick ô đúng rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
+            + (dupOf(d) ? `<div class="rvdup">⚠️ Có thể đã ghi rồi: ${esc(txLine(dupOf(d)))}</div>` : '')
             + fr('type', 'Loại', esc(d.type)) + fr('amount', 'Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount') + fr('dt', 'Ngày giờ', esc(dFmt(d)), 'date')
             + fr('acc', 'Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account') + (d.note ? fr('note', 'Ghi chú', esc(d.note)) : '')
             + (has.cat ? fr('cat', 'Hạng mục', esc(d.cat + ' › ' + d.sub), 'category') : '')
             + (d.ask || []).filter(a => a.f === 'category' ? !ck && !d.cat : !d.acc).map(a => `<div class="rvq"><div style="font-weight:600;margin-top:8px">🤔 ${esc(a.q)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">` + a.opts.map((o, i) => `<button type="button" class="btn" data-rvq="${a.f}" data-oi="${i}">${esc(a.f === 'category' ? o.p + ' › ' + o.c : o)}</button>`).join('') + '</div></div>').join('')
-            + `<div class="rvb"><button type="button" class="btn p" data-rv="ok">Điền ${rvN(E.review)} ô đã chọn</button><button type="button" class="btn" data-rv="no">Bỏ qua</button></div></div>`;
+            + `<div class="rvall"><button type="button" class="chip" data-rvall="1">Chọn hết</button><button type="button" class="chip" data-rvall="0">Bỏ hết</button></div><div class="rvb"><button type="button" class="btn p" data-rv="ok">Điền ${rvN(E.review)} ô đã chọn</button><button type="button" class="btn" data-rv="no">Bỏ qua</button></div></div>`;
     }
     const n = E.batch.filter(x => x.on).length;
     return `<div class="rvc"><div class="rvh">✨ AI đọc được ${E.batch.length} ảnh — chọn giao dịch để lưu</div>`
-        + E.batch.map((x, i) => { const d = x.d, ok = draftOk(d); return `<div class="bri${ok ? '' : ' bad'}"><label><input type="checkbox" data-bk="${i}" ${x.on ? 'checked' : ''} ${ok ? '' : 'disabled'}><img src="${esc(x.st.url)}" alt=""><span><b>${esc(d.type)} ${d.amount ? num(d.amount) + ' ₫' : '—'}${d.unsure.length ? ' <em class="uns" title="Có ô AI không chắc">⚠</em>' : ''}</b><small>${esc(dFmt(d))} · ${esc(d.acc || 'chưa rõ tài khoản')}${d.type === 'Chuyển khoản' ? ' → ' + esc(d.accTo || '?') : ' · ' + esc(d.cat ? d.cat + ' › ' + d.sub : 'chưa rõ hạng mục')}</small>${ok ? '' : '<small class="need">Thiếu thông tin — bấm Sửa để bổ sung</small>'}</span></label><button type="button" class="chip" data-bfix="${i}">Sửa</button></div>`; }).join('')
+        + E.batch.map((x, i) => { const d = x.d, ok = draftOk(d); return `<div class="bri${ok ? '' : ' bad'}"><label><input type="checkbox" data-bk="${i}" ${x.on ? 'checked' : ''} ${ok ? '' : 'disabled'}><img src="${esc(x.st.url)}" alt=""><span><b>${esc(d.type)} ${d.amount ? num(d.amount) + ' ₫' : '—'}${d.unsure.length ? ' <em class="uns" title="Có ô AI không chắc">⚠</em>' : ''}</b><small>${esc(dFmt(d))} · ${esc(d.acc || 'chưa rõ tài khoản')}${d.type === 'Chuyển khoản' ? ' → ' + esc(d.accTo || '?') : ' · ' + esc(d.cat ? d.cat + ' › ' + d.sub : 'chưa rõ hạng mục')}</small>${ok ? '' : '<small class="need">Thiếu thông tin — bấm Sửa để bổ sung</small>'}${dupOf(d) ? '<small class="need">⚠️ Có thể trùng giao dịch đã có (đã bỏ chọn)</small>' : ''}</span></label><button type="button" class="chip" data-bfix="${i}">Sửa</button></div>`; }).join('')
         + `<div class="rvb"><button type="button" class="btn p" data-bsave ${n ? '' : 'disabled'}>Lưu ${n} giao dịch</button><button type="button" class="btn" data-bno>Bỏ qua</button></div></div>`;
 }
 function renderScan() {
@@ -4097,7 +4112,7 @@ async function scanMany(fs) {
     const items = out.filter(Boolean).map(r => {
         const d = r.d; if (d.type !== 'Chuyển khoản' && !d.acc) { d.acc = defAcc(); if (!d.unsure.includes('account')) d.unsure.push('account'); }
         r.st.name = [d.date || todayS(), nz(d.sub || d.cat || d.type).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'giao-dich', d.amount || 0, Date.now().toString(36) + Math.random().toString(36).slice(2, 5)].join('_') + '.jpg';
-        return { st: r.st, d, on: draftOk(d) };
+        return { st: r.st, d, on: draftOk(d) && !dupOf(d) };
     });
     if (E !== E0) { toast('Đã đọc xong ' + items.length + ' ảnh nhưng form đã đóng'); return; }
     if (cancelled) toast('Đã hủy quét');
@@ -4120,9 +4135,17 @@ $('#ov').addEventListener('click', e => {
         }
         return;
     }
+    const ra = q('[data-rvall]');
+    if (ra && E.review) {
+        const h = rvHas(E.review.d), on = ra.dataset.rvall === '1';
+        Object.keys(h).forEach(k => { if (h[k]) E.review.sel[k] = on; });
+        renderScan();
+        return;
+    }
     const rv = q('[data-rv]');
     if (rv) {
         const x = E.review; E.review = null;
+        if (x && rv.dataset.rv === 'ok') rvRemember(x);
         if (rv.dataset.rv === 'ok' && x) { (E.staged = E.staged || []).some(s => s === x.st) || E.staged.push(x.st); applyDraft(x.d, x.sel); x.st.name = imgName(); toast('Đã điền ' + rvN(x) + ' ô đã chọn — kiểm tra lại rồi bấm Lưu'); }
         else { if (x) E.staged = (E.staged || []).filter(s => s !== x.st), renderAtt(); renderScan(); }
         return;
