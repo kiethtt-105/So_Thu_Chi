@@ -731,14 +731,13 @@ function limPage() {
 }
 const diffs = () => { const tol = +cfg().tx.tol || 0; return S.acc.map(a => { const sys = bal(a), v = S.act[a.name], has = v !== undefined, raw = has ? v - sys : 0; return { a, sys, has, act: v, diff: Math.abs(raw) <= tol ? 0 : raw }; }); };   // lệch ≤ ngưỡng (Cài đặt › Ghi chép) coi như khớp
 // Gợi ý chuyển khoản: tài khoản THIẾU tiền (thực tế < sổ) và tài khoản DƯ tiền (thực tế > sổ) thường là do đã chuyển giữa hai nơi mà chưa ghi.
-// Ghép đúng số tiền trước, sau đó ghép dần; phần không ghép được mới là "điều chỉnh" (lệch chưa rõ lý do).
+// Chỉ ghép khi số thiếu và số dư bằng nhau đúng từng đồng; phần còn lại là "điều chỉnh" đúng bằng số lệch của từng tài khoản.
 function balPlan(L) {
     const neg = L.filter(x => x.diff < 0).map(x => ({ n: x.a.name, d: -x.diff })),
         pos = L.filter(x => x.diff > 0).map(x => ({ n: x.a.name, d: x.diff })), T = [];
     const mv = (f, t, v) => { T.push({ from: f.n, to: t.n, amount: v }); f.d -= v; t.d -= v; };
     neg.forEach(f => { const t = pos.find(p => p.d === f.d && f.d > 0); if (t) mv(f, t, f.d); });
-    neg.sort((x, y) => y.d - x.d); pos.sort((x, y) => y.d - x.d);
-    neg.forEach(f => pos.forEach(t => { if (f.d > 0 && t.d > 0) mv(f, t, Math.min(f.d, t.d)); }));
+    // Không ghép một phần: trước đây thiếu 15.000 + dư 328 bị ghép thành "chuyển 328", để lại điều chỉnh lẻ 14.672. Chỉ gợi ý chuyển khoản khi hai số bằng nhau đúng từng đồng.
     const A = neg.filter(x => x.d > 0).map(x => ({ n: x.n, d: -x.d })).concat(pos.filter(x => x.d > 0).map(x => ({ n: x.n, d: x.d })));
     return { T, A };
 }
@@ -763,7 +762,7 @@ function reconUpdate() {
     const rowH = (ico, title, sub, key, label) => `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">${ico} ${title}</b><small class="sens" style="display:block">${sub}</small></span><button type="button" class="btn" data-bdo="${key}">${label}</button></div>`;
     let h = '';
     if (bad.length) {
-        if (PL.T.length) h += '<div class="ch" style="margin-top:0">Gợi ý chuyển khoản <small>không bắt buộc</small></div>' + PL.T.map((t, i) => rowH('⇄', esc(t.from) + ' → ' + esc(t.to), num(t.amount), 't:' + i, 'Ghi')).join('') + '<p class="note">Một nơi thiếu tiền và một nơi dư tiền thường là do đã chuyển giữa hai nơi mà chưa ghi sổ. Không đúng thì bỏ qua, không sao cả.</p>';
+        if (PL.T.length) h += '<div class="ch" style="margin-top:0">Gợi ý chuyển khoản <small>không bắt buộc</small></div>' + PL.T.map((t, i) => rowH('⇄', esc(t.from) + ' → ' + esc(t.to), num(t.amount), 't:' + i, 'Ghi')).join('') + '<p class="note">Một nơi thiếu và một nơi dư đúng cùng số tiền thường là do đã chuyển giữa hai nơi mà chưa ghi sổ. Không đúng thì bỏ qua, không sao cả.</p>';
         if (PL.A.length) h += '<div class="ch"' + (PL.T.length ? '' : ' style="margin-top:0"') + '>Còn lệch, chưa rõ lý do</div>' + PL.A.map((x, i) => rowH('⚖️', esc(x.n), sgn(x.d), 'a:' + i, 'Ghi điều chỉnh')).join('') + '<p class="note"><b>Điều chỉnh</b> chỉ sửa số dư của đúng 1 tài khoản cho khớp thực tế, không tính là thu hay chi. <b>Chuyển khoản</b> là tiền đi từ tài khoản này sang tài khoản kia, tổng tiền không đổi.</p>';
         if (cnt > 1) h += '<button type="button" class="btn p w" data-bdo="all">Ghi tất cả (' + cnt + ')</button>';
     } else h += has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px">Nhập số dư thực tế ở bên trái để so với sổ.</p>';
