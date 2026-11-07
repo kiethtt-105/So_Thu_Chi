@@ -614,10 +614,23 @@ function limBar(x, label) {
     const r = x.v ? x.used / x.v : 0, c = r > 1 ? 'var(--chi)' : r > .8 ? 'var(--dc)' : 'var(--thu)';
     return `<div class="bar" style="--bc:${c}"><div><span>${label}</span><b class="sens">${vnd(x.used)} / ${vnd(x.v)} <small style="color:${c}">${x.used > x.v ? 'vượt ' + vnd(x.used - x.v) : Math.round(r * 100) + '%'}</small></b></div><i><s style="width:${Math.min(100, r * 100)}%"></s></i></div>`;
 }
+// Giao dịch dính Tiền mặt mà số tiền không chia hết cho 1.000 đ: tiền thật không có lẻ như vậy -> gần như chắc chắn gõ sai
+function oddCash() {
+    const cash = new Set(S.acc.filter(a => a.type === 'Tiền mặt').map(a => a.name));
+    if (!cash.size) return [];
+    return S.tx.filter(t => (cash.has(t.acc) || (t.type === 'Chuyển khoản' && cash.has(t.accTo))) && Math.round(Math.abs(+t.amount || 0)) % 1000 !== 0);
+}
+function issuesAll() {
+    return S.issues.concat(oddCash().slice(0, 200).map(t => ({
+        lv: 'warn', label: 'Tiền mặt bị lẻ', row: '',
+        msg: t.date + ' · ' + t.type + ' ' + num(t.amount) + ' ₫ · ' + t.acc + (t.accTo ? ' → ' + t.accTo : '') + (noteTxt(t.note) ? ' · ' + String(noteTxt(t.note)).slice(0, 40) : '') + ' — tiền mặt thật không lẻ dưới 1.000 ₫, kiểm tra lại số tiền'
+    })));
+}
 function issueBanner() {
-    if (!S.issues.length)
+    const IS = issuesAll();
+    if (!IS.length)
         return '';
-    const e = S.issues.filter(i => i.lv === 'err').length, w = S.issues.length - e;
+    const e = IS.filter(i => i.lv === 'err').length, w = IS.length - e;
     return `<div class="warn ${e ? 'err' : ''}">⚠️ ${e ? e + ' dòng dữ liệu bị lỗi (chưa được tính vào số liệu)' : ''}${e && w ? ' · ' : ''}${w ? w + ' dòng cần lưu ý' : ''}. <button data-a="issues">Xem chi tiết</button></div>`;
 }
 
@@ -834,7 +847,7 @@ function nav() {
     if (!bn) { bn = document.createElement('nav'); bn.id = 'bn'; bn.setAttribute('aria-label', 'Thanh điều hướng nhanh'); $('#app').appendChild(bn); }
     const on = k => (k === 'tx' ? GRP_TX.includes(S.tab) : S.tab === k) ? 'on' : '';
     bn.innerHTML = `<button class="${on('home')}" data-tab="home">${ic('home')}<span>Tổng quan</span></button><button class="${on('tx')}" data-tab="tx">${ic('tx')}<span>Giao dịch</span></button><button class="fab" data-a="new" aria-label="Thêm giao dịch"><svg class="i" viewBox="0 0 24 24" style="stroke-width:2.6"><path d="M12 5v14M5 12h14"/></svg></button><button class="${on('rp')}" data-tab="rp">${ic('rp')}<span>Báo cáo</span></button><button data-a="menu">${ic('more')}<span>Thêm</span></button>`;
-    const n = S.issues.length;
+    const n = issuesAll().length;
     $('#isb').classList.toggle('hide', !n);
     $('#isn').textContent = n > 99 ? '99+' : n;
     if (typeof nbUpdate === 'function')
@@ -898,7 +911,7 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : 
         cnt = load(a.name);
         try { ED = null; E = null; } catch (e) { }
         $('#sh').innerHTML = `<h3>Bảng Kê Tiền Mặt <small class="mut" style="font:500 13px var(--fb,inherit)">${esc(a.name)}</small></h3>
-<div class="cash" id="cash">${DEN.map(d => `<div class="cr"><b>${num(d)}</b><span class="x">×</span><input class="cin" data-d="${d}" inputmode="numeric" maxlength="5" placeholder="0" value="${cnt[d] ? cnt[d] : ''}" aria-label="Số tờ ${num(d)}"><span class="cs sens" id="cs${d}">–</span></div>`).join('')}</div>
+<div class="cash" id="cash" data-cn="${esc(a.name)}">${DEN.map(d => `<div class="cr"><b>${num(d)}</b><span class="x">×</span><input class="cin" data-d="${d}" inputmode="numeric" maxlength="5" placeholder="0" value="${cnt[d] ? cnt[d] : ''}" aria-label="Số tờ ${num(d)}"><span class="cs sens" id="cs${d}">–</span></div>`).join('')}</div>
 <div class="ctot"><span>Tổng <small id="cs_n"></small></span><b class="sens" id="cs_t">0 ₫</b></div>
 <button type="button" class="btn p w" data-cfill>Điền vào ô tiền mặt</button>
 <button type="button" class="btn w" data-cclear>Xóa hết</button>`;
@@ -907,6 +920,16 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : 
         setTimeout(() => { const f = $('#cash .cin'); if (f) f.focus(); }, 80);
     }
 
+    // Khôi phục bảng kê sau F5 (chỉ trong cùng tab, xem draftSave)
+    window.__cashOpen = (name, c) => {
+        const i = S.acc.findIndex(a => a.name === name);
+        if (i < 0) return false;
+        openCash(i);
+        cnt = {};
+        DEN.forEach(d => { const n = Math.max(0, Math.floor(+(c || {})[d] || 0)); if (n) cnt[d] = n; const e = $('#cash .cin[data-d="' + d + '"]'); if (e) e.value = n || ''; });
+        refresh();
+        return true;
+    };
     function fill() {
         const a = S.acc[cur];
         if (!a) return closeSheet();
@@ -1176,7 +1199,7 @@ document.addEventListener('keydown', e => {
         f[0].focus();
     }
 });
-function openIssues() { const L = S.issues; ED = null; E = null; $('#sh').innerHTML = `<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0, 80).map(i => `<div class="iss ${i.lv}"><b>${esc(SN[i.sheet] || i.sheet)} · dòng ${i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length > 80 ? `<p class="mut" style="margin-top:8px">… và ${L.length - 80} mục nữa</p>` : ''}`; openSheet(); }
+function openIssues() { const L = issuesAll(); ED = null; E = null; $('#sh').innerHTML = `<h3>Dữ liệu cần kiểm tra (${L.length}) <span class="tip" tabindex="0" role="note" aria-label="Ý nghĩa màu" data-tip="Đỏ = lỗi, dòng đó chưa được tính vào số liệu. Vàng = cần lưu ý, vẫn được tính. Chỉnh lại các dòng được liệt kê, số liệu sẽ tự cập nhật.">ⓘ</span></h3>${L.slice(0, 80).map(i => `<div class="iss ${i.lv}"><b>${i.label ? esc(i.label) : esc(SN[i.sheet] || i.sheet) + ' · dòng ' + i.row}</b><span>${esc(i.msg)}</span></div>`).join('')}${L.length > 80 ? `<p class="mut" style="margin-top:8px">… và ${L.length - 80} mục nữa</p>` : ''}`; openSheet(); }
 const catNorm = s => nz(String(s || '')).replace(/\s+/g, ' ').trim();
 
 function cbOpts(kind, ty, cat, q) {
@@ -1490,6 +1513,10 @@ $('#ov').addEventListener('click', async (e) => {
             return toast(er);
         if (E.up)
             return toast('Đang nén ảnh, vui lòng chờ…');
+        const cashN = new Set(S.acc.filter(a => a.type === 'Tiền mặt').map(a => a.name));
+        if ((cashN.has(E.acc) || (ty === 'Chuyển khoản' && cashN.has(E.accTo))) && Math.abs(Math.round(E.amount)) % 1000 !== 0 &&
+            !await ask('Số tiền mặt bị lẻ', 'Tiền mặt thật không lẻ dưới 1.000 ₫, mà bạn đang nhập ' + num(Math.abs(Math.round(E.amount))) + ' ₫. Vẫn lưu?', { icon: '🪙', ok: 'Vẫn lưu', cancel: 'Sửa lại' }))
+            return;
         const x = ty === 'Chuyển khoản' || ty === 'Điều chỉnh', row = { id: E.id, date: E.date, type: ty, amount: Math.round(+E.amount || 0), acc: E.acc, accTo: ty === 'Chuyển khoản' ? E.accTo : '', cat: x ? '' : E.cat, sub: x ? '' : E.sub, note: joinImg(E.note, E.imgs) };
         if (E.time) {
             row.at = E.date + 'T' + E.time + ':00';
@@ -4756,6 +4783,12 @@ function draftSave() {
             const fa = g('#fa') || '';
             if (!(e.isNew && !fa && !e.note && !e.cat && !e.imgs.length)) d.f = { fa, E: e };   // form mới tinh chưa nhập gì thì không cần giữ
         }
+        const cs = $('#cash');
+        if (ov && ov.classList.contains('open') && cs && cs.dataset.cn) {
+            const c = {};
+            $$('#cash .cin').forEach(i => { const n = +String(i.value).replace(/\D/g, '') || 0; if (n) c[i.dataset.d] = n; });
+            d.c = { n: cs.dataset.cn, c };
+        }
         sessionStorage.setItem('stc_draft', JSON.stringify(d));
     } catch (e) { }
 }
@@ -4770,16 +4803,22 @@ function draftSave() {
         const app = $('#app');
         if (!app || app.classList.contains('hide')) return;   // chưa đăng nhập: đợi
         done = true;
-        const f = DR.f;
-        if (!f || !f.E) return;
+        const f = DR.f, c = DR.c, hasAct = S.tab === 'rec' && Object.keys(S.act).length > 0;
         setTimeout(() => {
+            let what = '';
             try {
-                if ($('#ov').classList.contains('open')) return;
-                const e = f.E;
-                E = { ...e, imgs: Array.isArray(e.imgs) ? e.imgs.filter(x => typeof x === 'string') : [] };
-                ED = null; form(); openSheet();
-                const a = $('#fa'); if (a && typeof f.fa === 'string') a.value = f.fa;
+                if (!$('#ov').classList.contains('open')) {
+                    if (f && f.E) {
+                        const e = f.E;
+                        E = { ...e, imgs: Array.isArray(e.imgs) ? e.imgs.filter(x => typeof x === 'string') : [] };
+                        ED = null; form(); openSheet();
+                        const a = $('#fa'); if (a && typeof f.fa === 'string') a.value = f.fa;
+                        what = 'giao dịch đang nhập';
+                    } else if (c && c.n && window.__cashOpen && window.__cashOpen(c.n, c.c)) what = 'bảng kê tiền mặt';
+                }
             } catch (x) { }
+            if (!what && hasAct) what = 'số dư thực tế ở Cân đối';
+            if (what) { try { toast('Đã khôi phục ' + what + ' sau khi tải lại trang. Đóng tab là mất.', null, { ico: '📝', title: 'Khôi phục bản nháp' }); } catch (x) { } }
         }, 0);
     }
     const r0 = render;
