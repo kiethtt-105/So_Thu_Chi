@@ -1,7 +1,7 @@
 
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
-const V = 'stc-v48';
+const V = 'stc-v49';
 const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -134,9 +134,10 @@ async function obSend(job) {
   await obPost({ ops, rev: '', fast: ops.every(x => OB_FAST.includes(x.op)) });
 }
 function obNote(body) {
+  // Không tự hiện popup hệ thống (sẽ bỏ qua cài đặt người dùng): chuyển cho app đang mở, app tự hiện toast
   try {
-    if (self.Notification && Notification.permission === 'granted')
-      return self.registration.showNotification('Sổ Thu Chi', { body, icon: 'icons/icon-192.png', tag: 'stc-sync' });
+    return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(list => list.forEach(c => c.postMessage({ type: 'note', body })));
   } catch (e) { }
 }
 let flushing = null;

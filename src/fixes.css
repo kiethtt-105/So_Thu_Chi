@@ -47,3 +47,12 @@ html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
 .row,.rr,.li,.iss,.kr,.an,.dh{border-bottom-color:color-mix(in srgb,var(--line) 35%,transparent)}
 .sheet:has(#fa) .tf-l{border-right:0}
 .sfoot{border-top:0}
+
+/* ───────────── Thẻ AI đọc ảnh: tick từng ô ───────────── */
+.rvr:has(input[data-rvf]){justify-content:flex-start;align-items:center;gap:10px;cursor:pointer}
+.rvr:has(input[data-rvf])>span{flex:1 1 auto}
+.rvr input[data-rvf]{appearance:auto;-webkit-appearance:checkbox;width:18px;height:18px;min-height:0;flex:none;margin:0;padding:0;accent-color:var(--acc);cursor:pointer}
+.rvr.off{opacity:.5;cursor:default}
+.rvr:has(input[data-rvf]:not(:checked):not(:disabled)) b{opacity:.55;text-decoration:line-through}
+/* Thẻ cao thì cuộn trong thẻ, không đè mất form bên dưới */
+.sheet:has(#fa) #scanrow:has(.rvc){max-height:min(300px,38dvh);overflow-y:auto;overscroll-behavior:contain}

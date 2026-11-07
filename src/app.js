@@ -1875,13 +1875,14 @@ function cfg() {
     catch (e) { }
     return {
         fg: c.fg != null ? !!c.fg : localStorage.nall === '1',
+        sys: c.sys !== false,
         kinds: { tx: true, limit: true, sync: true, report: true, remind: true, ...c.kinds },
         rp: { on: true, at: '06:00', ...c.rp },
         rm: Array.isArray(c.rm) ? c.rm : [],
         adv: { max: 3, hist: 40, ...(c.adv || {}), f: { date: true, acc: true, cat: true, note: true, img: true, bal: true, ...((c.adv || {}).f) }, quiet: { on: false, from: '22:00', to: '06:00', ...((c.adv || {}).quiet) } },
         scan: { ai: true, hint: true, ocr: true, auto: false, ...(c.scan || {}) },
         tx: { acc: '', type: 'Chi', dup: true, tol: 0, ...(c.tx || {}) },
-        tg: { on: true, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
+        tg: { on: false, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
 }
 const cfgSave = c => { try {
@@ -2012,6 +2013,8 @@ if ('serviceWorker' in navigator)
         const d = e.data || {};
         if (d.type === 'open-tab' && d.tab && alive())
             go(d.tab);
+        if (d.type === 'note' && d.body)
+            toast(d.body, null, { title: 'Sổ Thu Chi', ico: '⚠️', err: 1 });
     });
 function notify(body, o) {
     o = o || {};
@@ -2028,7 +2031,7 @@ function notify(body, o) {
     nsave(a);
     nbUpdate();
     toast(body, o.undo, { title, ico, err: o.err, sticky: o.sticky });
-    if (pushOn() && !inQuiet() && (o.force || cfg().fg || document.hidden || !document.hasFocus()))
+    if (cfg().sys && pushOn() && !inQuiet() && (o.force || cfg().fg || document.hidden || !document.hasFocus()))
         showSys(title, body, o);
 }
 const txLine = t => (t.type === 'Chi' ? '−' : t.type === 'Thu' ? '+' : '') + num(t.amount) + ' · ' + (t.sub || t.cat || t.type) + ' · ' + (t.type === 'Chuyển khoản' && t.accTo ? t.acc + ' → ' + t.accTo : t.acc);
@@ -2235,6 +2238,7 @@ function openSettings() {
 ${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}`;
     const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
+${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
 ${p === 'granted' ? sw('fg', '📲', 'Hiện cả khi đang mở ứng dụng', 'Mặc định chỉ hiện khi bạn ở ứng dụng hoặc tab khác', c.fg) : ''}</div>
 ${hint ? `<p class="hint">${hint}</p>` : ''}
 
@@ -2389,6 +2393,8 @@ document.addEventListener('change', e => {
     if (g) {
         if (g === 'fg')
             c.fg = t.checked;
+        else if (g === 'sys')
+            c.sys = t.checked;
         else if (g === 'rp.at') {
             if (toMin(t.value) < 0)
                 return;
@@ -3387,8 +3393,16 @@ async function tgSend(title, text, silent) {
 }
 function tgPush(kind, title, text, silent) {
     const t = cfg().tg;
-    if (!/^https?:$/.test(location.protocol) || !t.on)
+    if (!kind || !/^https?:$/.test(location.protocol) || !t.on)
         return;
+    try {
+        const key = title + '|' + text, now = Date.now(), m = JSON.parse(localStorage.tgdup || '{}');
+        for (const k in m) if (now - m[k] > 8000) delete m[k];
+        if (m[key]) return;
+        m[key] = now;
+        localStorage.tgdup = JSON.stringify(m);
+    }
+    catch (e) { }
     tgSend(title, text, silent);
 }
 if (typeof notify === 'function') {
@@ -3985,19 +3999,23 @@ async function readOne(f, sig, o) {
     return { st, d, aiErr };
 }
 const dFmt = d => (d.date ? d.date.split('-').reverse().join('/') : 'chưa rõ ngày') + (d.time ? ' ' + d.time : '');
-function applyDraft(d) {
+const rvHas = d => ({ type: true, amount: !!d.amount, dt: !!(d.date || d.time), acc: !!d.acc, note: !!d.note, cat: d.type !== 'Chuyển khoản' && !!(d.cat && d.sub) });
+const rvSel = d => { const u = k => !d.unsure.includes(k); return { type: true, amount: u('amount'), dt: u('date'), acc: u('account'), note: true, cat: u('category') }; };
+const rvN = rv => { const h = rvHas(rv.d); return Object.keys(h).filter(f => h[f] && rv.sel[f]).length; };
+function applyDraft(d, sel) {
     pull();
-    if ((E.type === 'Chi' || E.type === 'Thu') && d.type !== E.type) { E.type = d.type; E.cat = E.sub = ''; }
-    if (d.amount) E.amount = d.amount;
-    if (d.date) E.date = d.date;
-    if (d.time) E.time = d.time;
-    if (d.note && !E.note) E.note = d.note;
-    if ((E.type === 'Chi' || E.type === 'Thu') && !E.cat && d.cat && d.sub) { E.cat = d.cat; E.sub = d.sub; }
-    if (d.acc) E.acc = d.acc;
-    if (E.type === 'Chuyển khoản' && d.accTo) E.accTo = d.accTo;
+    const on = k => !sel || sel[k] !== false;
+    if (on('type') && (E.type === 'Chi' || E.type === 'Thu') && d.type !== E.type) { E.type = d.type; E.cat = E.sub = ''; }
+    if (on('amount') && d.amount) E.amount = d.amount;
+    if (on('dt')) { if (d.date) E.date = d.date; if (d.time) E.time = d.time; }
+    if (on('note') && d.note && !E.note) E.note = d.note;
+    if (on('cat') && d.type === E.type && (E.type === 'Chi' || E.type === 'Thu') && !E.cat && d.cat && d.sub) { E.cat = d.cat; E.sub = d.sub; }
+    if (on('acc') && d.acc) E.acc = d.acc;
+    if (on('acc') && E.type === 'Chuyển khoản' && d.accTo) E.accTo = d.accTo;
     form();
-    const m = { amount: '#fa', date: '#fd', account: '#fc', category: '#fp' };
+    const m = { amount: '#fa', date: '#fd', account: '#fc', category: '#fp' }, sk = { amount: 'amount', date: 'dt', account: 'acc', category: 'cat' };
     d.unsure.forEach(k => {
+        if (!on(sk[k])) return;
         const el = $(m[k]); if (!el) return;
         const box = el.closest('.amtw, label, .cbw'); if (box) box.classList.add('unsure');
         if (k === 'category' && $('#fs')) $('#fs').closest('.cbw').classList.add('unsure');
@@ -4007,12 +4025,14 @@ function scanCard() {
     const flag = (d, k) => d.unsure.includes(k) ? ' <em class="uns" title="AI không chắc, hãy kiểm tra">⚠</em>' : '';
     const row = (l, v, k, d) => `<div class="rvr"><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></div>`;
     if (E.review) {
-        const d = E.review.d, ck = d.type === 'Chuyển khoản';
-        return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được' + (d.model ? ' (' + esc(d.model) + ')' : '') + ' — kiểm tra rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
-            + row('Loại', esc(d.type)) + row('Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount', d) + row('Ngày giờ', esc(dFmt(d)), 'date', d)
-            + row('Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account', d) + (d.note ? row('Ghi chú', esc(d.note)) : '')
+        const d = E.review.d, ck = d.type === 'Chuyển khoản', sel = E.review.sel, has = rvHas(d);
+        const fr = (f, l, v, k) => `<label class="rvr${has[f] ? '' : ' off'}"><input type="checkbox" data-rvf="${f}" ${sel[f] && has[f] ? 'checked' : ''} ${has[f] ? '' : 'disabled'}><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></label>`;
+        return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được' + (d.model ? ' (' + esc(d.model) + ')' : '') + ' — tick ô đúng rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
+            + fr('type', 'Loại', esc(d.type)) + fr('amount', 'Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount') + fr('dt', 'Ngày giờ', esc(dFmt(d)), 'date')
+            + fr('acc', 'Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account') + (d.note ? fr('note', 'Ghi chú', esc(d.note)) : '')
+            + (has.cat ? fr('cat', 'Hạng mục', esc(d.cat + ' › ' + d.sub), 'category') : '')
             + (d.ask || []).filter(a => a.f === 'category' ? !ck && !d.cat : !d.acc).map(a => `<div class="rvq"><div style="font-weight:600;margin-top:8px">🤔 ${esc(a.q)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">` + a.opts.map((o, i) => `<button type="button" class="btn" data-rvq="${a.f}" data-oi="${i}">${esc(a.f === 'category' ? o.p + ' › ' + o.c : o)}</button>`).join('') + '</div></div>').join('')
-            + `<div class="rvb"><button type="button" class="btn p" data-rv="ok">Điền vào form</button><button type="button" class="btn" data-rv="no">Bỏ qua</button></div></div>`;
+            + `<div class="rvb"><button type="button" class="btn p" data-rv="ok">Điền ${rvN(E.review)} ô đã chọn</button><button type="button" class="btn" data-rv="no">Bỏ qua</button></div></div>`;
     }
     const n = E.batch.filter(x => x.on).length;
     return `<div class="rvc"><div class="rvh">✨ AI đọc được ${E.batch.length} ảnh — chọn giao dịch để lưu</div>`
@@ -4048,7 +4068,7 @@ async function scanImg(f) {
             toast('Đã tự điền ' + d.type + ' ' + num(d.amount) + ' ₫ — kiểm tra rồi bấm Lưu');
             return;
         }
-        E0.review = { d, st: r.st };
+        E0.review = { d, st: r.st, sel: rvSel(d) };
         renderScan();
     }
     catch (e) { _ocrLog = null; E0.scan = ''; if (E === E0) renderScan(); toast(e.cancel ? 'Đã hủy quét' + (st ? ' (ảnh vẫn được đính kèm)' : '') : 'Không quét được: ' + e.message); }
@@ -4094,8 +4114,8 @@ $('#ov').addEventListener('click', e => {
     if (rq && E.review) {
         const d = E.review.d, a = (d.ask || []).find(x => x.f === rq.dataset.rvq), o = a && a.opts[+rq.dataset.oi];
         if (o) {
-            if (a.f === 'category') { d.cat = o.p; d.sub = o.c; d.unsure = d.unsure.filter(k => k !== 'category'); }
-            else { d.acc = o; d.unsure = d.unsure.filter(k => k !== 'account'); }
+            if (a.f === 'category') { d.cat = o.p; d.sub = o.c; d.unsure = d.unsure.filter(k => k !== 'category'); E.review.sel.cat = true; }
+            else { d.acc = o; d.unsure = d.unsure.filter(k => k !== 'account'); E.review.sel.acc = true; }
             renderScan();
         }
         return;
@@ -4103,7 +4123,7 @@ $('#ov').addEventListener('click', e => {
     const rv = q('[data-rv]');
     if (rv) {
         const x = E.review; E.review = null;
-        if (rv.dataset.rv === 'ok' && x) { (E.staged = E.staged || []).some(s => s === x.st) || E.staged.push(x.st); applyDraft(x.d); x.st.name = imgName(); toast('Đã điền ' + x.d.type + ' ' + num(x.d.amount) + ' ₫ — kiểm tra ô có dấu ⚠ rồi bấm Lưu'); }
+        if (rv.dataset.rv === 'ok' && x) { (E.staged = E.staged || []).some(s => s === x.st) || E.staged.push(x.st); applyDraft(x.d, x.sel); x.st.name = imgName(); toast('Đã điền ' + rvN(x) + ' ô đã chọn — kiểm tra lại rồi bấm Lưu'); }
         else { if (x) E.staged = (E.staged || []).filter(s => s !== x.st), renderAtt(); renderScan(); }
         return;
     }
@@ -4122,6 +4142,12 @@ $('#ov').addEventListener('click', e => {
         if (!E0.batch.length) { E0.batch = null; closeSheet(); } else renderScan();
         toast('Đã lưu ' + items.length + ' giao dịch');
     }
+});
+$('#ov').addEventListener('change', e => {
+    const c = e.target.closest && e.target.closest('[data-rvf]');
+    if (!c || !E || !E.review) return;
+    E.review.sel[c.dataset.rvf] = c.checked;
+    const b = $('#scanrow [data-rv="ok"]'); if (b) b.textContent = 'Điền ' + rvN(E.review) + ' ô đã chọn';
 });
 $('#ov').addEventListener('change', e => {
     if (E && e.target.dataset && e.target.dataset.bk != null && E.batch) { E.batch[+e.target.dataset.bk].on = e.target.checked; renderScan(); }
