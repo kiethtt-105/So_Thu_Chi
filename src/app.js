@@ -3209,7 +3209,7 @@ document.addEventListener('click', e => {
             + (L.length ? `<div class="kpis">${kpi('Mình đang nợ', vnd(sum('owe')), 'chi', XD.debt.filter(d => d.dir === 'owe' && dbLeft(d)).length + ' khoản', 'h')}${kpi('Người khác nợ mình', vnd(sum('lent')), 'thu', XD.debt.filter(d => d.dir === 'lent' && dbLeft(d)).length + ' khoản')}</div>` : '')
             + (L.length ? `<div class="col">${L.map(({ d, i }) => {
                 const left = dbLeft(d), pct = Math.min(100, Math.floor((d.paid || 0) / d.amount * 100)), late = left && d.due && d.due < today;
-                return `<div class="card dcard"><div class="dtop"><span class="dot lg">${d.dir === 'owe' ? '🔴' : '🟢'}</span><div class="dtt"><h2>${esc(d.who)}</h2><p>${d.dir === 'owe' ? 'Mình nợ' : 'Họ nợ mình'} ${vnd(d.amount)}${d.due ? ' · hạn ' + d.due.slice(8) + '/' + d.due.slice(5, 7) + '/' + d.due.slice(0, 4) : ''}${d.note ? ' · ' + esc(d.note) : ''}</p></div><div class="dbal"><small>Còn lại</small><b class="sens ${left ? (d.dir === 'owe' ? 'chi' : 'thu') : ''}">${vnd(left)}</b></div></div>
+                return `<div class="card dcard"><div class="dtop"><span class="dot lg">${d.dir === 'owe' ? '🔴' : '🟢'}</span><div class="dtt"><h2>${esc(d.who)}</h2><p>${d.dir === 'owe' ? 'Mình nợ' : 'Họ nợ mình'} ${vnd(d.amount)}${d.acc ? ' · ' + esc(d.acc) : ''}${d.due ? ' · hạn ' + d.due.slice(8) + '/' + d.due.slice(5, 7) + '/' + d.due.slice(0, 4) : ''}${d.note ? ' · ' + esc(d.note) : ''}</p></div><div class="dbal"><small>Còn lại</small><b class="sens ${left ? (d.dir === 'owe' ? 'chi' : 'thu') : ''}">${vnd(left)}</b></div></div>
 <div class="bar" style="--bc:${left ? 'var(--acc)' : 'var(--thu)'};margin-top:14px"><div><span>${pct}%</span><span class="mut sens">${num(d.paid || 0)} / ${num(d.amount)}</span></div><i><s style="width:${pct}%"></s></i></div>
 ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu">Đã tất toán</p>' : ''}
 <div class="cg" style="margin-top:12px">${left ? `<button class="btn p" data-dbpay="${i}">${d.dir === 'owe' ? 'Ghi nhận đã trả' : 'Ghi nhận đã thu'}</button>` : ''}<button class="btn" data-dbe="${i}">Sửa</button></div></div>`;
@@ -3217,21 +3217,25 @@ ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu
     }
     let DB = { i: null };
     function dbForm(i) {
-        const d = i == null ? { who: '', dir: 'owe', amount: 0, due: '', note: '' } : XD.debt[i];
+        const d = i == null ? { who: '', dir: 'owe', amount: 0, due: '', note: '', acc: defAcc() } : { ...XD.debt[i], acc: XD.debt[i].acc || defAcc() };
         DB = { i }; ED = null; E = null;
         $('#sh').innerHTML = `<h3>${i == null ? 'Thêm khoản nợ' : 'Sửa khoản nợ'}</h3><div class="f"><label class="w">Người liên quan<input id="db_who" value="${esc(d.who)}" placeholder="Tên người"></label>
 <label class="w">Loại${pkSel('db_dir', [{ v: 'owe', t: 'Mình nợ người khác' }, { v: 'lent', t: 'Người khác nợ mình' }], d.dir)}</label>
+<label class="w">Tài khoản${pkSel('db_acc', S.acc.map(a => ({ v: a.name, t: a.name })), d.acc)}</label><p class="hint w" style="margin:-4px 0 4px">Mình nợ: tiền được cộng vào tài khoản này. Người khác nợ mình: tiền bị trừ khỏi tài khoản này.</p>
 <label>Số tiền<input class="money" id="db_amt" inputmode="numeric" value="${d.amount ? num(d.amount) : ''}" placeholder="0"></label><label>Hạn trả, không bắt buộc<input type="date" id="db_due" value="${esc(d.due || '')}"></label>
 <label class="w">Ghi chú<input id="db_note" value="${esc(d.note || '')}" placeholder="Không bắt buộc"></label></div><button class="btn p w" data-dbsave>Lưu</button>${i == null ? '' : '<button class="btn d w" data-dbdel style="margin-top:6px">Xóa khoản này</button>'}`;
         openSheet();
     }
-    function dbSave() {
-        const who = val('db_who').trim(), amount = pm(val('db_amt'));
+    async function dbSave() {
+        const who = val('db_who').trim(), amount = pm(val('db_amt')), acc = val('db_acc');
         if (!who) return toast('Nhập tên người');
+        if (!acc) return toast('Chọn tài khoản');
         if (!(amount > 0)) return toast('Nhập số tiền lớn hơn 0');
-        const o = { who, dir: val('db_dir'), amount, due: val('db_due') || '', note: val('db_note').trim() };
-        if (DB.i == null) XD.debt.push({ id: xid(), paid: 0, at: Date.now(), ...o }); else Object.assign(XD.debt[DB.i], o);
+        const o = { who, dir: val('db_dir'), amount, acc, due: val('db_due') || '', note: val('db_note').trim() }, isNew = DB.i == null;
+        if (isNew) XD.debt.push({ id: xid(), paid: 0, at: Date.now(), ...o }); else Object.assign(XD.debt[DB.i], o);
         xsave(); closeSheet(); render(); toast('Đã lưu');
+        if (isNew && await ask('Ghi vào sổ thu chi?', (o.dir === 'owe' ? 'Tạo giao dịch Thu ' + num(amount) + ' vào ' + acc : 'Tạo giao dịch Chi ' + num(amount) + ' từ ' + acc) + ' để số dư tài khoản khớp.', { icon: '🧾', ok: 'Ghi', cancel: 'Để sau' }))
+            qOpen({ type: o.dir === 'owe' ? 'Thu' : 'Chi', amount, date: todayS(), time: hm(new Date()), note: (o.dir === 'owe' ? 'Vay của ' : 'Cho vay ') + who, cat: '', sub: '', acc, accTo: '' });
     }
     async function dbDel() {
         if (!await ask('Xóa khoản này?', 'Chỉ xóa ghi chú trong Sổ nợ, không ảnh hưởng giao dịch.', { danger: 1, ok: 'Xóa' })) return;
@@ -3247,7 +3251,7 @@ ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu
         if (!(a > 0)) return toast('Nhập số tiền');
         d.paid = (d.paid || 0) + a; xsave(); closeSheet(); render();
         if (await ask('Ghi vào sổ thu chi?', 'Tạo giao dịch ' + (d.dir === 'owe' ? 'Chi' : 'Thu') + ' ' + num(a) + ' để số dư tài khoản khớp.', { icon: '🧾', ok: 'Ghi', cancel: 'Để sau' }))
-            qOpen({ type: d.dir === 'owe' ? 'Chi' : 'Thu', amount: a, date: todayS(), time: hm(new Date()), note: (d.dir === 'owe' ? 'Trả nợ ' : 'Thu nợ ') + d.who, cat: '', sub: '', acc: '', accTo: '' });
+            qOpen({ type: d.dir === 'owe' ? 'Chi' : 'Thu', amount: a, date: todayS(), time: hm(new Date()), note: (d.dir === 'owe' ? 'Trả nợ ' : 'Thu nợ ') + d.who, cat: '', sub: '', acc: d.acc || '', accTo: '' });
     }
 
     const cdLast = (day, t) => { let d = new Date(t.getFullYear(), t.getMonth(), Math.min(day, dimOf(t.getFullYear(), t.getMonth()))); if (d > t) { const p = new Date(t.getFullYear(), t.getMonth() - 1, 1); d = new Date(p.getFullYear(), p.getMonth(), Math.min(day, dimOf(p.getFullYear(), p.getMonth()))); } return d; };
