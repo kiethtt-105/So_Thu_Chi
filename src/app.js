@@ -874,7 +874,7 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : 
 
 (function () {
     IC.cnt = 'M4 4h16v16H4zM4 9h16M4 14h16M9 4v16M15 4v16';
-    const DEN = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500];
+    const DEN = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000];
     const KEY = 'stcash';
     let cur = -1;
     let cnt = {};
