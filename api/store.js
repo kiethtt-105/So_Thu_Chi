@@ -49,6 +49,46 @@ async function sheet(body, ms) {
 }
 
 const parse = s => { try { return JSON.parse(s); } catch (e) { return null; } };
+
+// ---- Kiểm tra dữ liệu giao dịch ngay ở server (không tin trình duyệt: bản app cũ / thiết bị chưa cập nhật vẫn bị chặn) ----
+// Lỗi nhẹ thì sửa lại (làm tròn số tiền về số nguyên). Lỗi nặng thì từ chối cả yêu cầu, không ghi gì.
+// Không kiểm tra tên tài khoản có tồn tại hay không: việc đó cần đọc thêm Redis ở mỗi lần ghi nhanh, và dễ từ chối nhầm lúc vừa đổi tên tài khoản.
+const TX_TYPES = new Set(['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh']);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_OPS = 500, MAX_AMT = 1e12;
+function cleanRow(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return { err: 'Giao dịch không hợp lệ' };
+  const id = String(r.id == null ? '' : r.id);
+  if (!id || id.length > 64) return { err: 'Mã giao dịch không hợp lệ' };
+  if (!TX_TYPES.has(r.type)) return { err: 'Loại giao dịch không hợp lệ' };
+  if (!DATE_RE.test(String(r.date || ''))) return { err: 'Ngày giao dịch không hợp lệ (cần dạng YYYY-MM-DD)' };
+  if (typeof r.amount !== 'number' && !(typeof r.amount === 'string' && r.amount.trim())) return { err: 'Thiếu số tiền' };
+  const a = Number(r.amount);
+  if (!isFinite(a) || Math.abs(a) > MAX_AMT) return { err: 'Số tiền không hợp lệ' };
+  const amount = Math.round(a);
+  if (amount === 0) return { err: 'Số tiền phải khác 0' };
+  if (amount < 0 && r.type !== 'Điều chỉnh') return { err: 'Số tiền phải lớn hơn 0' };
+  const acc = String(r.acc == null ? '' : r.acc).trim(), to = String(r.accTo == null ? '' : r.accTo).trim();
+  if (!acc || acc.length > 100) return { err: 'Thiếu tài khoản' };
+  if (r.type === 'Chuyển khoản') {
+    if (!to) return { err: 'Chuyển khoản thiếu tài khoản nhận' };
+    if (to === acc) return { err: 'Tài khoản nguồn và nhận phải khác nhau' };
+  }
+  return { row: Object.assign({}, r, { amount }) };
+}
+function cleanOps(ops) {
+  if (ops.length > MAX_OPS) return { err: 'Quá nhiều thao tác trong một lần gửi' };
+  const out = [];
+  for (const x of ops) {
+    if (x && x.op === 'tx.save') {
+      const c = cleanRow(x.row);
+      if (c.err) return { err: c.err };
+      out.push(Object.assign({}, x, { row: c.row }));
+    } else if (x && (x.op === 'tx.del' || x.op === 'tx.purge') && typeof x.id !== 'string' && typeof x.id !== 'number') return { err: 'Thiếu mã giao dịch cần xóa' };
+    else out.push(x);
+  }
+  return { ops: out };
+}
 const rowsOf = ops => ops.filter(x => x.op === 'tx.save' && x.row && x.row.id).map(x => x.row);
 const delsOf = ops => ops.filter(x => (x.op === 'tx.del' || x.op === 'tx.purge') && x.id).map(x => x.id);
 // Phủ hàng đợi lên bản đồ giao dịch theo ĐÚNG thứ tự từng thao tác. keepDel=true: xóa được ghi là null (để HDEL).
@@ -311,6 +351,11 @@ module.exports = async (req, res) => {
     // Tải ảnh: chuyển sang Apps Script (KEY nằm ở server)
     if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));
     if (body.cfg) return await cfgApi(res, body, HAS_REDIS);   // cài đặt đồng bộ giữa các thiết bị (chỉ lưu trên Redis)
+    if (Array.isArray(body.ops) && body.ops.length) {          // kiểm tra giao dịch TRƯỚC khi ghi Redis hay chuyển sang Sheet
+      const v = cleanOps(body.ops);
+      if (v.err) return res.status(200).json({ ok: false, err: 'Dữ liệu bị từ chối: ' + v.err });
+      body.ops = v.ops;
+    }
     if (!HAS_REDIS) return res.status(200).json(await proxy(body));
     
     const ops = Array.isArray(body.ops) ? body.ops : [], sid = typeof body.sid === 'string' ? body.sid.slice(0, 64) : '';
@@ -389,3 +434,4 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: false, hubErr: true, err: 'Redis: ' + (e && e.message || e) });
   }
 };
+module.exports._cleanOps = cleanOps;   // dùng cho test
