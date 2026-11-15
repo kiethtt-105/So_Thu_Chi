@@ -1505,13 +1505,13 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=num
 
 /* ═════════ SỬA: Cài đặt — 2 cột, chữ lớn, mô tả không bị cắt ═════════ */
 .ov.open .sheet:has(.stg){
-  width:min(1000px,calc(96vw / var(--z,1)));max-width:none;
+  width:min(1280px,calc(96vw / var(--z,1)));max-width:none;
   display:flex;flex-direction:column;overflow:hidden;
-  height:min(780px,calc(90dvh / var(--z,1)));max-height:calc(92dvh / var(--z,1));
-  padding:22px 26px 14px;font-size:16px}
+  height:min(860px,calc(92dvh / var(--z,1)));max-height:calc(94dvh / var(--z,1));
+  padding:24px 32px 16px;font-size:16px}
 .sheet:has(.stg)>.shh{flex:none;margin-bottom:14px}
 .sheet:has(.stg)>.shh h3{font-size:24px}
-.sheet:has(.stg)>.stg{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:224px minmax(0,1fr);gap:26px}
+.sheet:has(.stg)>.stg{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:240px minmax(0,1fr);gap:32px}
 .stn{display:flex;flex-direction:column;gap:4px;overflow-y:auto;align-self:start;max-height:100%;scrollbar-width:thin}
 .sheet .stn button{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 14px;border-radius:12px;font-size:15.5px;font-weight:600;color:var(--mut);text-align:left;white-space:nowrap;justify-content:flex-start}
 .sheet .stn button:hover{background:var(--soft);color:var(--tx,inherit)}
