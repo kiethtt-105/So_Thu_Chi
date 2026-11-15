@@ -98,7 +98,7 @@ const isDark = () => { const m = themeMode(); return m === 'dark' || (m === 'aut
 function applyTheme() { const d = isDark(); [document.documentElement, document.body].forEach(e => e.classList.toggle('dark', d)); const m = document.querySelector('meta[name=theme-color]'); if (m)
     m.content = d ? '#080C16' : '#F1F3F8'; }
 function setTheme(v) { const h = document.documentElement; h.classList.add('tt'); clearTimeout(setTheme._t); setTheme._t = setTimeout(() => h.classList.remove('tt'), 380); try {
-    localStorage.theme = v;
+    csSet('theme', v);
 }
 catch (e) { } applyTheme(); }
 const toggleTheme = () => setTheme(isDark() ? 'light' : 'dark');
@@ -172,7 +172,7 @@ function stamp() { }
 // ===== Đồng bộ cài đặt giữa các thiết bị (lưu ở Redis qua /api/store, trường "cfg") =====
 // localStorage chỉ còn là bản sao để dùng offline. Sửa ở đâu cũng được: máy khác nhận trong vài giây.
 // Hai máy sửa cùng lúc: gộp 3 chiều (so với bản gốc đã đồng bộ lần trước), nên không đè mất thay đổi của nhau.
-const CS_KEYS = ['stcfg', 'stcx', 'tpl', 'goals', 'rvpref', 'lastAcc', 'snz'];
+const CS_KEYS = ['stcfg', 'stcx', 'tpl', 'goals', 'rvpref', 'lastAcc', 'snz', 'theme', 'sbc', 'fx', 'hidtabs', 'aicon'];   // theme/sbc/fx/hidtabs/aicon: giao diện, thanh bên, âm thanh, menu ẩn, biểu tượng tài khoản
 const CS = { crev: '', busy: false, again: false, tm: 0, off: false };
 const csObj = k => { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } };
 const csPut = (k, o) => { try { localStorage.setItem(k, JSON.stringify(o)); } catch (e) { } };
@@ -279,6 +279,11 @@ function csChanged(keys) {
         if (keys.includes('tpl')) { try { TPL = JSON.parse(localStorage.getItem('tpl') || '[]'); } catch (e) { TPL = []; } }
         if (keys.includes('goals')) { try { GOALS = JSON.parse(localStorage.getItem('goals') || '[]'); } catch (e) { GOALS = []; } }
         if (keys.includes('stcx') && window.__xReload) window.__xReload();
+        if (keys.includes('theme')) applyTheme();
+        if (keys.includes('sbc')) document.documentElement.classList.toggle('sbc', localStorage.sbc === '1');
+        if (keys.includes('fx')) document.documentElement.classList.toggle('fxoff', localStorage.fx === '0');
+        if (keys.includes('aicon')) { try { AI = JSON.parse(localStorage.aicon || '{}') || {}; } catch (e) { AI = {}; } }
+        if (keys.includes('hidtabs') && typeof nav === 'function') nav();
         if (typeof nbUpdate === 'function') nbUpdate();
         if (!$('#ov.open') && !typing() && !$('#app').classList.contains('hide')) render();
     } catch (e) { }
@@ -420,7 +425,7 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); }
+function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe(); }
 let LOGOUT_ALL_AT = 0;
 async function logoutAll() {
     if (!await ask('Đăng xuất tất cả thiết bị?', 'Mọi máy khác phải nhập lại mật khẩu. Máy này vẫn giữ đăng nhập.', { icon: '🔒', ok: 'Đăng xuất' })) return;
@@ -466,6 +471,94 @@ $('#lf').onsubmit = async ev => {
         $('#pw').select();
     }
 };
+// ===== Passkey (WebAuthn) + thiết bị đăng nhập: gọi /api/account =====
+const ACC = STORE ? STORE.replace(/[^/]*$/, 'account') : '';
+const PK_OK = !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+const b64u = b => { let s = ''; new Uint8Array(b).forEach(x => { s += String.fromCharCode(x); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64u = s => { s = String(s || '').replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); const r = atob(s), u = new Uint8Array(r.length); for (let i = 0; i < r.length; i++) u[i] = r.charCodeAt(i); return u.buffer; };
+async function accCall(body) {
+    if (!ACC) return { ok: false, err: 'Thiếu cấu hình máy chủ' };
+    try {
+        const r = await fetch(ACC, { method: 'POST', credentials: 'same-origin', body: JSON.stringify(body) });
+        let j; try { j = await r.json(); } catch (e) { return { ok: false, err: 'Máy chủ trả lỗi ' + r.status + (r.status === 404 ? ' (không thấy /api/account, kiểm tra thư mục api/ và deploy lại)' : '') }; }
+        if (j.auth) lock();
+        return j;
+    } catch (e) { return { ok: false, err: 'Không kết nối được máy chủ' }; }
+}
+async function pkProbe() {   // chỉ hiện nút khi trình duyệt hỗ trợ VÀ đã có ít nhất một passkey
+    const b = $('#pkb'); if (!b) return;
+    if (!PK_OK) { b.hidden = true; return; }
+    const j = await accCall({ act: 'has' });
+    b.hidden = !(j && j.ok && j.has);
+}
+async function pkLogin() {
+    if (LOGIN_BUSY) return;
+    LOGIN_BUSY = true;
+    const er = $('#lerr'); er.textContent = '';
+    try {
+        const o = await accCall({ act: 'authopts' });
+        if (!o.ok) { er.textContent = o.err || 'Không đăng nhập được bằng passkey'; return; }
+        const cr = await navigator.credentials.get({ publicKey: { challenge: unb64u(o.challenge), rpId: o.rpId, allowCredentials: (o.allow || []).map(id => ({ type: 'public-key', id: unb64u(id) })), userVerification: 'required', timeout: 60000 } });
+        if (!cr) return;
+        const r = cr.response;
+        const j = await accCall({ act: 'authverify', cred: { id: cr.id, response: { clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) } } });
+        if (j.ok) { try { sessionStorage.sess = Date.now(); } catch (e) { } touch(); boot(); }
+        else { er.textContent = j.err || 'Passkey không hợp lệ'; $('#lf').classList.remove('shake'); void $('#lf').offsetWidth; $('#lf').classList.add('shake'); }
+    } catch (e) {
+        if (!(e && e.name === 'NotAllowedError')) er.textContent = 'Không dùng được passkey trên thiết bị này';   // người dùng bấm Hủy thì im lặng
+    } finally { LOGIN_BUSY = false; }
+}
+async function pkAdd() {
+    if (!PK_OK) { toast('Trình duyệt hoặc địa chỉ này chưa hỗ trợ passkey (cần HTTPS)'); return; }
+    const o = await accCall({ act: 'regopts' });
+    if (!o.ok) { toast(o.err || 'Không thực hiện được'); return; }
+    try {
+        const cr = await navigator.credentials.create({ publicKey: { challenge: unb64u(o.challenge), rp: o.rp, user: { id: unb64u(o.user.id), name: o.user.name, displayName: o.user.displayName }, pubKeyCredParams: o.params, authenticatorSelection: o.sel, excludeCredentials: (o.exclude || []).map(id => ({ type: 'public-key', id: unb64u(id) })), attestation: 'none', timeout: 60000 } });
+        if (!cr) return;
+        const j = await accCall({ act: 'regverify', cred: { id: cr.id, response: { clientDataJSON: b64u(cr.response.clientDataJSON), attestationObject: b64u(cr.response.attestationObject) } } });
+        toast(j.ok ? 'Đã thêm passkey' : (j.err || 'Không thêm được passkey'));
+    } catch (e) {
+        if (e && e.name === 'InvalidStateError') toast('Thiết bị này đã có passkey');
+        else if (!(e && e.name === 'NotAllowedError')) toast('Không tạo được passkey');
+    }
+    secLoad();
+}
+const secT = t => t ? new Date(t).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+const SEC_EV = { login: 'Đăng nhập', outdev: 'Đăng xuất một thiết bị', outall: 'Đăng xuất các thiết bị khác', pkadd: 'Thêm passkey', pkdel: 'Xóa passkey' };
+async function secLoad() {
+    if (!$('#seccard')) return;
+    const j = await accCall({ act: 'info' });
+    const box = $('#seccard'); if (!box) return;
+    if (!j.ok) { box.innerHTML = `<p class="hint">${esc(j.err || 'Không tải được phần bảo mật')}</p>`; return; }
+    const row = (t, s, btn) => `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">${t}</b><small style="display:block">${s}</small></span>${btn || ''}</div>`;
+    const pk = (j.passkeys || []).map(p => row('🔑 ' + esc(p.n || 'Passkey'), 'Tạo ' + secT(p.t) + ' · Dùng gần nhất ' + (p.l ? secT(p.l) : 'chưa dùng'), `<button type="button" class="btn" data-sec="pkdel" data-id="${esc(p.id)}">Xóa</button>`)).join('');
+    const dv = (j.devices || []).map(d => row((d.id === j.me ? '📍 ' : '💻 ') + esc(d.n || 'Thiết bị') + (d.id === j.me ? ' (máy này)' : ''), 'Vào bằng ' + (d.m === 'passkey' ? 'passkey' : 'mật khẩu') + ' · ' + secT(d.t) + ' · Hoạt động ' + secT(d.l) + (d.ip ? ' · ' + esc(d.ip) : ''), d.id === j.me ? '' : `<button type="button" class="btn" data-sec="dev" data-id="${esc(d.id)}">Đăng xuất</button>`)).join('');
+    const lg = (j.log || []).slice(0, 8).map(x => `<small style="display:block">${secT(x.t)} · ${esc(SEC_EV[x.e] || x.e)}${x.m ? ' (' + esc(x.m === 'passkey' ? 'passkey' : 'mật khẩu') + ')' : ''}${x.ok ? '' : ' · <b>thất bại</b>'} · ${esc(x.d || '')}</small>`).join('');
+    box.innerHTML = `<div class="shh sub"><b>Passkey</b>${PK_OK ? '<button type="button" class="chip on" data-sec="pkadd">+ Thêm passkey</button>' : ''}</div>`
+        + (pk || '<p class="hint">Chưa có passkey. Thêm một cái để lần sau mở sổ bằng vân tay / khuôn mặt / mã PIN, không cần gõ mật khẩu.</p>')
+        + (PK_OK ? '' : '<p class="hint">Trình duyệt hoặc địa chỉ này không hỗ trợ passkey (cần HTTPS).</p>')
+        + `<div class="shh sub"><b>Thiết bị đang đăng nhập</b></div>` + (dv || '<p class="hint">Chưa có.</p>')
+        + (lg ? `<div class="shh sub"><b>Hoạt động gần đây</b></div><div style="padding:0 2px 8px">${lg}</div>` : '');
+}
+document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-sec]'); if (!b) return;
+    const k = b.dataset.sec, id = b.dataset.id;
+    if (k === 'pkadd') return pkAdd();
+    if (k === 'pkdel') {
+        if (!await ask('Xóa passkey này?', 'Thiết bị dùng passkey này sẽ không thể mở sổ bằng passkey nữa.', { icon: '🔑', ok: 'Xóa' })) return;
+        const j = await accCall({ act: 'pkdel', id });
+        toast(j.ok ? 'Đã xóa passkey' : (j.err || 'Không xóa được'));
+        return secLoad();
+    }
+    if (k === 'dev') {
+        if (!await ask('Đăng xuất thiết bị này?', 'Thiết bị đó phải đăng nhập lại.', { icon: '🔒', ok: 'Đăng xuất' })) return;
+        const j = await accCall({ act: 'outdev', id });
+        toast(j.ok ? 'Đã đăng xuất thiết bị' : (j.err || 'Không thực hiện được'));
+        return secLoad();
+    }
+});
+{ const pb = $('#pkb'); if (pb) pb.onclick = pkLogin; }
+if (!alive()) pkProbe();
 function setUser() {
     const n = String(NAME || '').trim(), ini = Array.from(n)[0] || '';
     $$('.usr').forEach(e => e.classList.toggle('hide', !n));
@@ -830,12 +923,12 @@ document.addEventListener('change', e => {
     if (!t.dataset || t.dataset.vis === undefined) return;
     const s = hidSet();
     if (t.checked) s.delete(t.dataset.vis); else s.add(t.dataset.vis);
-    try { localStorage.hidtabs = JSON.stringify([...s]); } catch (x) { }
+    try { csSet('hidtabs', JSON.stringify([...s])); } catch (x) { }
     nav();
 });
 document.addEventListener('click', e => {
     if (!e.target.closest('[data-visreset]')) return;
-    try { localStorage.removeItem('hidtabs'); } catch (x) { }
+    try { csSet('hidtabs', null); } catch (x) { }
     nav();
     if (typeof openSettings === 'function') openSettings();
 });
@@ -1419,7 +1512,7 @@ $('#ov').addEventListener('click', async (e) => {
                     AI[nm] = AI[old];
                 } if (old && old !== nm)
                     delete AI[old]; try {
-                    localStorage.aicon = JSON.stringify(AI);
+                    csSet('aicon', JSON.stringify(AI));
                 }
                 catch (er) { } render(); });
                 return;
@@ -2383,9 +2476,9 @@ function openSettings() {
 
 <div class="shh sub"><b>Menu hiển thị</b><button type="button" class="chip" data-visreset>Hiện tất cả</button></div>
 <div class="menu">${TABS.filter(t => t[0] !== 'home').map(([k, l]) => `<label class="row sw">${ic(k)}<span class="m"><b>${l}</b></span><input type="checkbox" role="switch" data-vis="${k}" ${tabOn(k) ? 'checked' : ''} aria-label="Hiện ${l}"></label>`).join('')}</div>
-<p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Lưu riêng trên từng thiết bị.</p>
+<p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Đồng bộ trên mọi thiết bị.</p>
 ${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}
-<div class="sec">Bảo mật</div><div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔒 Đăng xuất tất cả thiết bị</b><small style="display:block">Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div>`;
+<div class="sec">Bảo mật</div><div id="seccard"><p class="hint">Đang tải…</p></div><div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔒 Đăng xuất tất cả thiết bị</b><small style="display:block">Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div>`;
     const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
 ${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
@@ -2452,6 +2545,7 @@ ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại 
 <div class="seg">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
 ${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : SET_TAB === 'tx' ? pTx() : pUi()}`;
     openSheet();
+    if (!['adv', 'tg', 'nt', 'tx'].includes(SET_TAB)) secLoad();
 }
 document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-nt]');
@@ -3425,7 +3519,7 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
 const reduceMotion = () => matchMedia('(prefers-reduced-motion:reduce)').matches;
 function sbToggle() {
     const on = document.documentElement.classList.toggle('sbc');
-    try { localStorage.sbc = on ? '1' : '0'; } catch (e) { }
+    try { csSet('sbc', on ? '1' : '0'); } catch (e) { }
     const b = $('#sbt');
     if (b) {
         b.setAttribute('aria-label', on ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên');
@@ -3504,7 +3598,7 @@ const sfx = {
 };
 function fxToggle() {
     const off = document.documentElement.classList.toggle('fxoff');
-    try { localStorage.fx = off ? '0' : '1'; } catch (e) { }
+    try { csSet('fx', off ? '0' : '1'); } catch (e) { }
     if (!off) sfx.ok();
     toast('Âm thanh và rung: ' + (off ? 'Tắt' : 'Bật'));
 }

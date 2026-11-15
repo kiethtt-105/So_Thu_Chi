@@ -69,12 +69,16 @@ module.exports = async (req, res) => {
   let b = {};
   try { b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) { return send(400, { ok: false, err: 'Dữ liệu không hợp lệ' }); }
   const act = String(b.act || '');
-  if (!AUTHED.has(act) && act !== 'authopts' && act !== 'authverify') return send(400, { ok: false, err: 'Yêu cầu không hợp lệ' });
+  if (!AUTHED.has(act) && act !== 'has' && act !== 'authopts' && act !== 'authverify') return send(400, { ok: false, err: 'Yêu cầu không hợp lệ' });
   if (!auth.hasRedis) return send(200, { ok: false, err: 'Cần Redis để dùng tính năng này' });
   if (AUTHED.has(act) && !(await auth.ok(req, res))) return send(401, { ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
   try {
     const cred = b.cred || {}, r = cred.response || {}, id = String(b.id || '');
     switch (act) {
+      case 'has': {   // chưa cần đăng nhập: có passkey nào chưa (để màn hình đăng nhập quyết định hiện nút)
+        const [n] = await auth.redis(['HLEN', WA]);
+        return send(200, { ok: true, has: +n > 0 });
+      }
       case 'authopts': {   // chưa cần đăng nhập: xin challenge để đăng nhập bằng passkey
         const k = 'stc:wa:rl:' + auth.ip(req), [n] = await auth.redis(['INCR', k]);
         if (+n === 1) await auth.redis(['EXPIRE', k, '300']);
