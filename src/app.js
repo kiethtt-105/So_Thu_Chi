@@ -85,14 +85,29 @@ try {
 } catch (e) { }
 if (!TABS.some(t => t[0] === S.tab))
     S.tab = 'home';
+// ===== Bản sao dữ liệu trên máy: mở app là có số liệu ngay, không cần mạng =====
+// IndexedDB là nơi lưu chính (dung lượng lớn, ghi không đơ giao diện); localStorage giữ thêm bản dự phòng để mở nhanh nhất có thể.
+const KV = {
+    p: null,
+    open() { return this.p || (this.p = new Promise((ok, no) => { try { const r = indexedDB.open('stc-cache', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); } catch (e) { no(e); } }).catch(() => null)); },
+    run(m, f) { return this.open().then(db => db && new Promise(ok => { try { const t = db.transaction('kv', m), q = f(t.objectStore('kv')); t.oncomplete = () => ok(q && q.result); t.onerror = t.onabort = () => ok(null); } catch (e) { ok(null); } })); },
+    get(k) { return this.run('readonly', s => s.get(k)); },
+    put(k, v) { return this.run('readwrite', s => s.put(v, k)); }
+};
+const CACHE_KEYS = ['tx', 'acc', 'cat', 'lim', 'trash', 'issues'];
+let _scT = 0;
+function useCache(c) { CACHE_KEYS.forEach(k => S[k] = c[k] || []); S.cacheT = +c.t || 0; S.ready = true; }
 try {
     const c = JSON.parse(localStorage.cache || 'null');
-    if (c) {
-        ['tx', 'acc', 'cat', 'lim', 'trash', 'issues'].forEach(k => S[k] = c[k] || []);
-        S.ready = true;
-    }
+    if (c) useCache(c);
 }
 catch (e) { }
+if (!S.ready) KV.get('cache').then(s => {   // localStorage trống / đầy: lấy từ IndexedDB
+    try {
+        const c = JSON.parse(s || 'null');
+        if (c && !S.ready) { useCache(c); if (!$('#app').classList.contains('hide')) render(); }
+    } catch (e) { }
+});
 const themeMode = () => localStorage.theme || (localStorage.dark === '1' ? 'dark' : localStorage.dark === '0' ? 'light' : 'auto');
 const isDark = () => { const m = themeMode(); return m === 'dark' || (m === 'auto' && matchMedia('(prefers-color-scheme:dark)').matches); };
 function applyTheme() { const d = isDark(); [document.documentElement, document.body].forEach(e => e.classList.toggle('dark', d)); const m = document.querySelector('meta[name=theme-color]'); if (m)
@@ -314,20 +329,19 @@ function apply(j) {
     S.rev = j.rev;
     S.ready = true;
     overlayParked();
-    try {
-        localStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues });
-    }
-    catch (e) { }
+    S.cacheT = Date.now();
+    saveCache();
     return true;
 }
 const setLive = s => { const e = $('#live'); if (!e || e.dataset.s === s)
     return; e.dataset.s = s; e.className = 'live ' + s; e.lastChild.textContent = { ok: 'Live', err: 'Mất kết nối', wait: 'Đang kết nối' }[s]; };
 const spin = on => { const e = $('#rf'); if (e)
     e.classList.toggle('spin', on); };
+let _askQ = Promise.resolve();
 function ask(title, msg, o) {
     o = o || {};
-    return new Promise(res => {
-        const c = $('#cf');
+    const run = () => new Promise(res => {
+        const c = $('#cf'), prev = document.activeElement;
         $('#cft').textContent = title;
         $('#cfm').textContent = msg || '';
         $('#cfi').textContent = o.icon || (o.danger ? '🗑️' : '❓');
@@ -335,26 +349,27 @@ function ask(title, msg, o) {
         $('#cfn').textContent = o.cancel || 'Hủy';
         c.classList.toggle('danger', !!o.danger);
         c.classList.add('open');
-        $('#cfo').focus();
-        const done = v => { c.classList.remove('open'); $('#cfo').onclick = $('#cfn').onclick = c.onclick = null; document.removeEventListener('keydown', kd, true); res(v); }, kd = e => { if (e.key === 'Escape') {
-            e.preventDefault();
-            e.stopPropagation();
-            done(false);
-        }
-        else if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            done(true);
-        } };
+        (o.danger ? $('#cfn') : $('#cfo')).focus();   // việc nguy hiểm: mặc định đứng ở nút Hủy, lỡ bấm Enter cũng không mất dữ liệu
+        const done = v => {
+            c.classList.remove('open'); $('#cfo').onclick = $('#cfn').onclick = c.onclick = null; document.removeEventListener('keydown', kd, true);
+            try { if (prev && prev.isConnected && prev !== document.body && prev.focus) prev.focus({ preventScroll: true }); } catch (e) { }
+            res(v);
+        }, kd = e => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+            else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(document.activeElement !== $('#cfn')); }
+            else if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); (document.activeElement === $('#cfo') ? $('#cfn') : $('#cfo')).focus(); }
+        };
         $('#cfo').onclick = () => done(true);
         $('#cfn').onclick = () => done(false);
-        c.onclick = e => { if (e.target === c)
-            done(false); };
+        c.onclick = e => { if (e.target === c) done(false); };
         document.addEventListener('keydown', kd, true);
     });
+    const p = _askQ.then(run);   // nhiều hộp thoại liên tiếp: lần lượt từng cái, không đè nhau
+    _askQ = p.catch(() => { });
+    return p;
 }
 let UNDO = null;
-const typing = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#v') && /INPUT|SELECT|TEXTAREA/.test(a.tagName)); };
+const typing = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#v') && (/INPUT|SELECT|TEXTAREA/.test(a.tagName) || (a.tagName === 'BUTTON' && a.classList.contains('ddb')))) || !!document.querySelector('.ddm,.dpm'); };
 let inflight = false, fails = 0, skip = 0;
 async function sync(manual) {
     if (inflight || (!manual && (S.busy || (document.hidden && !pushOn()))))
@@ -561,7 +576,7 @@ function setUser() {
     if (g) g.textContent = n ? 'Xin chào ' + n + ', nhập mật khẩu để mở sổ' : 'Nhập mật khẩu để mở sổ';
 }
 setUser();
-function boot() { setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); resumeOutbox(); sync(true); if (typeof pushInit === 'function')
+function boot() { try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { } setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); resumeOutbox(); sync(true); if (typeof pushInit === 'function')
     pushInit(); }
 let ACT_T = Date.now(), PT = 0;
 document.addEventListener('visibilitychange', () => { if (document.hidden)
@@ -1219,11 +1234,26 @@ function csv() {
     setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 4000);
 }
 let _opener = null;
+const HSB = {
+    on: 0, ign: 0,
+    push() { if (this.on) return; try { history.pushState({ stcSheet: 1 }, ''); this.on = 1; } catch (e) { } },
+    pop() { if (!this.on) return; this.on = 0; this.ign++; try { history.back(); } catch (e) { this.ign--; } }
+};
+addEventListener('popstate', () => {
+    if (HSB.ign) { HSB.ign--; return; }
+    if (!HSB.on) return;
+    HSB.on = 0;
+    const ov = $('#ov');
+    if (!ov.classList.contains('open')) return;
+    if ($('#cf').classList.contains('open')) { HSB.push(); return; }
+    tryClose().then(() => { if (ov.classList.contains('open')) HSB.push(); });
+});
 function openSheet() {
     const ov = $('#ov');
     if (!ov.classList.contains('open'))
         _opener = document.activeElement;
     ov.classList.add('open');
+    HSB.push();
     setTimeout(() => { const a = $('#ov.open #fa'); if (a && !ov.contains(document.activeElement))
         a.focus(); }, 60);
 }
@@ -1232,6 +1262,7 @@ async function tryClose() { if (formDirty() && !await ask('Đóng mà chưa lưu
 function closeSheet() {
     const ov = $('#ov'), was = ov.classList.contains('open');
     ov.classList.remove('open');
+    if (was) HSB.pop();
     if (was && _opener && _opener.isConnected && typeof _opener.focus === 'function') {
         try { _opener.focus({ preventScroll: true }); } catch (e) { }
     }
@@ -3763,7 +3794,7 @@ function oflSet() {
     const e = $('#ofl'); if (!e) return;
     const off = navigator.onLine === false || OB.net;
     e.classList.toggle('on', off);
-    const m = $('#oflm'); if (m) m.textContent = OB.n ? 'Đang offline · ' + OB.n + ' thay đổi chờ gửi, sẽ tự gửi khi có mạng' : 'Đang offline · bạn vẫn xem được dữ liệu đã tải, thay đổi sẽ được gửi khi có mạng';
+    const m = $('#oflm'); if (m) m.textContent = OB.n ? 'Đang offline · ' + OB.n + ' thay đổi chờ gửi, sẽ tự gửi khi có mạng' : 'Đang offline · đang xem dữ liệu đã lưu trên máy' + (S.cacheT ? ' (cập nhật lúc ' + hhmm(S.cacheT) + ')' : '') + ', thay đổi sẽ được gửi khi có mạng';
 }
 addEventListener('online', () => { OB.net = false; oflSet(); });
 addEventListener('offline', oflSet);
@@ -3796,7 +3827,28 @@ document.addEventListener('click', async e => {
     if (!e.target.closest('#pgx')) return;
     if (await ask('Hủy các thay đổi chưa lưu?', OB.n + ' việc đang chờ sẽ bị bỏ, dữ liệu trở về như trên sổ.', { ok: 'Hủy thay đổi', cancel: 'Tiếp tục gửi', icon: '↩️', danger: 1 })) obCancel();
 });
-function saveCache() { try { localStorage.cache = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues }); } catch (e) { } }
+function saveCache(now) {   // ghi gộp: nhiều lần gọi liên tiếp chỉ ghi 1 lần, không làm đứng giao diện khi sổ lớn
+    clearTimeout(_scT); _scT = 0;
+    const go = () => {
+        _scT = 0;
+        let s; try { s = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues, t: S.cacheT || 0 }); } catch (e) { return; }
+        KV.put('cache', s);
+        try { localStorage.cache = s; } catch (e) { try { localStorage.removeItem('cache'); } catch (_) { } }   // localStorage đầy: đã có bản trong IndexedDB
+    };
+    if (now) go(); else _scT = setTimeout(go, 350);
+}
+addEventListener('pagehide', () => { if (_scT) saveCache(true); });
+if ('serviceWorker' in navigator) {
+    let had = !!navigator.serviceWorker.controller, upd = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (!had) { had = true; return; } upd = true; });
+    // Có bản mới: chỉ nạp lại khi người dùng quay lại app lúc không còn việc dang dở (không có thay đổi chờ gửi, không mở form, không đang gõ)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden || !upd) return;
+        if (OB.n || S.busy || $('#ov').classList.contains('open') || $('#cf').classList.contains('open') || typing() || $('#app').classList.contains('hide')) return;
+        location.reload();
+    });
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && _scT) saveCache(true); });
 
 addEventListener('beforeunload', e => { if (Object.values(OB.jobs).some(j => !j.persisted) || (E && E.up)) { e.preventDefault(); e.returnValue = 'Đang lưu dữ liệu, thoát bây giờ có thể mất thay đổi.'; return e.returnValue; } });
 function handOff() {
@@ -4961,4 +5013,216 @@ function promptText(title, ph, def) {
     const later = () => { if (!raf) raf = requestAnimationFrame(scan); };
     new MutationObserver(later).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden', 'disabled'] });
     window.addEventListener('resize', later); later();
+})();
+
+// ===== Bộ chọn ngày / giờ / tháng riêng: thay hộp chọn gốc của trình duyệt (cùng kiểu với ô chọn .ddb) =====
+// Ô <input type=date|time|month> gốc vẫn nằm trong trang (ẩn) và vẫn giữ giá trị chuẩn ISO, nên mã cũ đọc .value như cũ.
+(() => {
+    const PICK_ALL = true;   // true: mọi thiết bị dùng bộ chọn riêng. false: điện thoại / máy tính bảng dùng lại bộ chọn của hệ điều hành
+    const FINE = matchMedia('(pointer:fine)');
+    const P2 = n => String(n).padStart(2, '0');
+    const PH = { date: 'Chọn ngày', time: 'Chọn giờ', month: 'Chọn tháng' };
+    const WD = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    const fmt = (t, v) => {
+        if (!v) return '';
+        let m;
+        if (t === 'date' && (m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v))) return m[3] + '/' + m[2] + '/' + m[1];
+        if (t === 'month' && (m = /^(\d{4})-(\d{2})$/.exec(v))) return m[2] + '/' + m[1];
+        return v;
+    };
+    const setVal = (inp, v) => {
+        if (inp.value === v) return;
+        inp.value = v;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    let pop = null, cur = null, t0 = 0;
+
+    function closePop(focus) {
+        if (!pop) return;
+        const c = cur;
+        pop.remove(); pop = null; cur = null;
+        window.removeEventListener('keydown', kd, true);
+        document.removeEventListener('pointerdown', pd, true);
+        document.removeEventListener('scroll', sc, true);
+        window.removeEventListener('resize', rs);
+        if (c) { c.btn.setAttribute('aria-expanded', 'false'); if (focus) { try { c.btn.focus({ preventScroll: true }); } catch (e) { } } }
+    }
+    const pd = e => { if (pop && !pop.contains(e.target) && !(cur && cur.btn.contains(e.target))) closePop(); };
+    const sc = e => { if (pop && Date.now() - t0 > 250 && !pop.contains(e.target)) closePop(); };
+    const rs = () => closePop();
+
+    function place() {
+        const r = cur.btn.getBoundingClientRect(), W = innerWidth, H = innerHeight;
+        pop.style.visibility = 'hidden';
+        const w = pop.offsetWidth, h = pop.offsetHeight, below = H - r.bottom - 10, above = r.top - 10, up = below < h && above > below;
+        let top = up ? r.top - h - 6 : r.bottom + 6;
+        top = Math.max(8, Math.min(top, H - h - 8));
+        pop.style.left = Math.max(8, Math.min(r.left, W - w - 8)) + 'px';
+        pop.style.top = top + 'px';
+        pop.style.visibility = '';
+    }
+
+    const foot = (nowLbl, req) => `<div class="dpf"><button type="button" data-pk="now">${nowLbl}</button>${req ? '' : '<button type="button" data-pk="clear">Xóa</button>'}</div>`;
+
+    function draw(focusSel) {
+        const c = cur, t = c.t, ak = pop.contains(document.activeElement) ? (document.activeElement.dataset.pk || '') : '';
+        let h = '';
+        if (t === 'time') {
+            const m = /^(\d{1,2}):(\d{2})/.exec(c.inp.value) || [], hh = m[1] === undefined ? -1 : +m[1], mi = m[2] === undefined ? -1 : +m[2];
+            const col = (n, sel, a) => `<div class="dpc" role="listbox" aria-label="${a === 'h' ? 'Giờ' : 'Phút'}">${Array.from({ length: n }, (_, i) => `<button type="button" role="option" data-${a}="${i}" tabindex="-1" class="${i === sel ? 'sel' : ''}" aria-selected="${i === sel}">${P2(i)}</button>`).join('')}</div>`;
+            h = `<div class="dpt2"><span>Giờ</span><span>Phút</span></div><div class="dptm">${col(24, hh, 'h')}${col(60, mi, 'm')}</div>${foot('Bây giờ', c.inp.required)}`;
+        } else if (c.view === 'month') {
+            const sel = c.t === 'month' ? c.inp.value : '', now = ymd(new Date()).slice(0, 7);
+            h = `<div class="dph"><button type="button" data-pk="prev" aria-label="Năm trước">‹</button><span class="dpt">${c.y}</span><button type="button" data-pk="next" aria-label="Năm sau">›</button></div><div class="dpmo">${Array.from({ length: 12 }, (_, i) => { const v = c.y + '-' + P2(i + 1); return `<button type="button" data-mo="${i}" class="${v === sel ? 'sel' : ''}${v === now ? ' now' : ''}">Tháng ${i + 1}</button>`; }).join('')}</div>${t === 'month' ? foot('Tháng này', c.inp.required) : ''}`;
+        } else {
+            const sel = c.inp.value, today = ymd(new Date()), mn = c.inp.min || '', mx = c.inp.max || '';
+            const lead = (new Date(c.y, c.m, 1).getDay() + 6) % 7;
+            let cells = '';
+            for (let i = 0; i < 42; i++) {
+                const d = new Date(c.y, c.m, 1 - lead + i), s = ymd(d), dis = (mn && s < mn) || (mx && s > mx);
+                cells += `<button type="button" data-d="${s}" tabindex="${s === c.fd ? 0 : -1}" class="dpd${d.getMonth() !== c.m ? ' out' : ''}${s === sel ? ' sel' : ''}${s === today ? ' now' : ''}" ${dis ? 'disabled' : ''} aria-label="${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}"${s === sel ? ' aria-pressed="true"' : ''}>${d.getDate()}</button>`;
+            }
+            h = `<div class="dph"><button type="button" data-pk="prev" aria-label="Tháng trước">‹</button><button type="button" class="dpt" data-pk="title" aria-label="Chọn tháng / năm">Tháng ${c.m + 1} · ${c.y}</button><button type="button" data-pk="next" aria-label="Tháng sau">›</button></div><div class="dpw">${WD.map(x => `<span>${x}</span>`).join('')}</div><div class="dpg">${cells}</div>${foot('Hôm nay', c.inp.required)}`;
+        }
+        pop.innerHTML = h;
+        place();
+        if (t === 'time') { pop.querySelectorAll('.dpc .sel').forEach(b => { const p = b.parentElement; p.scrollTop = b.offsetTop - (p.clientHeight - b.offsetHeight) / 2; }); }
+        if (focusSel) {
+            const f = t === 'time' ? pop.querySelector('.dpc .sel') || pop.querySelector('.dpc button') : c.view === 'month' ? pop.querySelector('.dpmo .sel') || pop.querySelector('.dpmo .now') || pop.querySelector('.dpmo button') : pop.querySelector('.dpd[tabindex="0"]');
+            if (f) { try { f.focus({ preventScroll: true }); } catch (e) { } }
+        } else if (ak) { const f = pop.querySelector('[data-pk="' + ak + '"]'); if (f) f.focus({ preventScroll: true }); }
+    }
+
+    function onClick(e) {
+        const x = e.target.closest('button');
+        if (!x || x.disabled || !cur) return;
+        const c = cur, inp = c.inp, a = x.dataset.pk;
+        if (a === 'prev' || a === 'next') {
+            const s = a === 'next' ? 1 : -1;
+            if (c.view === 'month') c.y += s; else { c.m += s; if (c.m < 0) { c.m = 11; c.y--; } if (c.m > 11) { c.m = 0; c.y++; } c.fd = ymd(new Date(c.y, c.m, 1)); }
+            return draw();
+        }
+        if (a === 'title') { c.view = 'month'; return draw(true); }
+        if (a === 'clear') { setVal(inp, ''); return closePop(true); }
+        if (a === 'now') {
+            const n = new Date();
+            setVal(inp, c.t === 'date' ? ymd(n) : c.t === 'month' ? ymd(n).slice(0, 7) : P2(n.getHours()) + ':' + P2(n.getMinutes()));
+            return closePop(true);
+        }
+        if (x.dataset.d) { setVal(inp, x.dataset.d); return closePop(true); }
+        if (x.dataset.mo !== undefined) {
+            if (c.t === 'month') { setVal(inp, c.y + '-' + P2(+x.dataset.mo + 1)); return closePop(true); }
+            c.m = +x.dataset.mo; c.view = 'day'; c.fd = ymd(new Date(c.y, c.m, 1)); return draw(true);
+        }
+        if (x.dataset.h !== undefined || x.dataset.m !== undefined) {
+            const m = /^(\d{1,2}):(\d{2})/.exec(inp.value) || [];
+            let h = m[1] === undefined ? 0 : +m[1], mi = m[2] === undefined ? 0 : +m[2];
+            if (x.dataset.h !== undefined) h = +x.dataset.h; else mi = +x.dataset.m;
+            setVal(inp, P2(h) + ':' + P2(mi));
+            pop.querySelectorAll('.dpc button').forEach(b => { const on = b.dataset.h !== undefined ? +b.dataset.h === h : +b.dataset.m === mi; b.classList.toggle('sel', on); b.setAttribute('aria-selected', on); });
+            if (x.dataset.m !== undefined) closePop(true);
+        }
+    }
+
+    function kd(e) {
+        if (!pop) return;
+        const k = e.key, tg = e.target;
+        if (k === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); return closePop(true); }
+        if (k === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); return closePop(true); }
+        if (!pop.contains(tg)) return;
+        e.stopPropagation();   // phím tắt của app không chạy khi đang chọn
+        const c = cur;
+        if (tg.classList.contains('dpd') && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(k)) {
+            e.preventDefault();
+            const d = new Date(c.fd + 'T00:00');
+            if (k === 'ArrowLeft') d.setDate(d.getDate() - 1);
+            else if (k === 'ArrowRight') d.setDate(d.getDate() + 1);
+            else if (k === 'ArrowUp') d.setDate(d.getDate() - 7);
+            else if (k === 'ArrowDown') d.setDate(d.getDate() + 7);
+            else if (k === 'PageUp' || k === 'PageDown') { const day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + (k === 'PageUp' ? -1 : 1)); d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate())); }
+            else if (k === 'Home') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+            else d.setDate(d.getDate() + (6 - (d.getDay() + 6) % 7));
+            c.fd = ymd(d); c.y = d.getFullYear(); c.m = d.getMonth();
+            return draw(true);
+        }
+        if (tg.closest('.dpmo') && k.startsWith('Arrow')) {
+            e.preventDefault();
+            const L = [...pop.querySelectorAll('.dpmo button')], i = L.indexOf(tg), n = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 }[k];
+            if (L[i + n]) L[i + n].focus();
+            return;
+        }
+        if (tg.closest('.dpc') && k.startsWith('Arrow')) {
+            e.preventDefault();
+            const col = tg.parentElement, L = [...col.children], i = L.indexOf(tg);
+            if (k === 'ArrowUp' && L[i - 1]) L[i - 1].focus();
+            else if (k === 'ArrowDown' && L[i + 1]) L[i + 1].focus();
+            else if (k === 'ArrowLeft' || k === 'ArrowRight') { const cols = [...pop.querySelectorAll('.dpc')], o = cols[cols.indexOf(col) + (k === 'ArrowRight' ? 1 : -1)]; if (o) { const s = o.querySelector('.sel') || o.children[Math.min(i, o.children.length - 1)]; s && s.focus(); } }
+        }
+    }
+
+    function openPop(inp, btn) {
+        if (pop && cur.btn === btn) return closePop(true);
+        closePop();
+        const t = inp.type, v = inp.value, today = ymd(new Date());
+        let y, m, fd = today;
+        if (t === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(v)) { y = +v.slice(0, 4); m = +v.slice(5, 7) - 1; fd = v; }
+        else if (t === 'month' && /^\d{4}-\d{2}$/.test(v)) { y = +v.slice(0, 4); m = +v.slice(5, 7) - 1; }
+        else { y = +today.slice(0, 4); m = +today.slice(5, 7) - 1; if (t === 'date') fd = today; }
+        if (t === 'date' && (fd.slice(0, 7) !== y + '-' + P2(m + 1))) fd = ymd(new Date(y, m, 1));
+        cur = { inp, btn, t, y, m, fd, view: t === 'month' ? 'month' : 'day' };
+        pop = document.createElement('div');
+        pop.className = 'dpm ' + t;
+        pop.setAttribute('role', 'dialog');
+        pop.setAttribute('aria-label', PH[t]);
+        pop.addEventListener('click', onClick);
+        pop.addEventListener('pointerdown', e => { if (!e.target.closest('input,textarea')) e.stopPropagation(); }, false);
+        document.body.appendChild(pop);
+        btn.setAttribute('aria-expanded', 'true');
+        t0 = Date.now();
+        window.addEventListener('keydown', kd, true);
+        document.addEventListener('pointerdown', pd, true);
+        document.addEventListener('scroll', sc, true);
+        window.addEventListener('resize', rs);
+        draw(true);
+    }
+
+    function enh(inp) {
+        if (inp._pk || inp.closest('[data-native]')) return;
+        if (!PICK_ALL && !FINE.matches) return;
+        const r = inp.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        inp._pk = 1;
+        const t = inp.type;
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'ddb dpb ' + t;
+        b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
+        const lb = inp.getAttribute('aria-label') || (inp.closest('label') && inp.closest('label').firstChild && inp.closest('label').firstChild.nodeType === 3 ? inp.closest('label').firstChild.textContent.trim() : '');
+        if (lb) b.setAttribute('aria-label', lb);
+        const cs = getComputedStyle(inp), par = inp.parentElement;
+        b.style.width = par && r.width >= par.clientWidth - 2 ? '100%' : r.width + 'px';
+        b.style.height = r.height + 'px'; b.style.margin = cs.margin; b.style.flex = cs.flex;
+        const upd = () => { const v = inp.value; b.textContent = v ? fmt(t, v) : PH[t]; b.classList.toggle('empty', !v); b.disabled = inp.disabled; };
+        const d1 = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        Object.defineProperty(inp, 'value', { get() { return d1.get.call(this); }, set(v) { d1.set.call(this, v); upd(); }, configurable: true });
+        inp._pku = upd; upd();
+        inp.insertAdjacentElement('afterend', b);
+        inp.classList.add('dd-native'); inp.tabIndex = -1; inp.setAttribute('aria-hidden', 'true');
+        b.addEventListener('click', e => { e.preventDefault(); if (!b.disabled) openPop(inp, b); });
+        b.addEventListener('keydown', e => { if (['ArrowDown', 'Enter', ' '].includes(e.key) && !pop) { e.preventDefault(); if (!b.disabled) openPop(inp, b); } });
+        // bấm vào chữ của nhãn <label> cũng mở bộ chọn (ô gốc đã ẩn)
+        const lab = inp.closest('label');
+        if (lab && !lab._pkl) { lab._pkl = 1; lab.addEventListener('click', e => { if (e.target === lab || (e.target.nodeType === 1 && !e.target.closest('button,input,select,textarea,a'))) { const bb = lab.querySelector('.dpb'); if (bb && !bb.disabled && e.target !== bb) { e.preventDefault(); bb.click(); } } }); }
+    }
+    let raf = 0;
+    const scan = () => {
+        raf = 0;
+        document.querySelectorAll('input[type=date]:not(.dd-native),input[type=time]:not(.dd-native),input[type=month]:not(.dd-native)').forEach(enh);
+        document.querySelectorAll('input.dd-native').forEach(i => i._pku && i._pku());
+        if (pop && !document.body.contains(cur.btn)) closePop();
+    };
+    const later = () => { if (!raf) raf = requestAnimationFrame(scan); };
+    new MutationObserver(later).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden', 'disabled'] });
+    window.addEventListener('resize', later);
+    later();
 })();

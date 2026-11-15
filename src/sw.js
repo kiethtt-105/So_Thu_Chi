@@ -2,6 +2,10 @@
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
 const V = 'stc-v54';
+const RT = 'stc-rt', RT_MAX = 80;   // cache nền: ảnh đính kèm, thư viện CDN (đọc ảnh HEIC / quét chữ) để dùng lại khi offline
+const isLib = h => h === 'cdn.jsdelivr.net' || h === 'cdnjs.cloudflare.com' || h === 'unpkg.com';
+const isImg = h => h === 'drive.google.com' || /(^|\.)googleusercontent\.com$/.test(h);
+async function trim(c, max) { const ks = await c.keys(); for (let i = 0; i < ks.length - max; i++) await c.delete(ks[i]); }
 const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -15,7 +19,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== V).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== V && k !== RT).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -33,7 +37,17 @@ self.addEventListener('fetch', e => {
         .then(res => { if (res && res.ok && res.type === 'basic') c.put(r, res.clone()); return res; })
         .catch(() => null);
       if (hit) { e.waitUntil(net); return hit; }
-      return net.then(res => res || c.match('index.html'));
+      return net.then(res => res || (r.mode === 'navigate' ? c.match('index.html') : Response.error()));
+    })));
+  } else if (isLib(u.hostname)) {
+    // Thư viện có phiên bản cố định trong URL: có bản trên máy thì dùng luôn
+    e.respondWith(caches.open(RT).then(c => c.match(r).then(hit => hit || fetch(r).then(res => { if (res.ok || res.type === 'opaque') { c.put(r, res.clone()); e.waitUntil(trim(c, RT_MAX)); } return res; }))));
+  } else if (isImg(u.hostname) && r.destination === 'image') {
+    // Ảnh đính kèm: hiện ngay từ máy, âm thầm làm mới ở nền
+    e.respondWith(caches.open(RT).then(c => c.match(r).then(hit => {
+      const net = fetch(r).then(res => { if (res.ok || res.type === 'opaque') { c.put(r, res.clone()); e.waitUntil(trim(c, RT_MAX)); } return res; }).catch(() => hit || Response.error());
+      if (hit) { e.waitUntil(net); return hit; }
+      return net;
     })));
   } else if (/(^|\.)(googleapis|gstatic)\.com$/.test(u.hostname)) {
     e.respondWith(caches.open(V).then(c => c.match(r).then(hit => {
