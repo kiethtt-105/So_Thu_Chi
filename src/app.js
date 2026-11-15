@@ -2459,10 +2459,13 @@ function schedTick() {
             const m = toMin(r.at);
             if (!r.on || m < 0 || (r.days && !r.days.includes(now.getDay())))
                 return;
-            const k = rmKey(r, today);
+            const k = rmKey(r, today), kc = 'rmc:' + r.at + '|' + String(r.text || '').trim() + ':' + today;   // kc: hai nhắc nhở trùng giờ + trùng nội dung chỉ bắn một thông báo
             if (cur < m || fired(k))
                 return;
             markFired(k);
+            if (fired(kc))
+                return;
+            markFired(kc);
             const late = cur - m;
             if (late > 240)
                 return;
