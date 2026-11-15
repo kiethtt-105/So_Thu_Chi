@@ -45,6 +45,25 @@ const fm = el => {
     el.value = (ng ? '-' : '') + (d ? num(+d) : '');
     if (cur) { let p = 0, c = 0; while (p < el.value.length && c < left) { if (/\d/.test(el.value[p])) c++; p++; } try { el.setSelectionRange(p, p); } catch (e) { } }
 };
+// Số tiền dài không được tràn khỏi ô: tự thu nhỏ chữ cho vừa khung
+function fitAmt() {
+    const a = document.getElementById('fa');
+    if (!a) return;
+    const box = a.closest('.amtw') || a.parentElement, cur = box.querySelector('.cur');
+    a.style.fontSize = '';
+    if (!box.clientWidth) return;
+    const cs = getComputedStyle(a), bs = getComputedStyle(box), px = v => parseFloat(v) || 0;
+    const full = px(cs.fontSize) || 40, txt = a.value || a.placeholder || '0';
+    const avail = box.clientWidth - px(bs.paddingLeft) - px(bs.paddingRight) - (cur ? cur.offsetWidth + 14 : 0) - 8;   // chừa lề hai bên
+    const cx = fitAmt.cx || (fitAmt.cx = document.createElement('canvas').getContext('2d'));
+    const wid = f => { cx.font = cs.fontWeight + ' ' + f + 'px ' + cs.fontFamily; return cx.measureText(txt).width + px(cs.paddingLeft) + px(cs.paddingRight); };
+    let f = full;
+    while (f > 18 && wid(f) > avail) f -= 2;
+    if (f !== full) a.style.fontSize = f + 'px';
+}
+const fitAmtSoon = () => requestAnimationFrame(fitAmt);
+document.addEventListener('input', e => { if (e.target.id === 'fa') fitAmtSoon(); });
+addEventListener('resize', fitAmtSoon);
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'], CLS = { Thu: 'thu', Chi: 'chi', 'Chuyển khoản': 'chuyen', 'Điều chỉnh': 'dc' };
 const HELD = 'Giữ Hộ';
 const ACC_TYPES = ['Tiền mặt', 'Ngân hàng', 'Thẻ tín dụng', 'Ví điện tử', 'Tiết kiệm', HELD];
@@ -960,9 +979,19 @@ function drawView() {
         return `<div class="card"><h3>Không hiển thị được màn hình này</h3><p class="chi">${esc(e.message)}</p><p class="note">Thử tải lại trang bằng Ctrl+F5. Nếu vẫn lỗi, kiểm tra lại bản deploy gần nhất trên Vercel.</p></div>`;
     }
 }
+let QF = true;   // true = lần vào tab Giao dịch tới đây sẽ đặt con trỏ vào ô tìm kiếm
+function focusSearch() {
+    if (!QF || !S.ready || S.tab !== 'tx') return;
+    const q = $('#q');
+    if (!q || $('#ov').classList.contains('open')) return;
+    QF = false;
+    if (!matchMedia('(hover:hover) and (pointer:fine)').matches) return;   // điện thoại: không bật bàn phím khi chỉ muốn xem danh sách
+    q.focus({ preventScroll: true });
+    q.select();
+}
 function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : '<div class="sk"></div><div class="sk"></div><div class="sk"></div>') : drawView(); if (S.ready && S.tab === 'rec')
     reconUpdate(); mdFix(); if (typeof fxEnter === 'function')
-    fxEnter(); }
+    fxEnter(); focusSearch(); }
 
 (function () {
     IC.cnt = 'M4 4h16v16H4zM4 9h16M4 14h16M9 4v16M15 4v16';
@@ -1052,7 +1081,7 @@ function render() { nav(); $('#v').innerHTML = !S.ready ? (!STORE ? errCard() : 
     document.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('cin')) setTimeout(() => { try { e.target.select(); } catch (x) { } }, 0); });
 })();
 
-const go = t => { S.tab = t; try { localStorage.tab = t; } catch (e) { } if (location.hash) history.replaceState(null, '', location.pathname + location.search); scrollTo(0, 0); closeSheet(); render(); };
+const go = t => { S.tab = t; QF = t === 'tx'; try { localStorage.tab = t; } catch (e) { } if (location.hash) history.replaceState(null, '', location.pathname + location.search); scrollTo(0, 0); closeSheet(); render(); };
 document.addEventListener('click', e => {
     if (e.target.closest('[data-a3="print"]')) { setTimeout(() => window.print(), 150); return; }
     const t = e.target.closest('[data-tab],[data-m],[data-f],[data-edit],[data-a],[data-bdo],[data-ed],[data-rs]');
@@ -1356,6 +1385,7 @@ ${ty === 'Chuyển khoản' ? (noAcc ? '' : accBox('ft', 'Đến tài khoản', 
 <div class="sfoot"><button class="btn p w" data-save title="Ctrl + Enter">${E.isNew ? 'Lưu giao dịch' : 'Lưu thay đổi'}</button>
 <div class="sec2"><button type="button" class="btn" data-tplsave>☆ Lưu mẫu</button>${E.isNew ? '' : '<button type="button" class="btn" data-dup>⧉ Nhân đôi</button><button type="button" class="btn d" data-del>🗑 Xóa</button>'}</div></div>`;
     renderAtt();
+    fitAmtSoon();
 }
 $('#ov').addEventListener('click', e => {
     if (!E || !e.target.closest('[data-reload]')) return;
@@ -2510,8 +2540,10 @@ function openSettings() {
 <div class="shh sub"><b>Menu hiển thị</b><button type="button" class="chip" data-visreset>Hiện tất cả</button></div>
 <div class="menu">${TABS.filter(t => t[0] !== 'home').map(([k, l]) => `<label class="row sw">${ic(k)}<span class="m"><b>${l}</b></span><input type="checkbox" role="switch" data-vis="${k}" ${tabOn(k) ? 'checked' : ''} aria-label="Hiện ${l}"></label>`).join('')}</div>
 <p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Đồng bộ trên mọi thiết bị.</p>
-${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}
-<div class="sec">Bảo mật</div><div id="seccard"></div><div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔒 Đăng xuất tất cả thiết bị</b><small style="display:block">Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div>`;
+${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}`;
+    const pSec = () => `<div class="sec">Đăng nhập và thiết bị</div>
+<div id="seccard"></div>
+<div class="menu"><div class="row"><span class="dot">🔒</span><span class="m"><b>Đăng xuất tất cả thiết bị</b><small>Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div></div>`;
     const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
 ${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
@@ -2524,8 +2556,8 @@ ${hint ? `<p class="hint">${hint}</p>` : ''}
 
 <div class="sec">Thông báo về</div>
 <div class="menu">${Object.entries(CFG_KINDS).map(([k, [i, t, s]]) => sw('k:' + k, i, t, s, c.kinds[k] !== false)).join('')}</div>
-
-<div class="sec">Báo cáo thu chi hằng ngày</div>
+${quietBlock()}`;
+    const pRm = () => `<div class="sec">Báo cáo thu chi hằng ngày</div>
 <div class="menu">${sw('k:report', '📒', 'Gửi báo cáo mỗi ngày', 'Tổng thu, chi và hạng mục chi nhiều nhất của ' + (rpToday() ? 'hôm nay' : 'hôm qua'), c.kinds.report !== false && c.rp.on)}
 <div class="row"><span class="m"><b>Giờ gửi</b><small>Trước 12:00 báo cáo hôm qua, từ 12:00 báo cáo hôm nay</small></span><input type="time" class="tm" data-cfg="rp.at" value="${esc(c.rp.at)}"><button class="chip" data-nt="report">Xem thử</button></div></div>
 
@@ -2546,24 +2578,23 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
 <p class="hint">Telegram nhận đúng từng thông báo hiện trên web, cùng tiêu đề, biểu tượng và nội dung, theo cùng công tắc ở tab Thông báo, và bạn có thể tắt riêng từng loại ở trên. Cài đặt này đồng bộ trên mọi thiết bị, và máy chủ chỉ gửi một tin dù nhiều thiết bị cùng mở. Bấm “Gửi thử” để kiểm tra bot, khóa APP_KEY và chat đã đúng chưa.</p>`;
     const A = c.adv, FL = [['date', '📅', 'Ngày'], ['acc', '🏦', 'Tài khoản và tài khoản đến'], ['cat', '📂', 'Hạng mục cha, con'], ['note', '📝', 'Ghi chú'], ['at', '🕒', 'Tạo lúc'], ['bal', '💰', 'Số dư cuối'], ['img', '📎', 'Ảnh (link)'], ['month', '🗓️', 'Tháng']];
     const segc = (act, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="adv:${act}:${v}" class="${cur === v ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
+    const quietBlock = () => `<div class="sec">Giờ yên tĩnh</div>
+<div class="menu">${sw('adv.quiet.on', '🌙', 'Bật giờ yên tĩnh', 'Không bật chuông thông báo hệ thống, Telegram gửi im lặng. Thông báo vẫn được lưu', A.quiet.on)}
+<div class="row"><span class="m"><b>Từ – đến</b><small>Qua nửa đêm vẫn đúng</small></span><input type="time" class="tm" data-cfg="adv.quiet.from" value="${esc(A.quiet.from)}"><input type="time" class="tm" data-cfg="adv.quiet.to" value="${esc(A.quiet.to)}"></div></div>`;
     const pScan = () => `<div class="sec">Quét ảnh bằng AI</div>
 <div class="menu">${sw('scan.ai', '✨', 'Dùng AI đọc ảnh', 'Gửi ảnh lên máy chủ của bạn để AI đọc hóa đơn, bill. Tắt nếu không muốn gửi ảnh cho AI', c.scan.ai)}
 ${sw('scan.hint', '🏷️', 'Gợi ý tài khoản và hạng mục cho AI', 'AI chọn đúng tên tài khoản, hạng mục của bạn. Tắt thì AI chỉ đọc số tiền, ngày, ghi chú', c.scan.hint)}
 ${sw('scan.ocr', '🔤', 'Dự phòng đọc chữ trên máy', 'Dùng khi AI lỗi hoặc đang tắt. Chậm hơn và kém chính xác hơn', c.scan.ocr)}
 ${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem lại nếu AI chắc mọi trường. Có ô nghi ngờ thì vẫn hiện để bạn kiểm tra', c.scan.auto)}</div>
-<p class="hint">Các tùy chọn quét ảnh được đồng bộ trên mọi thiết bị.</p>
 <div class="sec">Không tính vào thu chi</div>
 <p class="hint">Để một tài khoản không cộng vào thu chi (tiền giữ hộ, quỹ chung, chuyển nội bộ…): vào tab Tài khoản, bấm tài khoản, bật “Không tính vào thu chi”. Cài đặt này lưu trong Google Sheet nên mọi thiết bị và trang TongQuan đều giống nhau.</p>`;
-    const pAdv = () => `${pScan()}<div class="sec">Nội dung thông báo</div>
+    const pAdv = () => `<div class="sec">Nội dung thông báo</div>
 <div class="menu">${FL.map(([k, i, t]) => sw('adv.f:' + k, i, t, 'Hiện trong thông báo giao dịch', A.f[k] !== false)).join('')}</div>
 <p class="hint">Mã, số tiền và loại giao dịch luôn hiện. Web và Telegram dùng chung nội dung này nên luôn giống nhau.</p>
 <div class="sec">Thông báo gộp</div>
-<div class="row"><span class="m"><b>Số giao dịch tối đa mỗi thông báo</b><small>Phần còn lại gộp thành “+N giao dịch khác”</small></span></div>${segc('max', [1, 3, 5, 10], A.max)}
-<div class="sec">Giờ yên tĩnh</div>
-<div class="menu">${sw('adv.quiet.on', '🌙', 'Bật giờ yên tĩnh', 'Không bật chuông thông báo hệ thống, Telegram gửi im lặng. Thông báo vẫn được lưu', A.quiet.on)}
-<div class="row"><span class="m"><b>Từ – đến</b><small>Qua nửa đêm vẫn đúng</small></span><input type="time" class="tm" data-cfg="adv.quiet.from" value="${esc(A.quiet.from)}"><input type="time" class="tm" data-cfg="adv.quiet.to" value="${esc(A.quiet.to)}"></div></div>
+<div class="menu"><div class="row"><span class="m"><b>Số giao dịch tối đa mỗi thông báo</b><small>Phần còn lại gộp thành “+N giao dịch khác”</small></span></div>${segc('max', [1, 3, 5, 10], A.max)}</div>
 <div class="sec">Lịch sử thông báo</div>
-<div class="row"><span class="m"><b>Số thông báo lưu trên thiết bị</b><small>Cũ hơn sẽ tự xóa</small></span></div>${segc('hist', [20, 40, 100], A.hist, v => v + ' mục')}
+<div class="menu"><div class="row"><span class="m"><b>Số thông báo lưu trên thiết bị</b><small>Cũ hơn sẽ tự xóa</small></span></div>${segc('hist', [20, 40, 100], A.hist, v => v + ' mục')}</div>
 <div style="margin-top:16px"><button class="btn w" data-nt="adv-reset">Khôi phục mặc định phần nâng cao</button></div>`;
     const T = c.tx, segx = (k, vals, cur, fmt) => `<div class="seg" style="grid-template-columns:repeat(${vals.length},1fr);margin:8px 0 0">${vals.map(v => `<button type="button" data-nt="txs:${k}:${v}" class="${String(cur) === String(v) ? 'on' : ''}">${fmt ? fmt(v) : v}</button>`).join('')}</div>`;
     const pTx = () => `<div class="sec">Khi thêm giao dịch mới</div>
@@ -2571,14 +2602,19 @@ ${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem 
 <div class="row"><span class="m"><b>Loại mặc định</b><small>Loại được chọn sẵn khi mở form</small></span></div>${segx('type', ['Chi', 'Thu'], T.type)}
 ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại nếu cùng ngày, loại, số tiền, tài khoản vừa ghi trong 30 phút', T.dup !== false)}</div>
 <div class="sec">Cân đối</div>
-<div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}
-<p class="hint">Các cài đặt này được đồng bộ trên mọi thiết bị.</p>`;
-    const tabs = [['ui', 'Giao diện'], ['tx', 'Ghi chép'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['adv', 'Nâng cao']];
-    $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
-<div class="seg">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : SET_TAB === 'tx' ? pTx() : pUi()}`;
+<div class="menu"><div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}</div>
+${pScan()}`;
+    const tabs = [['ui', '🎨', 'Giao diện'], ['tx', '✍️', 'Ghi chép'], ['nt', '🔔', 'Thông báo'], ['rm', '⏰', 'Nhắc nhở'], ['tg', '✈️', 'Telegram'], ['sec', '🔒', 'Bảo mật'], ['adv', '⚙️', 'Nâng cao']];
+    const pages = { ui: pUi, tx: pTx, nt: pNt, rm: pRm, tg: pTg, sec: pSec, adv: pAdv };
+    if (!pages[SET_TAB]) SET_TAB = 'ui';
+    const old = $('#sh .stb'), keepTop = old && old.dataset.t === SET_TAB ? old.scrollTop : 0;   // bấm công tắc không bị nhảy lên đầu trang
+    $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Xem thông báo</button></div>
+<div class="stg"><nav class="stn" aria-label="Nhóm cài đặt">${tabs.map(([k, i, l]) => `<button type="button" data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}" aria-current="${SET_TAB === k}"><span class="si" aria-hidden="true">${i}</span><span>${l}</span></button>`).join('')}</nav>
+<div class="stb" data-t="${SET_TAB}">${pages[SET_TAB]()}</div></div>`;
+    const nb = $('#sh .stb'); if (nb && keepTop) nb.scrollTop = keepTop;
+    const on = $('#sh .stn .on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
     openSheet();
-    if (!['adv', 'tg', 'nt', 'tx'].includes(SET_TAB)) secLoad();
+    if (SET_TAB === 'sec') secLoad();
 }
 document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-nt]');
@@ -2601,7 +2637,7 @@ document.addEventListener('click', async (e) => {
         return openSettings();
     }
     if (k === 'adv-reset') {
-        try { const r = JSON.parse(localStorage.stcfg || '{}'); delete r.adv; delete r.scan; if (r.tg) { delete r.tg.pfx; delete r.tg.retry; } csSet('stcfg', JSON.stringify(r)); } catch (e) { }
+        try { const r = JSON.parse(localStorage.stcfg || '{}'); delete r.adv; if (r.tg) { delete r.tg.pfx; delete r.tg.retry; } csSet('stcfg', JSON.stringify(r)); } catch (e) { }
         toast('Đã khôi phục cấu hình nâng cao');
         return openSettings();
     }
