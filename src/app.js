@@ -425,7 +425,7 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe(); }
+function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe();  }
 let LOGOUT_ALL_AT = 0;
 async function logoutAll() {
     if (!await ask('Đăng xuất tất cả thiết bị?', 'Mọi máy khác phải nhập lại mật khẩu. Máy này vẫn giữ đăng nhập.', { icon: '🔒', ok: 'Đăng xuất' })) return;
@@ -485,11 +485,19 @@ async function accCall(body) {
         return j;
     } catch (e) { return { ok: false, err: 'Không kết nối được máy chủ' }; }
 }
-async function pkProbe() {   // nút passkey (đã có sẵn trong index.html) chỉ hiện khi có passkey và trình duyệt hỗ trợ
+async function pkProbe(auto) {   // có passkey => passkey là cách đăng nhập mặc định: nút lên đầu, tự bật hộp xác thực
     const b = $('#pkb'); if (!b) return;
     if (!PK_OK) { b.hidden = true; return; }
     const j = await accCall({ act: 'has' });
-    b.hidden = !(j && j.ok && j.has);
+    const has = !!(j && j.ok && j.has);
+    b.hidden = !has;
+    if (!has) return;
+    const f = $('#lf'), pw = f && f.querySelector('.pwf');
+    if (pw && pw.parentNode === f) f.insertBefore(b, pw);
+    b.textContent = '🔑 Mở sổ bằng passkey';
+    const g = $('#lgreet'); if (g) g.textContent = 'Dùng vân tay / khuôn mặt, hoặc nhập mật khẩu';
+    try { $('#pw').blur(); } catch (e) { }
+    if (auto && !$('#login').classList.contains('hide')) pkLogin();
 }
 async function pkLogin() {
     if (LOGIN_BUSY) return;
@@ -543,7 +551,7 @@ document.addEventListener('click', async e => {
     }
 });
 { const pb = $('#pkb'); if (pb) pb.onclick = pkLogin; }
-if (!alive()) pkProbe();
+if (!alive()) pkProbe(true);
 function setUser() {
     const n = String(NAME || '').trim(), ini = Array.from(n)[0] || '';
     $$('.usr').forEach(e => e.classList.toggle('hide', !n));
