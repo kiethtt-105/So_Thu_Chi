@@ -3482,7 +3482,7 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
             rcForm(RC.i, r);
         }
     });
-    document.addEventListener('click', e => {
+    document.addEventListener('click', async e => {
         const g = s => e.target.closest(s);
         let b;
         if (g('[data-rcnew]')) return rcForm(null);
@@ -3499,7 +3499,7 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
         if ((b = g('[data-cde]'))) return cdForm(b.dataset.cde);
         if (g('[data-cdsave]')) return cdSave();
         if ((b = g('[data-flt]'))) { const p = XD.flt[+b.dataset.flt]; if (p) { Object.assign(S, FD, p.s, { pg: 100, fo: false }); render(); } return; }
-        if (g('[data-fltsave]')) { const n = (prompt('Đặt tên cho bộ lọc này', '') || '').trim(); if (!n) return; const s = {}; FK.forEach(k => s[k] = S[k]); const i = XD.flt.findIndex(x => x.name.toLowerCase() === n.toLowerCase()); const o = { name: n, s }; if (i >= 0) XD.flt[i] = o; else XD.flt.push(o); xsave(); render(); return toast('Đã lưu bộ lọc “' + n + '”'); }
+        if (g('[data-fltsave]')) { const n = ((await promptText('Đặt tên cho bộ lọc này', 'Tên bộ lọc')) || '').trim(); if (!n) return; const s = {}; FK.forEach(k => s[k] = S[k]); const i = XD.flt.findIndex(x => x.name.toLowerCase() === n.toLowerCase()); const o = { name: n, s }; if (i >= 0) XD.flt[i] = o; else XD.flt.push(o); xsave(); render(); return toast('Đã lưu bộ lọc “' + n + '”'); }
         if (g('[data-fltmg]')) { fltMg = !fltMg; return render(); }
         if ((b = g('[data-fltdel]'))) { XD.flt.splice(+b.dataset.fltdel, 1); xsave(); if (!XD.flt.length) fltMg = false; return render(); }
         if ((b = g('[data-x]'))) {
@@ -4880,4 +4880,85 @@ function draftSave() {
     }
     const r0 = render;
     render = function () { const r = r0.apply(this, arguments); later(); restore(); return r; };
+})();
+
+
+/* ===== Ô chọn / gợi ý / nhập chữ dùng chung giao diện của app (thay thanh thả và hộp thoại gốc của trình duyệt) ===== */
+function promptText(title, ph, def) {
+    return new Promise(res => {
+        const w = document.createElement('div'); w.className = 'cfx';
+        w.innerHTML = `<div class="box" role="dialog" aria-modal="true"><div class="ic">✏️</div><h4></h4><input type="text" maxlength="60" autocomplete="off"><div class="bt"><button type="button" data-n>Hủy</button><button type="button" class="ok" data-o>Lưu</button></div></div>`;
+        w.querySelector('h4').textContent = title; const inp = w.querySelector('input'); inp.placeholder = ph || ''; inp.value = def || '';
+        const done = v => { document.removeEventListener('keydown', kd, true); w.remove(); res(v); };
+        const kd = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(null); } else if (e.key === 'Enter' && e.target === inp) { e.preventDefault(); e.stopPropagation(); done(inp.value.trim()); } };
+        w.onclick = e => { if (e.target === w || e.target.closest('[data-n]')) done(null); else if (e.target.closest('[data-o]')) done(inp.value.trim()); };
+        document.addEventListener('keydown', kd, true); document.body.appendChild(w); inp.focus(); inp.select();
+    });
+}
+(() => {
+    const FINE = matchMedia('(pointer:fine)');   // điện thoại / máy tính bảng giữ bộ chọn của hệ điều hành (rất tiện), máy tính dùng ô chọn riêng
+    const fold = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+    let menu = null, cur = null;
+    function closeMenu(focus) {
+        if (!menu) return; const c = cur; menu.remove(); menu = null; cur = null;
+        document.removeEventListener('keydown', mk, true); document.removeEventListener('mousedown', mo, true); window.removeEventListener('resize', mr); document.removeEventListener('scroll', ms, true);
+        if (c && c.anchor.classList.contains('ddb')) { c.anchor.setAttribute('aria-expanded', 'false'); if (focus) c.anchor.focus(); }
+    }
+    const mo = e => { if (menu && !menu.contains(e.target) && e.target !== cur.anchor) closeMenu(); };
+    const mr = () => closeMenu(), ms = e => { if (menu && !menu.contains(e.target)) closeMenu(); };
+    function act(i, scroll) { if (!cur) return; const els = cur.els; if (!els.length) return; i = (i + els.length) % els.length; cur.i = i; els.forEach((e, k) => e.classList.toggle('act', k === i)); if (scroll !== false) els[i].scrollIntoView({ block: 'nearest' }); }
+    function mk(e) {
+        if (!menu) return; const dl = cur.kind === 'dl';
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(!dl); }
+        else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); act(cur.i < 0 ? (e.key === 'ArrowDown' ? 0 : -1) : cur.i + (e.key === 'ArrowDown' ? 1 : -1)); }
+        else if ((e.key === 'Enter' || (!dl && e.key === ' ')) && cur.i >= 0) { e.preventDefault(); e.stopPropagation(); pick(cur.i); }
+        else if (e.key === 'Tab') closeMenu();
+        else if (!dl && e.key.length === 1) { const q = fold(e.key), n = cur.els.length; for (let k = 1; k <= n; k++) { const j = (cur.i + k) % n; if (fold(cur.items[j].t).startsWith(q)) { act(j); break; } } }
+        else if (e.key === 'Home' && !dl) { e.preventDefault(); act(0); } else if (e.key === 'End' && !dl) { e.preventDefault(); act(cur.els.length - 1); }
+    }
+    function pick(i) { const c = cur, it = c.items[i]; if (!it || it.dis) return; closeMenu(c.kind !== 'dl'); c.onPick(it); }
+    function openMenu(anchor, items, sel, onPick, kind) {
+        closeMenu(); const m = document.createElement('div'); m.className = 'ddm'; m.setAttribute('role', 'listbox'); const els = [], list = [];
+        items.forEach(it => {
+            if (it.group) { const g = document.createElement('div'); g.className = 'ddg'; g.textContent = it.group; m.appendChild(g); return; }
+            const d = document.createElement('div'); d.className = 'ddo' + (it.i === sel ? ' sel' : ''); d.setAttribute('role', 'option'); if (it.dis) d.setAttribute('aria-disabled', 'true'); d.dataset.k = list.length;
+            const sp = document.createElement('span'); sp.textContent = it.t; d.appendChild(sp); m.appendChild(d); els.push(d); list.push(it);
+        });
+        cur = { anchor, items: list, els, i: -1, onPick, kind };
+        m.addEventListener('mousedown', e => { e.preventDefault(); const d = e.target.closest('.ddo'); if (d) pick(+d.dataset.k); });
+        m.addEventListener('mousemove', e => { const d = e.target.closest('.ddo'); if (d && cur && cur.i !== +d.dataset.k) act(+d.dataset.k, false); });
+        menu = m; const r = anchor.getBoundingClientRect(); m.style.minWidth = r.width + 'px'; m.style.visibility = 'hidden'; document.body.appendChild(m);
+        const room = 300, below = innerHeight - r.bottom - 12, above = r.top - 12, up = below < Math.min(m.scrollHeight, 220) && above > below;
+        m.style.maxHeight = Math.max(120, Math.min(room, up ? above : below)) + 'px';
+        m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + 'px'; m.style.top = (up ? r.top - m.offsetHeight - 6 : r.bottom + 6) + 'px'; m.style.visibility = '';
+        const s = items.filter(x => !x.group).findIndex(x => x.i === sel); if (kind !== 'dl') act(s >= 0 ? s : 0);
+        document.addEventListener('keydown', mk, true); document.addEventListener('mousedown', mo, true); window.addEventListener('resize', mr); document.addEventListener('scroll', ms, true);
+    }
+    const itemsOf = sel => { const out = []; let n = 0; [...sel.children].forEach(c => { if (c.tagName === 'OPTGROUP') { out.push({ group: c.label }); [...c.children].forEach(o => out.push({ t: o.textContent.trim(), v: o.value, dis: o.disabled || c.disabled, i: o.index })); } else out.push({ t: c.textContent.trim(), v: c.value, dis: c.disabled, i: c.index }); n++; }); return out; };
+    function enh(sel) {
+        if (sel._dd || sel.multiple || sel.size > 1 || sel.closest('[data-native]')) return;
+        const r = sel.getBoundingClientRect(); if (!r.width || !r.height) return; sel._dd = 1;
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'ddb'; b.setAttribute('aria-haspopup', 'listbox'); b.setAttribute('aria-expanded', 'false');
+        const al = sel.getAttribute('aria-label'); if (al) b.setAttribute('aria-label', al);
+        const cs = getComputedStyle(sel), par = sel.parentElement;
+        b.style.width = par && r.width >= par.clientWidth - 2 ? '100%' : r.width + 'px'; b.style.height = r.height + 'px'; b.style.margin = cs.margin; b.style.flex = cs.flex;
+        const upd = () => { const o = sel.options[sel.selectedIndex]; b.textContent = o ? o.textContent.trim() : ''; b.disabled = sel.disabled; };
+        const d1 = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value'), d2 = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'selectedIndex');
+        Object.defineProperty(sel, 'value', { get() { return d1.get.call(this); }, set(v) { d1.set.call(this, v); upd(); }, configurable: true });
+        Object.defineProperty(sel, 'selectedIndex', { get() { return d2.get.call(this); }, set(v) { d2.set.call(this, v); upd(); }, configurable: true });
+        sel._ddu = upd; upd(); sel.insertAdjacentElement('afterend', b); sel.classList.add('dd-native'); sel.tabIndex = -1; sel.setAttribute('aria-hidden', 'true');
+        const open = () => { if (b.disabled) return; if (menu && cur.anchor === b) return closeMenu(); b.setAttribute('aria-expanded', 'true'); openMenu(b, itemsOf(sel), sel.selectedIndex, it => { if (sel.selectedIndex !== it.i) { sel.selectedIndex = it.i; sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); } upd(); }, 'sel'); };
+        b.addEventListener('click', e => { e.preventDefault(); open(); });
+        b.addEventListener('keydown', e => { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key) && !menu) { e.preventDefault(); open(); } });
+    }
+    function enhDl(inp) {
+        if (inp._dd) return; const dl = document.getElementById(inp.getAttribute('list')); if (!dl) return; inp._dd = 1; inp.removeAttribute('list'); inp.setAttribute('autocomplete', 'off');
+        const show = () => { const q = fold(inp.value), o = [...dl.options].map(x => ({ t: x.label || x.value, v: x.value })).filter(x => !q || fold(x.v).includes(q) || fold(x.t).includes(q)); if (!o.length || (o.length === 1 && o[0].v === inp.value)) return closeMenu(); o.forEach((x, k) => { x.i = k; }); openMenu(inp, o, -1, it => { inp.value = it.v; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); }, 'dl'); };
+        inp.addEventListener('focus', show); inp.addEventListener('input', show); inp.addEventListener('click', show);
+    }
+    let raf = 0;
+    const scan = () => { raf = 0; if (!FINE.matches) return; document.querySelectorAll('select:not(.dd-native)').forEach(enh); document.querySelectorAll('input[list]').forEach(enhDl); document.querySelectorAll('select.dd-native').forEach(s => s._ddu && s._ddu()); if (menu && !document.body.contains(cur.anchor)) closeMenu(); };
+    const later = () => { if (!raf) raf = requestAnimationFrame(scan); };
+    new MutationObserver(later).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden', 'disabled'] });
+    window.addEventListener('resize', later); later();
 })();

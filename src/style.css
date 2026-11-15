@@ -1421,3 +1421,23 @@ html:not(.dark) .card,html:not(.dark) .top,html:not(.dark) #sd,
 .sheet .seg.nf{display:flex;overflow-x:auto;scrollbar-width:none;margin:0 0 6px}
 .sheet .seg.nf::-webkit-scrollbar{display:none}
 .sheet .seg.nf button{flex:1 0 auto;white-space:nowrap;padding:6px 12px}
+
+
+/* ===== Ô chọn tùy biến: cùng bảng màu với app, hiện cả ở chế độ sáng và tối ===== */
+.dd-native{display:none!important}
+.ddb{display:block;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 38px 0 14px;border-radius:12px;border:1px solid var(--line);background:var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a93c0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center/16px;color:var(--ink);font:inherit;font-size:16px;cursor:pointer;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.ddb:hover{border-color:var(--line2)}.ddb:focus-visible,.ddb[aria-expanded=true]{outline:0;border-color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent)}.ddb:disabled{opacity:.55;cursor:not-allowed}
+.sheet .ddb{border-radius:14px}
+.ddm{position:fixed;z-index:9999;background:var(--pop);color:var(--ink);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--sh2);padding:6px;overflow:auto;overscroll-behavior:contain;animation:ddin .12s ease-out}
+.ddo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;min-height:40px;border-radius:9px;cursor:pointer;font-size:14.5px;font-weight:500}
+.ddo.act{background:var(--accl)}.ddo.sel{color:var(--acc);font-weight:700}.ddo.sel::after{content:"✓";font-weight:800}.ddo[aria-disabled=true]{opacity:.45;pointer-events:none}
+.ddg{padding:9px 12px 4px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+@keyframes ddin{from{opacity:0;transform:translateY(-4px)}}
+/* ô số: bỏ nút tăng giảm gốc */
+input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+/* hộp nhập tên (thay prompt của trình duyệt) */
+.cfx{position:fixed;inset:0;z-index:60;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:20px}
+.cfx .box{width:min(390px,100%);background:var(--pop);color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:24px 22px 18px;box-shadow:var(--sh2);animation:ddin .15s}
+.cfx .ic{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:21px;background:var(--accl);margin-bottom:13px}.cfx h4{font:700 17px var(--fd);margin:0 0 10px}
+.cfx input{width:100%;height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--field)}.cfx input:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent)}
+.cfx .bt{display:flex;gap:8px;margin-top:20px}.cfx .bt button{flex:1;padding:12px 8px;border-radius:10px;font-weight:700;font-size:14px;background:var(--soft);color:var(--ink);border:1px solid var(--line)}.cfx .bt .ok{background:var(--acc);color:var(--on-acc);border-color:transparent}
