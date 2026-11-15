@@ -172,7 +172,7 @@ function stamp() { }
 // ===== Đồng bộ cài đặt giữa các thiết bị (lưu ở Redis qua /api/store, trường "cfg") =====
 // localStorage chỉ còn là bản sao để dùng offline. Sửa ở đâu cũng được: máy khác nhận trong vài giây.
 // Hai máy sửa cùng lúc: gộp 3 chiều (so với bản gốc đã đồng bộ lần trước), nên không đè mất thay đổi của nhau.
-const CS_KEYS = ['stcfg', 'stcx', 'tpl', 'goals', 'rvpref', 'lastAcc', 'snz', 'theme', 'sbc', 'fx', 'hidtabs', 'aicon'];   // theme/sbc/fx/hidtabs/aicon: giao diện, thanh bên, âm thanh, menu ẩn, biểu tượng tài khoản
+const CS_KEYS = ['stcfg', 'stcx', 'tpl', 'goals', 'rvpref', 'lastAcc', 'snz', 'theme', 'sbc', 'fx', 'hidtabs', 'aicon'];
 const CS = { crev: '', busy: false, again: false, tm: 0, off: false };
 const csObj = k => { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } };
 const csPut = (k, o) => { try { localStorage.setItem(k, JSON.stringify(o)); } catch (e) { } };
@@ -471,7 +471,7 @@ $('#lf').onsubmit = async ev => {
         $('#pw').select();
     }
 };
-// ===== Passkey (WebAuthn) + thiết bị đăng nhập: gọi /api/account =====
+// ===== Passkey (WebAuthn): đăng nhập nhanh, gọi /api/account =====
 const ACC = STORE ? STORE.replace(/[^/]*$/, 'account') : '';
 const PK_OK = !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
 const b64u = b => { let s = ''; new Uint8Array(b).forEach(x => { s += String.fromCharCode(x); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -480,20 +480,16 @@ async function accCall(body) {
     if (!ACC) return { ok: false, err: 'Thiếu cấu hình máy chủ' };
     try {
         const r = await fetch(ACC, { method: 'POST', credentials: 'same-origin', body: JSON.stringify(body) });
-        let j; try { j = await r.json(); } catch (e) { return { ok: false, err: 'Máy chủ trả lỗi ' + r.status + (r.status === 404 ? ' (không thấy /api/account, kiểm tra thư mục api/ và deploy lại)' : '') }; }
+        let j; try { j = await r.json(); } catch (e) { return { ok: false, err: 'Máy chủ trả lỗi ' + r.status }; }
         if (j.auth) lock();
         return j;
     } catch (e) { return { ok: false, err: 'Không kết nối được máy chủ' }; }
 }
-async function pkProbe() {   // passkey là cách chính: chỉ hiện khi trình duyệt hỗ trợ VÀ đã có ít nhất một passkey
+async function pkProbe() {   // nút passkey (đã có sẵn trong index.html) chỉ hiện khi có passkey và trình duyệt hỗ trợ
     const b = $('#pkb'); if (!b) return;
-    let has = false;
-    if (PK_OK) { const j = await accCall({ act: 'has' }); has = !!(j && j.ok && j.has); }
-    b.hidden = !has;
-    const o = $('#lor'); if (o) o.hidden = !has;
-    $('#lf').classList.toggle('haspk', has);
-    setUser();
-    if (has) { const g = $('#lgreet'), n = String(NAME || '').trim(); if (g) g.textContent = n ? 'Xin chào ' + n + ', chạm để mở sổ' : 'Chạm để mở sổ bằng passkey'; }
+    if (!PK_OK) { b.hidden = true; return; }
+    const j = await accCall({ act: 'has' });
+    b.hidden = !(j && j.ok && j.has);
 }
 async function pkLogin() {
     if (LOGIN_BUSY) return;
@@ -507,13 +503,12 @@ async function pkLogin() {
         const r = cr.response;
         const j = await accCall({ act: 'authverify', cred: { id: cr.id, response: { clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) } } });
         if (j.ok) { try { sessionStorage.sess = Date.now(); } catch (e) { } touch(); boot(); }
-        else { er.textContent = j.err || 'Passkey không hợp lệ'; $('#lf').classList.remove('shake'); void $('#lf').offsetWidth; $('#lf').classList.add('shake'); }
+        else er.textContent = j.err || 'Passkey không hợp lệ';
     } catch (e) {
-        if (!(e && e.name === 'NotAllowedError')) er.textContent = 'Không dùng được passkey trên thiết bị này';   // người dùng bấm Hủy thì im lặng
+        if (!(e && e.name === 'NotAllowedError')) er.textContent = 'Không dùng được passkey trên thiết bị này';
     } finally { LOGIN_BUSY = false; }
 }
 async function pkAdd() {
-    if (!PK_OK) { toast('Trình duyệt hoặc địa chỉ này chưa hỗ trợ passkey (cần HTTPS)'); return; }
     const o = await accCall({ act: 'regopts' });
     if (!o.ok) { toast(o.err || 'Không thực hiện được'); return; }
     try {
@@ -527,33 +522,22 @@ async function pkAdd() {
     }
     secLoad();
 }
-const secT = t => t ? new Date(t).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
-const SEC_EV = { login: 'Đăng nhập', outdev: 'Đăng xuất một thiết bị', outall: 'Đăng xuất các thiết bị khác', pkadd: 'Thêm passkey', pkdel: 'Xóa passkey' };
-async function secLoad() {
-    if (!$('#sec-pk')) return;
+async function secLoad() {   // chỉ thêm vài hàng cùng kiểu với hàng "Đăng xuất tất cả" trong mục Bảo mật
+    const box = $('#seccard'); if (!box) return;
+    if (!PK_OK) { box.innerHTML = ''; return; }
     const j = await accCall({ act: 'info' });
-    if (!$('#sec-pk')) return;
-    if (!j.ok) { ['#sec-pk', '#sec-dv', '#sec-lg'].forEach(q => { const e = $(q); if (e) e.innerHTML = ''; }); $('#sec-pk').innerHTML = `<div class="row"><span class="m"><small>${esc(j.err || 'Không tải được phần bảo mật')}</small></span></div>`; return; }
-    const row = (dot, t, s, btn) => `<div class="row"><span class="dot">${dot}</span><span class="m"><b>${t}</b><small>${s}</small></span>${btn || ''}</div>`;
-    const pk = (j.passkeys || []).map(p => row('🔑', esc(p.n || 'Passkey'), 'Tạo ' + secT(p.t) + ' · ' + (p.l ? 'dùng ' + secT(p.l) : 'chưa dùng'), `<button type="button" class="chip dgr" data-sec="pkdel" data-id="${esc(p.id)}">Xóa</button>`)).join('');
-    $('#sec-pk').innerHTML = pk || '<div class="row"><span class="m"><small>Chưa có passkey nào</small></span></div>';
-    $('#sec-dv').innerHTML = (j.devices || []).map(d => { const me = d.id === j.me, mob = /Android|iOS/.test(d.n || ''); return row(me ? '📍' : mob ? '📱' : '💻', esc(d.n || 'Thiết bị') + (me ? ' · máy này' : ''), (d.m === 'passkey' ? 'Passkey' : 'Mật khẩu') + ' · hoạt động ' + secT(d.l), me ? '' : `<button type="button" class="chip" data-sec="dev" data-id="${esc(d.id)}">Thoát</button>`); }).join('') || '<div class="row"><span class="m"><small>Chưa có</small></span></div>';
-    $('#sec-lg').innerHTML = (j.log || []).slice(0, 6).map(x => `<div class="row"><span class="m"><b>${esc(SEC_EV[x.e] || x.e)}${x.m ? ' · ' + (x.m === 'passkey' ? 'passkey' : 'mật khẩu') : ''}${x.ok ? '' : ' <span style="color:var(--chi)">thất bại</span>'}</b><small>${secT(x.t)} · ${esc(x.d || '')}${x.ip ? ' · ' + esc(x.ip) : ''}</small></span></div>`).join('') || '<div class="row"><span class="m"><small>Chưa có</small></span></div>';
+    const b2 = $('#seccard'); if (!b2) return;
+    if (!j.ok) { b2.innerHTML = ''; return; }
+    const rows = (j.passkeys || []).map(p => `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔑 ${esc(p.n || 'Passkey')}</b><small style="display:block">Tạo ${new Date(p.t).toLocaleDateString('vi-VN')}</small></span><button type="button" class="btn" data-sec="pkdel" data-id="${esc(p.id)}">Xóa</button></div>`).join('');
+    b2.innerHTML = rows + `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔑 Thêm passkey</b><small style="display:block">Mở sổ bằng vân tay / khuôn mặt / mã PIN</small></span><button type="button" class="btn" data-sec="pkadd">Thêm</button></div>`;
 }
 document.addEventListener('click', async e => {
     const b = e.target.closest('[data-sec]'); if (!b) return;
-    const k = b.dataset.sec, id = b.dataset.id;
-    if (k === 'pkadd') return pkAdd();
-    if (k === 'pkdel') {
-        if (!await ask('Xóa passkey này?', 'Thiết bị dùng passkey này sẽ không thể mở sổ bằng passkey nữa.', { icon: '🔑', ok: 'Xóa' })) return;
-        const j = await accCall({ act: 'pkdel', id });
+    if (b.dataset.sec === 'pkadd') return pkAdd();
+    if (b.dataset.sec === 'pkdel') {
+        if (!await ask('Xóa passkey này?', 'Thiết bị dùng passkey này sẽ không mở sổ bằng passkey được nữa.', { icon: '🔑', ok: 'Xóa' })) return;
+        const j = await accCall({ act: 'pkdel', id: b.dataset.id });
         toast(j.ok ? 'Đã xóa passkey' : (j.err || 'Không xóa được'));
-        return secLoad();
-    }
-    if (k === 'dev') {
-        if (!await ask('Đăng xuất thiết bị này?', 'Thiết bị đó phải đăng nhập lại.', { icon: '🔒', ok: 'Đăng xuất' })) return;
-        const j = await accCall({ act: 'outdev', id });
-        toast(j.ok ? 'Đã đăng xuất thiết bị' : (j.err || 'Không thực hiện được'));
         return secLoad();
     }
 });
@@ -2478,7 +2462,7 @@ function openSettings() {
 <div class="menu">${TABS.filter(t => t[0] !== 'home').map(([k, l]) => `<label class="row sw">${ic(k)}<span class="m"><b>${l}</b></span><input type="checkbox" role="switch" data-vis="${k}" ${tabOn(k) ? 'checked' : ''} aria-label="Hiện ${l}"></label>`).join('')}</div>
 <p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Đồng bộ trên mọi thiết bị.</p>
 ${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}
-`;
+<div class="sec">Bảo mật</div><div id="seccard"></div><div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔒 Đăng xuất tất cả thiết bị</b><small style="display:block">Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div>`;
     const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
 ${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
@@ -2540,21 +2524,12 @@ ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại 
 <div class="sec">Cân đối</div>
 <div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}
 <p class="hint">Các cài đặt này được đồng bộ trên mọi thiết bị.</p>`;
-    const pSec = () => `<div class="sec">Mở sổ nhanh bằng passkey</div>
-<div class="menu" id="sec-pk"><div class="row"><span class="m"><small>Đang tải…</small></span></div></div>
-${PK_OK ? '<div style="margin-top:10px"><button type="button" class="btn p w" data-sec="pkadd">+ Thêm passkey cho máy này</button></div>' : '<p class="hint">Trình duyệt hoặc địa chỉ này không hỗ trợ passkey (cần HTTPS).</p>'}
-<p class="hint">Passkey là cách mở sổ chính: chạm vân tay / khuôn mặt / mã PIN. Mật khẩu vẫn dùng được làm dự phòng.</p>
-<div class="sec">Thiết bị đang đăng nhập</div>
-<div class="menu" id="sec-dv"><div class="row"><span class="m"><small>Đang tải…</small></span></div></div>
-<div style="margin-top:10px"><button type="button" class="btn w" data-a="logoutall">🔒 Đăng xuất tất cả thiết bị khác</button></div>
-<div class="sec">Hoạt động gần đây</div>
-<div class="menu" id="sec-lg"></div>`;
-    const tabs = [['ui', 'Giao diện'], ['tx', 'Ghi chép'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['sec', 'Bảo mật'], ['adv', 'Nâng cao']];
+    const tabs = [['ui', 'Giao diện'], ['tx', 'Ghi chép'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['adv', 'Nâng cao']];
     $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
-<div class="seg" style="grid-template-columns:repeat(3,1fr)">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'sec' ? pSec() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : SET_TAB === 'tx' ? pTx() : pUi()}`;
+<div class="seg">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : SET_TAB === 'tx' ? pTx() : pUi()}`;
     openSheet();
-    if (SET_TAB === 'sec') secLoad();
+    if (!['adv', 'tg', 'nt', 'tx'].includes(SET_TAB)) secLoad();
 }
 document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-nt]');
