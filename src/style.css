@@ -2,7 +2,7 @@
 html.dark{color-scheme:dark;--bg:#0A0C1C;--card:#11142B;--pop:#181C3A;--soft:#161A38;--field:#0D1024;--ink:#ECEEFF;--mut:#9AA1CF;--line:#242955;--line2:#353C78;--acc:#8C9BFF;--on-acc:#0A0C1C;--accl:#1F2559;--thu:#35E3A5;--chi:#FF6F8E;--chuyen:#5CB8FF;--dc:#FFC566;--hero:#1A1F5C;--scrim:#04051099;--c1:#8C9BFF;--c2:#37E0CF;--c3:#FFC566;--c4:#FF7CBF;--c5:#B794FF;--c6:#B6F25A;--c7:#5CD2FF;--c8:#FF7C8E;--sh2:0 16px 44px #000a}
 *{box-sizing:border-box;margin:0}
 html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;background:var(--bg);scrollbar-color:var(--line2) transparent}
-body{font:400 14.5px/1.5 var(--fb);background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums;overscroll-behavior-y:none}
+body{font:400 14.5px/1.5 var(--fb);background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
 button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none}
 input,select{font-size:16px}input::placeholder{color:var(--mut);opacity:.7}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -635,7 +635,7 @@ body:has(#cpv.on) .sheet .qk small{visibility:hidden}
 .scanb.busy{cursor:progress;opacity:.9}
 .scanb .spn{flex:none}
 
-html{overflow-x:hidden}
+html{overflow-x:clip}
 .wrap{overflow-x:clip;min-width:0;max-width:100%}
 main,#v,.card,.col,.mdd{min-width:0;max-width:100%}
 svg{max-width:100%}
@@ -1119,7 +1119,7 @@ body{letter-spacing:0}
 
 /* ═══════ fixes (trước đây là fixes.css) ═══════ */
 /* fixes.css — nạp SAU layout.css. Chỉ vá các lỗi tràn/đè nhìn thấy trên điện thoại, không đổi giao diện cũ. */
-html,body{overflow-x:hidden}
+html,body{overflow-x:clip}
 /* Cài đặt: nút "Thông báo" không bị nút đóng (×) đè */
 .sheet>.shh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding-right:48px}
 .sheet>.shh h3{margin:0;padding-right:0;flex:1 1 auto}
@@ -1337,7 +1337,7 @@ body{letter-spacing:0}
 
 /* ═════════ VÁ LỖI & BỎ VIỀN (trước đây fixes.css) ═════════ */
 /* Vá các lỗi tràn/đè nhìn thấy trên điện thoại, không đổi giao diện cũ. */
-html,body{overflow-x:hidden}
+html,body{overflow-x:clip}
 /* Cài đặt: nút "Thông báo" không bị nút đóng (×) đè */
 .sheet>.shh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding-right:48px}
 .sheet>.shh h3{margin:0;padding-right:0;flex:1 1 auto}
@@ -1472,3 +1472,25 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=num
 .dpf button:hover{background:var(--soft)}
 @media(max-width:520px){.dpm{width:min(320px,calc(100vw - 16px))}.dpd{height:42px}.dpc button{height:42px}}
 @media(prefers-reduced-motion:reduce){.dpm{animation:none}}
+
+
+/* ═════════ VÁ GIAO DIỆN (rà lại) ═════════ */
+/* Hàng cài đặt có ô chọn giờ/ngày tùy biến: giữ đúng cỡ, không dãn hết hàng làm nhãn bị bóp và ô thứ hai tràn khỏi hộp */
+.row>.ddb.dpb.time{width:112px!important;flex:none!important}   /* JS gán sẵn width inline theo ô gốc (đo sai thành 482px) nên cần !important */
+.row>.ddb.dpb:not(.time){width:150px!important;flex:none!important}
+.row:has(>.ddb.dpb){flex-wrap:wrap}
+.row:has(>.ddb.dpb)>.m{flex:1 1 140px;min-width:0}
+/* Thanh bên: menu tự cuộn bên trong, phần chào người dùng và nút Thu gọn luôn hiện (màn hình thấp / Windows 125% không bị cắt) */
+@media(min-width:960px){
+  #sd{overflow:hidden}
+  #tb{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;margin-left:-12px;padding-left:12px;scrollbar-width:thin}
+  #sd .brand,#sd .usr.sdu,#sbt{flex:none}
+  #sd .usr.sdu{margin:6px 0 8px}
+}
+@media(min-width:960px) and (max-height:900px){
+  #sd{padding-block:12px}
+  #sd .brand{padding-bottom:8px}
+  #tb .sep{padding:10px 10px 4px}
+  #tb .sep:empty{margin:6px 4px}
+  #tb button{height:34px}
+}
