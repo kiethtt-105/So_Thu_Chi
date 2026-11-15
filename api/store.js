@@ -352,7 +352,7 @@ module.exports = async (req, res) => {
     // Đăng nhập (chưa cần cookie)
     if (body.login !== undefined) return await doLogin(req, res, body, HAS_REDIS);
     // Mọi request còn lại phải có cookie hợp lệ
-    if (!(await auth.ok(req))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
+    if (!(await auth.ok(req, res))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
 
     // Tải ảnh: chuyển sang Apps Script (KEY nằm ở server)
     if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));

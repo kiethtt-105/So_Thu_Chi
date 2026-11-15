@@ -64,7 +64,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, err: 'Method not allowed' });
   const sfs = req.headers['sec-fetch-site'];
   if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });
-  if (!(await auth.ok(req))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
+  if (!(await auth.ok(req, res))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
   if (!KEY) return res.status(200).json({ ok: false, err: 'Chưa cấu hình GEMINI_API_KEY trên Vercel' });
 
   let b = {};

@@ -1,6 +1,7 @@
 // Xác thực phía server. File bắt đầu bằng "_" nên Vercel KHÔNG coi là một API route.
 // APP_PASS / APP_KEY chỉ nằm trong biến môi trường của server. Đăng nhập đúng -> cookie HttpOnly có chữ ký HMAC.
-// Cookie: <iat_ms>.<exp_s>.<chữ ký>. "Đăng xuất tất cả" = ghi mốc thời gian vào Redis (stc:revoked); cookie cấp trước mốc đó bị loại.
+// Cookie: <iat_ms>.<exp_s>.<chữ ký>. Hạn trượt: còn dưới nửa thời hạn mà vẫn có yêu cầu hợp lệ thì cấp lại cookie đủ hạn.
+//  "Đăng xuất tất cả" = ghi mốc thời gian vào Redis (stc:revoked); cookie cấp trước mốc đó bị loại.
 const crypto = require('crypto');
 const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();   // bỏ dấu nháy / khoảng trắng thừa
 const APP_PASS = env('APP_PASS'), APP_KEY = env('APP_KEY');
@@ -42,12 +43,14 @@ async function revokeAll() {
   try { await redis(['SET', REV, String(t)]); rc = { v: t, t }; return true; } catch (e) { return false; }
 }
 
-async function ok(req) {
+async function ok(req, res) {   // truyền res để tự gia hạn cookie khi đang dùng
   if (!APP_PASS || !APP_KEY) return false;   // thiếu cấu hình thì không ai hợp lệ
   const c = String(req.headers.cookie || '').split(/;\s*/).find(x => x.startsWith(NAME + '='));
   const a = c ? c.slice(NAME.length + 1).split('.') : [];
   if (a.length !== 3) return false;
   const p = a[0] + '.' + a[1];
-  return eq(a[2], sig(p)) && +a[1] > Date.now() / 1000 && +a[0] >= await revokedAt();
+  const good = eq(a[2], sig(p)) && +a[1] > Date.now() / 1000 && +a[0] >= await revokedAt();
+  if (good && res && +a[1] - Date.now() / 1000 < HOURS * 1800) res.setHeader('Set-Cookie', cookie());   // còn dưới 1/2 hạn: gia hạn
+  return good;
 }
 module.exports = { env, ok, secretOk, cookie, clear, revokeAll };

@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
   const TG_TOKEN = env('TG_TOKEN'), TG_CHAT_ID = env('TG_CHAT_ID');
   const sfs = req.headers['sec-fetch-site'];
   if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });   // chặn gọi từ trang web khác
-  if (!(await auth.ok(req))) return res.status(401).json({ ok: false, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });        // cookie đăng nhập, không còn dùng key
+  if (!(await auth.ok(req, res))) return res.status(401).json({ ok: false, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });        // cookie đăng nhập, không còn dùng key
   if (!TG_TOKEN || !TG_CHAT_ID) return res.status(500).json({ ok: false, err: 'Thiếu TG_TOKEN hoặc TG_CHAT_ID trên Vercel' });   // kiểm tra SAU khi xác thực để không lộ cấu hình
   let body = {};
   try { body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) { return res.status(400).json({ ok: false, err: 'Dữ liệu không hợp lệ' }); }
