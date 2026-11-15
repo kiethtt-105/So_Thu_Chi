@@ -113,7 +113,7 @@ async function commit(ops, o = {}) {
   try {
     const j = await api({ ops, rev: '', fast: txOnly });
     if (!txOnly) apply(j); else store.set('cache', JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash }));
-    render(); if (o.ok) toast(typeof o.ok === 'function' ? o.ok() : o.ok, o.undo); return { ok: true };
+    render(); if (o.ok) toast(typeof o.ok === 'function' ? o.ok() : o.ok, o.undo); if (o.after) o.after(); return { ok: true };
   } catch (e) {
     if (e.net && ops.every(x => SAFE.has(x.op))) { await Ob.add(ops); Ob.kick(); S.q = await Ob.count(); toast('Đã lưu trên máy, sẽ tự gửi khi có mạng'); return { ok: true, queued: true }; }
     if (o.local) { S.tx = snap; bump(); render(); }
@@ -125,13 +125,14 @@ function txSave(row, old) {
   const nw = !old;
   return commit([{ op: 'tx.save', row }], {
     local: () => { S.tx = S.tx.filter(t => t.id !== row.id).concat(row); },
+    after: r => { tgTx(nw ? '🆕' : '✏️', row).then(() => { const w = limWarn(row); if (w) tgSend('⚠️' + w.replace('⚠️', '')); }); },
     ok: () => nw ? 'Đã thêm giao dịch' + limWarn(row) : 'Đã cập nhật' + limWarn(row),
     undo: () => commit(old ? [{ op: 'tx.save', row: old }] : [{ op: 'tx.purge', id: row.id }], { local: () => { S.tx = S.tx.filter(t => t.id !== row.id); if (old) S.tx.push(old); }, ok: 'Đã hoàn tác' })
   });
 }
 function txDel(id) {
   const old = S.tx.find(t => t.id === id); if (!old) return;
-  commit([{ op: 'tx.del', id }], { local: () => { S.tx = S.tx.filter(t => t.id !== id); }, ok: 'Đã chuyển vào Thùng rác', undo: () => commit([{ op: 'tx.save', row: old }], { local: () => { S.tx.push(old); }, ok: 'Đã hoàn tác' }) });
+  commit([{ op: 'tx.del', id }], { after: () => { tgTx('🗑️', old); }, local: () => { S.tx = S.tx.filter(t => t.id !== id); }, ok: 'Đã chuyển vào Thùng rác', undo: () => commit([{ op: 'tx.save', row: old }], { local: () => { S.tx.push(old); }, ok: 'Đã hoàn tác' }) });
 }
 function limWarn(r) {   // cảnh báo ngay khi một giao dịch chi làm vượt hạn mức
   if (r.type !== 'Chi') return ''; const m = r.date.slice(0, 7), td = today(); let w = '';
@@ -150,9 +151,9 @@ const closeSheet = () => { $('#ov').classList.remove('open'); $('#sh').innerHTML
 $('#ov').addEventListener('mousedown', e => { if (e.target.id === 'ov') closeSheet(); });
 
 /* ---------- Thành phần hiển thị ---------- */
-const IC = { home: 'M3 11l9-8 9 8M5 10v10h14V10', tx: 'M4 6h16M4 12h16M4 18h10', acc: 'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18', lim: 'M4 18a8 8 0 1 1 16 0M12 18l4-6', rp: 'M5 20V11M12 20V4M19 20v-6', more: 'M5 12h.01M12 12h.01M19 12h.01' };
+const IC = { home: 'M3 11l9-8 9 8M5 10v10h14V10', tx: 'M4 6h16M4 12h16M4 18h10', acc: 'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18', lim: 'M4 18a8 8 0 1 1 16 0M12 18l4-6', rp: 'M5 20V11M12 20V4M19 20v-6', more: 'M5 12h.01M12 12h.01M19 12h.01', debt: 'M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6', bal: 'M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', cat: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13', sec: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z' };
 const svg = k => `<svg class="i" viewBox="0 0 24 24"><path d="${IC[k]}"/></svg>`;
-const TABS = [['home', 'Tổng quan'], ['tx', 'Giao dịch'], ['acc', 'Tài khoản'], ['lim', 'Hạn mức'], ['rp', 'Báo cáo'], ['more', 'Thêm']];
+const TABS = [['home', 'Tổng quan'], ['tx', 'Giao dịch'], ['acc', 'Tài khoản'], ['lim', 'Hạn mức'], ['more', 'Thêm']], SIDE = [['home', 'Tổng quan'], ['rp', 'Báo cáo'], ['tx', 'Giao dịch'], ['acc', 'Tài khoản'], ['lim', 'Hạn mức'], ['debt', 'Sổ nợ'], ['bal', 'Cân đối'], ['cat', 'Hạng mục'], ['trash', 'Thùng rác'], ['sec', 'Cài đặt']];
 const EMO = [[/đầu tư|lãi|cổ phiếu/i, '📈'], [/ăn|uống|cơm|cafe|cà phê/i, '🍜'], [/xe|xăng|đi lại|grab/i, '🛵'], [/nhà|thuê|điện|nước|internet/i, '🏠'], [/mua|sắm|quần|áo/i, '🛍️'], [/y tế|thuốc|khám/i, '💊'], [/học|sách/i, '📚'], [/giải trí|phim|game|du lịch/i, '🎮'], [/lương|thưởng/i, '💰'], [/quà|từ thiện/i, '🎁'], [/tiết kiệm/i, '🐷']];
 const emo = k => (EMO.find(e => e[0].test(k || '')) || [0, '🧾'])[1];
 const ATY = { 'Tiền mặt': '💵', 'Ngân hàng': '🏦', 'Thẻ tín dụng': '💳', 'Ví điện tử': '👛', 'Tiết kiệm': '🐷', [HELD]: '🤝' };
@@ -174,6 +175,19 @@ function bars(ms) {   // cột Thu / Chi theo tháng
   return `<svg viewBox="0 0 300 150" style="width:100%">${d.map(([m, a, b], i) => { const x = i * 300 / d.length + 8, w = (300 / d.length - 16) / 2, h1 = a / mx * 110, h2 = b / mx * 110; return `<rect x="${x}" y="${120 - h1}" width="${w}" height="${h1}" rx="3" fill="var(--ok)"/><rect x="${x + w + 2}" y="${120 - h2}" width="${w}" height="${h2}" rx="3" fill="var(--er)"/><text x="${x + w}" y="140" text-anchor="middle" font-size="9" fill="var(--mu)">T${+m.slice(5)}</text>`; }).join('')}</svg>`;
 }
 const prog = (pct, cls) => `<div class="bar ${cls}"><i style="width:${Math.min(100, pct * 100)}%"></i></div>`;
+
+
+/* ---------- Telegram ---------- */
+const tgOn = () => store.get('tg', '1') === '1';
+async function tgSend(text, silent) { if (!tgOn()) return { ok: true, skip: 1 }; try { const r = await fetch('/api/telegram', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, silent: !!silent }) }); const j = await r.json().catch(() => ({})); return { ok: !!j.ok, err: j.err || (r.status === 404 ? 'Chưa có /api/telegram' : '') }; } catch (e) { return { ok: false, err: 'Không gọi được máy chủ' }; } }
+const tgTx = (verb, t) => tgSend(`${verb} ${t.type} ${NF.format(Math.abs(t.amount))} ₫${t.sub || t.cat ? ' — ' + (t.sub || t.cat) : ''}\n💳 ${t.acc}${t.accTo ? ' → ' + t.accTo : ''}\n📅 ${t.date}${t.note ? '\n📝 ' + String(t.note).replace(/https:\/\/\S+/g, '').trim() : ''}`, true);
+
+/* ---------- Dữ liệu mở rộng (sổ nợ...) đồng bộ qua cfg 'stcx' ---------- */
+const X = { d: { rec: [], debt: [], card: {}, flt: [] }, t: 0 };
+try { Object.assign(X.d, JSON.parse(store.get('stcx', '{}'))); } catch (e) { }
+async function xPull() { try { const j = await api({ cfg: {} }); if (j.off) return; const r = j.cfg && j.cfg.stcx; if (r) { X.t = r.t; try { Object.assign(X.d, JSON.parse(r.v)); } catch (e) { } store.set('stcx', r.v); } } catch (e) { } }
+async function xSave() { const v = JSON.stringify(X.d); store.set('stcx', v); try { const j = await api({ cfg: { set: { stcx: { v, base: X.t } } } }); if (j.conflict && j.conflict.length) { await xPull(); toast('Sổ nợ vừa đổi trên máy khác, hãy thử lại', null, 1); render(); } else if (j.cfg && j.cfg.stcx) X.t = j.cfg.stcx.t; } catch (e) { toast(e.message, null, 1); } }
+const dbLeft = d => Math.max(0, d.amount - (d.paid || 0));
 
 /* ---------- Các màn hình ---------- */
 const V = {};
@@ -215,7 +229,24 @@ V.rp = () => {
   return `${monthNav()}<div class="card"><h3>Thu / Chi 6 tháng <small class="mu">TB chi ${NF.format(avg)}</small></h3>${bars(ms)}</div>
 <div class="card"><h3>Chi theo danh mục</h3>${group(cur, t => t.cat || '').map(([k, v], i) => { const d = v - (pv[k] || 0); return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between"><span>${emo(k)} ${esc(k || 'Chưa phân loại')}</span><b class="num sens">${NF.format(v)} <small class="${d > 0 ? 'chi' : 'thu'}">${pv[k] ? sgn(d) : 'mới'}</small></b></div><div class="bar"><i style="width:${v / tot * 100}%;background:${col(i)}"></i></div></div>`; }).join('') || empty('Chưa có chi tiêu tháng này')}</div>`;
 };
-V.more = () => `<div class="card fl">${[['cat', '🗂️', 'Hạng mục', 'Danh mục thu chi'], ['trash', '🗑️', 'Thùng rác', S.trash.length + ' mục có thể khôi phục'], ['sec', '🔐', 'Bảo mật & giao diện', 'Passkey, đăng xuất, giao diện']].map(([k, i, t, s]) => `<a class="row" href="#${k}" style="text-decoration:none;color:inherit"><span class="dot">${i}</span><span class="m"><b>${t}</b><small>${s}</small></span>›</a>`).join('')}</div>`;
+
+V.debt = () => {
+  const L = X.d.debt.map((d, i) => ({ d, i })).sort((a, b) => (dbLeft(a.d) === 0) - (dbLeft(b.d) === 0) || (a.d.due || '9999').localeCompare(b.d.due || '9999')), sum = dir => X.d.debt.filter(d => d.dir === dir).reduce((s, d) => s + dbLeft(d), 0), td = today();
+  return `<div style="margin-bottom:12px"><button class="btn pri" data-act="debt-new">＋ Thêm khoản</button></div>
+<div class="kp" style="grid-template-columns:1fr 1fr"><div class="card"><small>Mình đang nợ</small><b class="chi num sens">${vnd(sum('owe'))}</b></div><div class="card"><small>Người khác nợ mình</small><b class="thu num sens">${vnd(sum('lent'))}</b></div></div>
+<div class="card fl">${L.map(({ d, i }) => { const left = dbLeft(d), late = left && d.due && d.due < td; return `<button class="row" data-debt="${i}"><span class="dot">${d.dir === 'owe' ? '📤' : '📥'}</span><span class="m"><b>${esc(d.who)}</b><small>${d.dir === 'owe' ? 'Mình nợ' : 'Nợ mình'}${d.due ? ' · hạn ' + dLabel(d.due) : ''}${late ? ' · quá hạn' : ''}${d.note ? ' · ' + esc(d.note) : ''}</small>${prog((d.paid || 0) / d.amount, left ? '' : '')}</span><span class="a num sens ${d.dir === 'owe' ? 'chi' : 'thu'}">${left ? vnd(left) : '✓ Xong'}</span></button>`; }).join('') || empty('Chưa có khoản nợ nào', 'Thêm khoản bạn nợ hoặc cho vay để theo dõi ngày hẹn và số còn lại.')}</div>`;
+};
+function debtForm(i) {
+  const d = i == null ? { who: '', dir: 'owe', amount: 0, due: '', note: '', acc: defAcc() } : X.d.debt[i];
+  openSheet(`<h3>${i == null ? 'Thêm khoản nợ' : 'Khoản nợ'}<button class="ib" data-act="close">✕</button></h3><div class="seg" style="grid-template-columns:1fr 1fr"><button data-dir="owe" class="${d.dir === 'owe' ? 'on' : ''}">Mình nợ</button><button data-dir="lent" class="${d.dir === 'lent' ? 'on' : ''}">Nợ mình</button></div><input type="hidden" id="d_dir" value="${d.dir}">
+<label class="f"><span>Với ai</span><input id="d_who" value="${esc(d.who)}"></label><div class="g2"><label class="f"><span>Số tiền</span><div><input id="d_amt" class="money" value="${d.amount ? NF.format(d.amount) : ''}"><small class="hint mu"></small></div></label><label class="f"><span>Hạn</span><input id="d_due" type="date" value="${esc(d.due || '')}"></label></div>
+<label class="f"><span>Ghi chú</span><input id="d_note" value="${esc(d.note || '')}"></label>
+${i != null && dbLeft(d) ? `<div class="card" style="padding:12px"><b>Trả / thu một phần</b> <small class="mu">(còn ${vnd(dbLeft(d))})</small><div class="q" style="margin:8px 0 0"><div style="flex:1"><input id="d_pay" class="money" placeholder="Số tiền"><small class="hint mu"></small></div><button class="btn" data-act="debt-pay" data-i="${i}">Ghi</button></div></div>` : ''}
+<div class="acts">${i != null ? `<button class="btn dng" data-act="debt-del" data-i="${i}">Xóa</button>` : ''}<button class="btn pri" data-act="debt-save" data-i="${i == null ? '' : i}">Lưu</button></div>`);
+}
+V.bal = () => { const B = balances(); return `<p class="mu">Nhập số dư thật (trong ví / app ngân hàng). App sẽ ghi giao dịch “Điều chỉnh” cho phần chênh.</p><div class="card fl">${S.acc.filter(a => a.type !== HELD).map(a => `<div class="row"><span class="dot">${ATY[a.type] || '🏦'}</span><span class="m"><b>${esc(a.name)}</b><small class="num sens">Trong sổ: ${vnd(B[a.name] || 0)}</small></span><div style="width:150px"><input class="money bl" data-neg="1" data-bacc="${esc(a.name)}" placeholder="Số dư thật"><small class="hint mu"></small></div></div>`).join('') || empty('Chưa có tài khoản')}</div><button class="btn pri" data-act="bal-save">Ghi điều chỉnh</button>`; };
+
+V.more = () => `<div class="card fl">${[['rp', '📊', 'Báo cáo', 'Thu chi 6 tháng, theo danh mục'], ['debt', '🤝', 'Sổ nợ', 'Khoản bạn nợ và cho vay'], ['bal', '⚖️', 'Cân đối', 'Đối chiếu số dư thật'], ['cat', '🗂️', 'Hạng mục', 'Danh mục thu chi'], ['trash', '🗑️', 'Thùng rác', S.trash.length + ' mục có thể khôi phục'], ['sec', '⚙️', 'Cài đặt', 'Giao diện, Telegram, passkey, bảo mật']].map(([k, i, t, s]) => `<a class="row" href="#${k}" style="text-decoration:none;color:inherit"><span class="dot">${i}</span><span class="m"><b>${t}</b><small>${s}</small></span>›</a>`).join('')}</div>`;
 V.cat = () => {
   const out = ['Chi', 'Thu'].map(t => { const P = [...new Set(S.cat.filter(c => c.t === t).map(c => c.p))]; return `<div class="card fl"><div class="dh"><span>${t}</span><button class="chip" data-act="cat-new" data-t="${t}">＋ Thêm</button></div>${P.map(p => `<div class="row" style="align-items:flex-start"><span class="dot">${emo(p)}</span><span class="m"><b>${esc(p)}</b><small style="white-space:normal">${S.cat.filter(c => c.t === t && c.p === p && c.c).map(c => `<a href="#" data-cat="${esc(t)}|${esc(c.p)}|${esc(c.c)}" style="color:inherit">${esc(c.c)}</a>`).join(' · ') || '—'}</small></span><button class="chip" data-cat="${esc(t)}|${esc(p)}|">Sửa</button></div>`).join('') || empty('Chưa có hạng mục')}</div>`; });
   return out.join('');
@@ -225,9 +256,10 @@ V.trash = () => {
   return `<div class="chips">${['all', 'gd', 'tk', 'dm'].map(k => `<button class="chip ${S.tf === k ? 'on' : ''}" data-set="tf" data-v="${k}">${k === 'all' ? 'Tất cả' : K[k]}</button>`).join('')}</div><div class="card fl">${L.map(x => `<div class="row"><span class="dot">${x.k === 'gd' ? '🧾' : x.k === 'tk' ? '🏦' : '🗂️'}</span><span class="m"><b>${esc(x.k === 'gd' ? (x.sub || x.cat || x.type || 'Giao dịch') : x.k === 'tk' ? x.id : (x.cat || '') + ' › ' + (x.sub || ''))}</b><small>${esc(String(x.at || '').slice(0, 16))}${x.amount ? ' · ' + NF.format(x.amount) : ''}</small></span><button class="btn" data-restore="${esc(x.k)}|${esc(x.at)}">Khôi phục</button></div>`).join('') || empty('Thùng rác trống')}</div>${L.length ? `<button class="btn dng" data-act="purge" style="margin-top:4px">Dọn sạch thùng rác</button>` : ''}`;
 };
 V.sec = () => `<div class="card"><h3>Giao diện</h3><div class="chips">${[['auto', 'Tự động'], ['light', 'Sáng'], ['dark', 'Tối']].map(([k, l]) => `<button class="chip ${store.get('theme', 'auto') === k ? 'on' : ''}" data-theme="${k}">${l}</button>`).join('')}<button class="chip ${store.get('priv') === '1' ? 'on' : ''}" data-act="priv">Ẩn số tiền</button></div></div>
+<div class="card"><h3>Telegram</h3><label class="f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-tg style="width:auto" ${tgOn() ? 'checked' : ''}> Gửi thông báo giao dịch qua Telegram</label><button class="btn" data-act="tg-test">Gửi tin thử</button></div>
 <div class="card"><h3>Passkey <button class="btn" data-act="pk-add">＋ Thêm</button></h3><div id="pkl" class="mu">Đang tải…</div></div>
 <div class="card"><h3>Phiên đăng nhập</h3><div class="acts"><button class="btn" data-act="logoutall">Đăng xuất thiết bị khác</button><button class="btn dng" data-act="lock">Khóa sổ</button></div></div>`;
-const TITLE = { home: 'Tổng quan', tx: 'Giao dịch', acc: 'Tài khoản', lim: 'Hạn mức', rp: 'Báo cáo', more: 'Thêm', cat: 'Hạng mục', trash: 'Thùng rác', sec: 'Bảo mật' };
+const TITLE = { debt: 'Sổ nợ', bal: 'Cân đối', home: 'Tổng quan', tx: 'Giao dịch', acc: 'Tài khoản', lim: 'Hạn mức', rp: 'Báo cáo', more: 'Thêm', cat: 'Hạng mục', trash: 'Thùng rác', sec: 'Bảo mật' };
 
 /* ---------- Render + điều hướng ---------- */
 let _scroll = {};
@@ -236,8 +268,8 @@ function render() {
   if ($('#ov').classList.contains('open') || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '') && $('#v').contains(document.activeElement) && S.tab !== 'tx') { S.dirty = true; return; }
   const tab = V[S.tab] ? S.tab : 'home', y = window.scrollY, f = document.activeElement && document.activeElement.id, sel = f === 'srch' ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
   $('#v').innerHTML = V[tab](); $('#ttl').textContent = TITLE[tab]; document.title = TITLE[tab] + ' · Sổ Thu Chi';
-  const grp = { cat: 'more', trash: 'more', sec: 'more' }[tab] || tab, nav = TABS.map(([k, l]) => `<a href="#${k}" class="${k === grp ? 'on' : ''}">${svg(k)}<span>${l}</span></a>`).join('');
-  $('#nv').innerHTML = nav; $('#bn').innerHTML = nav; S.dirty = false; window.scrollTo(0, y);
+  const grp = { cat: 'more', trash: 'more', sec: 'more', rp: 'more', debt: 'more', bal: 'more' }[tab] || tab, lk = (k, l, on) => `<a href="#${k}" class="${on ? 'on' : ''}">${svg(k)}<span>${l}</span></a>`;
+  $('#nv').innerHTML = SIDE.map(([k, l]) => lk(k, l, k === tab)).join('') + (S.trash.length ? '' : ''); $('#bn').innerHTML = TABS.map(([k, l]) => lk(k, l, k === grp)).join(''); S.dirty = false; window.scrollTo(0, y);
   if (f === 'srch') { const e = $('#srch'); e.focus(); e.setSelectionRange(...sel); }
   if (tab === 'sec') pkList();
 }
@@ -245,27 +277,44 @@ const go = () => { S.tab = location.hash.slice(1) || 'home'; S.pg = 80; window.s
 window.addEventListener('hashchange', go);
 
 /* ---------- Form giao dịch ---------- */
+const AI_ON = store.get('ai', '1') === '1';
+async function scanFile(file) {
+  if (!file) return; toast('Đang đọc ảnh…'); readForm();
+  try {
+    const img = await new Promise((ok, no) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); ok(im); }; im.onerror = no; im.src = u; });
+    const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const data = c.toDataURL('image/jpeg', .85).split(',')[1];
+    const j = await post({ image: data, mime: 'image/jpeg', today: today(), accounts: S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })), cats: S.cat.map(x => ({ t: x.t, p: x.p, c: x.c })) }, 45000, '/api/scan');
+    if (!j.ok || !j.data) return toast(j.err || 'AI không đọc được ảnh', null, 1);
+    const d = j.data; if (['Chi', 'Thu', 'Chuyển khoản'].includes(d.type)) E.type = d.type; if (+d.amount > 0) E.amount = Math.round(+d.amount); if (/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) E.date = d.date; if (/^\d{1,2}:\d{2}/.test(d.time || '')) E.time = d.time.slice(0, 5).padStart(5, '0');
+    const an = n => S.acc.find(a => a.name === n); if (an(d.account)) E.acc = d.account; if (an(d.account_to)) E.accTo = d.account_to;
+    if (d.category && catsOf(E.type).includes(d.category)) { E.cat = d.category; if (d.detail && catsOf(E.type, d.category).includes(d.detail)) E.sub = d.detail; }
+    if (d.note || d.memo || d.payee) E.note = d.note || d.memo || d.payee; drawForm(); toast('Đã điền từ ảnh, hãy kiểm tra lại');
+  } catch (e) { toast('Không xử lý được ảnh', null, 1); }
+}
+
 let E = null;
 const catsOf = (type, p) => [...new Set(S.cat.filter(c => c.t === type && (p === undefined ? true : c.p === p)).map(c => p === undefined ? c.p : c.c).filter(Boolean))];
 function defAcc() { const a = store.get('lastAcc'); return S.acc.some(x => x.name === a) ? a : (S.acc.find(x => !skipAcc(x)) || S.acc[0] || {}).name || ''; }
 function openForm(t) {
-  E = t ? { ...t, amount: t.amount, isNew: false, old: t } : { id: uid(), type: 'Chi', date: today(), amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', isNew: true };
+  E = t ? { ...t, amount: t.amount, isNew: false, old: t, time: (t.at || '').slice(11, 16) || '12:00' } : { id: uid(), type: 'Chi', date: today(), amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', isNew: true, time: nowAt().slice(11, 16) };
   drawForm();
 }
-function readForm() { if (!E || !$('#f_amt')) return; E.amount = amt($('#f_amt').value) ?? 0; E.date = $('#f_date').value; E.acc = $('#f_acc').value; E.note = $('#f_note').value; if ($('#f_to')) E.accTo = $('#f_to').value; if ($('#f_cat')) { E.cat = $('#f_cat').value; E.sub = $('#f_sub') ? $('#f_sub').value : ''; } }
+function readForm() { if (!E || !$('#f_amt')) return; E.amount = amt($('#f_amt').value) ?? 0; E.date = $('#f_date').value; E.time = $('#f_time').value || E.time; E.acc = $('#f_acc').value; E.note = $('#f_note').value; if ($('#f_to')) E.accTo = $('#f_to').value; if ($('#f_cat')) { E.cat = $('#f_cat').value; E.sub = $('#f_sub') ? $('#f_sub').value : ''; } }
 function drawForm() {
   const x = E.type === 'Chuyển khoản', cat = !x && E.type !== 'Điều chỉnh', opt = (l, v) => l.map(n => `<option ${n === v ? 'selected' : ''}>${esc(n)}</option>`).join(''), an = S.acc.map(a => a.name);
-  openSheet(`<h3>${E.isNew ? 'Thêm giao dịch' : 'Sửa giao dịch'}<button class="ib" data-act="close">✕</button></h3>
+  openSheet(`${AI_ON ? '<label class="btn wide" style="border-style:dashed;margin-bottom:12px">📷 Quét ảnh hóa đơn / bill<input type="file" id="f_scan" accept="image/*" hidden></label>' : ''}<h3>${E.isNew ? 'Thêm giao dịch' : 'Sửa giao dịch'}<button class="ib" data-act="close">✕</button></h3>
 <div class="seg">${['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'].map(t => `<button data-ty="${t}" class="${E.type === t ? 'on' : ''}">${t === 'Chuyển khoản' ? 'Chuyển' : t === 'Điều chỉnh' ? 'Chỉnh' : t}</button>`).join('')}</div>
 <label class="f"><span>Số tiền</span><div><input id="f_amt" class="money" ${E.type === 'Điều chỉnh' ? 'data-neg="1"' : ''} inputmode="${E.type === 'Điều chỉnh' ? 'text' : 'decimal'}" value="${E.amount ? NF.format(E.amount) : ''}" placeholder="0   (45k, 1tr2, 20k+35k)" autocomplete="off"><small class="hint mu"></small></div></label>
-<div class="g2"><label class="f"><span>Ngày</span><input id="f_date" type="date" value="${esc(E.date)}"></label><label class="f"><span>${x ? 'Từ tài khoản' : 'Tài khoản'}</span><select id="f_acc">${opt(an, E.acc)}</select></label></div>
+<div class="g2"><label class="f"><span>Ngày</span><input id="f_date" type="date" value="${esc(E.date)}"></label><label class="f"><span>Giờ</span><input id="f_time" type="time" value="${esc(E.time)}"></label></div><div class="chips">${[['Hôm nay', 0], ['Hôm qua', 1], ['Hôm kia', 2]].map(([l, n]) => `<button type="button" class="chip" data-dq="${n}">${l}</button>`).join('')}</div>
+<label class="f"><span>${x ? 'Từ tài khoản' : 'Tài khoản'}</span><select id="f_acc">${opt(an, E.acc)}</select></label>
 ${x ? `<label class="f"><span>Đến tài khoản</span><select id="f_to"><option value="">— chọn —</option>${opt(an.filter(n => n !== E.acc), E.accTo)}</select></label>` : ''}
 ${cat ? `<div class="g2"><label class="f"><span>Danh mục</span><select id="f_cat" data-cat-sel><option value="">— chưa phân loại —</option>${opt(catsOf(E.type), E.cat)}</select></label><label class="f"><span>Chi tiết</span><select id="f_sub"><option value="">—</option>${opt(catsOf(E.type, E.cat), E.sub)}</select></label></div>` : ''}
 <label class="f"><span>Ghi chú</span><input id="f_note" value="${esc(E.note)}" placeholder="Ghi chú"></label>
 <div class="acts">${E.isNew ? '' : '<button class="btn dng" data-act="f-del">Xóa</button>'}<button class="btn pri" data-act="f-save">Lưu</button></div>`);
 }
 async function formSave() {
-  readForm(); const t = E.type, a = E.amount, row = { id: E.id, type: t, date: E.date, amount: a, acc: E.acc, accTo: t === 'Chuyển khoản' ? E.accTo : '', cat: t === 'Chuyển khoản' || t === 'Điều chỉnh' ? '' : E.cat, sub: t === 'Chuyển khoản' || t === 'Điều chỉnh' ? '' : E.sub, note: E.note.trim(), at: E.old ? E.old.at || nowAt() : nowAt() };
+  readForm(); const t = E.type, a = E.amount, row = { id: E.id, type: t, date: E.date, amount: a, acc: E.acc, accTo: t === 'Chuyển khoản' ? E.accTo : '', cat: t === 'Chuyển khoản' || t === 'Điều chỉnh' ? '' : E.cat, sub: t === 'Chuyển khoản' || t === 'Điều chỉnh' ? '' : E.sub, note: E.note.trim(), at: E.date + ' ' + (E.time || '12:00') + ':00' };
   if (E.old) Object.keys(E.old).forEach(k => { if (!(k in row)) row[k] = E.old[k]; });
   if (!a || (a < 0 && t !== 'Điều chỉnh')) return toast('Hãy nhập số tiền hợp lệ', null, 1);
   if (!row.acc) return toast('Chọn tài khoản', null, 1);
@@ -334,7 +383,7 @@ async function pkList() {
 }
 
 /* ---------- Đăng nhập / khóa ---------- */
-function showLogin() { $('#app').hidden = true; $('#login').hidden = false; $('#pw').value = ''; $('#lerr').textContent = ''; setTimeout(() => $('#pw').focus(), 50); post({ act: 'has' }, 8000, ACC_URL).then(j => { $('#pkb').hidden = !(j.has && window.PublicKeyCredential); }).catch(() => { }); }
+function showLogin() { $('#app').hidden = true; $('#login').hidden = false; $('#pw').value = ''; $('#lerr').textContent = ''; setTimeout(() => $('#pw').focus(), 50); post({ act: 'has' }, 8000, ACC_URL).then(j => { }).catch(() => { }); $('#pkb').hidden = !window.PublicKeyCredential; }
 $('#lf').addEventListener('submit', async e => {
   e.preventDefault(); const pw = $('#pw').value; if (!pw) return; $('#lb').disabled = true;
   let j; try { j = await post({ login: pw }, 20000); } catch (x) { j = { ok: false, err: x.message }; } $('#lb').disabled = false;
@@ -362,6 +411,15 @@ const A = {
     closeSheet(); if (ops.length) act(ops, 'Đã lưu hạn mức');
   },
   purge: async () => { const L = S.trash.filter(x => S.tf === 'all' || x.k === S.tf); if (await ask('Dọn thùng rác?', 'Xóa hẳn ' + L.length + ' mục, không thể khôi phục.', 'Xóa hẳn')) act([{ op: 'trash.purge', items: L.map(x => ({ at: x.at, kind: x.k, id: x.id || '' })) }], 'Đã dọn thùng rác'); },
+  'debt-new': () => debtForm(), 'debt-save': el => {
+    const who = val('#d_who').trim(), a = amt(val('#d_amt')) || 0; if (!who || a <= 0) return toast('Nhập tên và số tiền', null, 1); const i = el.dataset.i === '' ? null : +el.dataset.i, o = { who, dir: val('#d_dir'), amount: a, due: val('#d_due'), note: val('#d_note').trim() };
+    if (i == null) X.d.debt.push({ id: uid(), paid: 0, at: Date.now(), acc: defAcc(), ...o }); else Object.assign(X.d.debt[i], o); closeSheet(); xSave(); render();
+  }, 'debt-del': async el => { if (await ask('Xóa khoản nợ?', 'Không thể khôi phục.', 'Xóa')) { X.d.debt.splice(+el.dataset.i, 1); closeSheet(); xSave(); render(); } },
+  'debt-pay': async el => { const d = X.d.debt[+el.dataset.i], a = Math.min(amt(val('#d_pay')) || 0, dbLeft(d)); if (!(a > 0)) return toast('Nhập số tiền', null, 1); d.paid = (d.paid || 0) + a; closeSheet(); xSave(); render();
+    if (await ask('Ghi vào sổ thu chi?', 'Tạo giao dịch ' + (d.dir === 'owe' ? 'Chi' : 'Thu') + ' ' + NF.format(a) + ' để số dư khớp.', 'Ghi')) { openForm(); E.type = d.dir === 'owe' ? 'Chi' : 'Thu'; E.amount = a; E.acc = d.acc || E.acc; E.note = (d.dir === 'owe' ? 'Trả nợ ' : 'Thu nợ ') + d.who; drawForm(); } },
+  'bal-save': async () => { const B = balances(), rows = []; $$('.bl').forEach(i => { if (!i.value.trim()) return; const r = amt(i.value); if (r == null) return; const diff = r - (B[i.dataset.bacc] || 0); if (diff) rows.push({ id: uid(), type: 'Điều chỉnh', date: today(), amount: diff, acc: i.dataset.bacc, accTo: '', cat: '', sub: '', note: 'Cân đối số dư', at: nowAt() }); });
+    if (!rows.length) return toast('Số dư đã khớp, không cần điều chỉnh'); if (!await ask('Ghi ' + rows.length + ' điều chỉnh?', rows.map(r => r.acc + ': ' + sgn(r.amount)).join('\n'), 'Ghi')) return; commit(rows.map(row => ({ op: 'tx.save', row })), { local: () => { S.tx = S.tx.concat(rows); }, ok: 'Đã cân đối ' + rows.length + ' tài khoản' }); },
+  'tg-test': async () => { const r = await tgSend('✅ Sổ Thu Chi: kết nối Telegram hoạt động'); toast(r.ok ? 'Đã gửi tin thử' : (r.err || 'Gửi thất bại'), null, !r.ok); },
   'pk-add': pkAdd, logoutall: async () => { if (!await ask('Đăng xuất thiết bị khác?', 'Giữ lại máy này, các máy khác phải đăng nhập lại.', 'Đăng xuất')) return; try { const j = await post({ logoutAll: 1 }); toast(j.ok ? 'Đã đăng xuất các thiết bị khác' : j.err, null, !j.ok); } catch (e) { toast(e.message, null, 1); } }
 };
 function setTheme(v) { store.set('theme', v); const d = v === 'dark' || (v === 'auto' && matchMedia('(prefers-color-scheme:dark)').matches); document.documentElement.classList.toggle('dark', d); document.querySelector('meta[name=theme-color]').content = d ? '#0B0F19' : '#F4F5F9'; if (S.tab === 'sec') render(); }
@@ -369,6 +427,9 @@ document.addEventListener('click', async e => {
   const t = e.target, c = s => t.closest(s);
   let el;
   if ((el = c('[data-act]'))) { const f = A[el.dataset.act]; return f && f(el, e); }
+  if ((el = c('[data-debt]'))) return debtForm(+el.dataset.debt);
+  if ((el = c('[data-dir]'))) { $('#d_dir').value = el.dataset.dir; $$('[data-dir]').forEach(b => b.classList.toggle('on', b === el)); return; }
+  if ((el = c('[data-dq]'))) { $('#f_date').value = ymd(new Date(Date.now() - 864e5 * el.dataset.dq)); return; }
   if ((el = c('[data-edit]'))) return openForm(S.tx.find(x => x.id === el.dataset.edit));
   if ((el = c('[data-acc]'))) return accForm(el.dataset.acc);
   if ((el = c('[data-cat]'))) { e.preventDefault(); const [a, b, d] = el.dataset.cat.split('|'); return catForm(a, b, d); }
@@ -381,6 +442,8 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'xa') { S.xa = e.target.value; render(); }
+  if (e.target.id === 'f_scan') scanFile(e.target.files[0]);
+  if (e.target.matches('[data-tg]')) store.set('tg', e.target.checked ? '1' : '0');
   if (e.target.id === 'f_cat') { readForm(); E.sub = ''; drawForm(); }
   if (e.target.id === 'f_acc' && E.type === 'Chuyển khoản') { readForm(); drawForm(); }
 });
@@ -402,7 +465,7 @@ async function sync(manual) {
   if (inflight || S.busy || (!manual && document.hidden)) return; if (!manual && S.ready && fails > 3 && ++skip % 5) return; inflight = true;
   try {
     S.q = await Ob.count(); const j = await api({ ops: [], rev: manual || S.q ? '' : S.rev }, 30000); fails = 0;
-    if (S.busy) return; const first = !S.ready; S.ready = true; live('ok', S.q ? 'Đang gửi ' + S.q + ' thay đổi' : 'Đã đồng bộ');
+    if (S.busy) return; const first = !S.ready; S.ready = true; if (j.crev !== undefined && j.crev !== S.crev) { S.crev = j.crev; xPull().then(() => render()); } live('ok', S.q ? 'Đang gửi ' + S.q + ' thay đổi' : 'Đã đồng bộ');
     if (!S.q && apply(j) || first) { if (first) apply(j); render(); }
   } catch (e) { fails++; live('err', e.message); if (!S.ready) $('#v').innerHTML = empty('Không tải được dữ liệu', esc(e.message) + '<br><br><button class="btn pri" onclick="sync(true)">Thử lại</button>'); }
   finally { inflight = false; if (S.dirty && !$('#ov').classList.contains('open')) render(); }
@@ -412,7 +475,7 @@ setInterval(() => sync(), POLL);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
 window.addEventListener('online', () => { Ob.kick(); sync(true); });
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => { });
+  const had = !!navigator.serviceWorker.controller; navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => { }); navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !window.__rl) { window.__rl = 1; location.reload(); } });
   navigator.serviceWorker.addEventListener('message', e => { const d = e.data || {}; if (d.type === 'note') toast(d.body, null, 1); if (d.type === 'open-tab' && d.tab) location.hash = d.tab; });
 }
 
