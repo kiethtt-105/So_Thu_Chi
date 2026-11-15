@@ -2,7 +2,7 @@
 // Cần biến môi trường trên Vercel: GEMINI_API_KEY (bắt buộc). SCAN_MODEL (tùy chọn, mặc định gemini-2.5-flash).
 // Khóa API chỉ nằm ở server. Chỉ người đã đăng nhập (cookie) mới gọi được.
 const auth = require('./_auth');
-const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
+const env = auth.env;
 const KEY = env('GEMINI_API_KEY'), MODEL = env('SCAN_MODEL') || 'gemini-flash-latest';
 const FALLBACKS = (env('SCAN_MODEL_FALLBACK') || 'gemini-2.5-flash-lite,gemini-flash-lite-latest').split(',').map(x => x.trim()).filter(Boolean);
 const TYPES = ['Chi', 'Thu', 'Chuyển khoản'];
@@ -64,7 +64,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, err: 'Method not allowed' });
   const sfs = req.headers['sec-fetch-site'];
   if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });
-  if (!auth.ok(req)) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
+  if (!(await auth.ok(req))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
   if (!KEY) return res.status(200).json({ ok: false, err: 'Chưa cấu hình GEMINI_API_KEY trên Vercel' });
 
   let b = {};

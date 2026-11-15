@@ -5,9 +5,8 @@
 //  - Request có thao tác khác (tài khoản, danh mục, hạn mức, phiên...) được chuyển thẳng sang Google Sheet như cũ.
 // Cùng định dạng request/response với Apps Script nên app.js dùng như cũ, chỉ thêm trường "hub" (trạng thái đồng bộ).
 
-const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();   // bỏ dấu nháy / khoảng trắng thừa
+const auth = require('./_auth'), env = auth.env;
 const APP_KEY = env('APP_KEY'), APP_API = env('APP_API'), APP_PASS = env('APP_PASS'), CRON_SECRET = env('CRON_SECRET');
-const auth = require('./_auth');
 const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const P = 'stc:';
@@ -343,10 +342,17 @@ module.exports = async (req, res) => {
 
     // Khóa sổ: xóa cookie đăng nhập ngay ở server (không cần cookie hợp lệ)
     if (body.logout) { res.setHeader('Set-Cookie', auth.clear()); return res.status(200).json({ ok: true }); }
+    // Đăng xuất tất cả thiết bị KHÁC: cần cookie hợp lệ, cấp lại cookie mới cho chính thiết bị này
+    if (body.logoutAll) {
+      if (!(await auth.ok(req))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
+      if (!(await auth.revokeAll())) return res.status(500).json({ ok: false, err: 'Cần Redis để đăng xuất tất cả' });
+      res.setHeader('Set-Cookie', auth.cookie());
+      return res.status(200).json({ ok: true });
+    }
     // Đăng nhập (chưa cần cookie)
     if (body.login !== undefined) return await doLogin(req, res, body, HAS_REDIS);
     // Mọi request còn lại phải có cookie hợp lệ
-    if (!auth.ok(req)) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
+    if (!(await auth.ok(req))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
 
     // Tải ảnh: chuyển sang Apps Script (KEY nằm ở server)
     if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));

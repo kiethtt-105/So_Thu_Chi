@@ -1,5 +1,6 @@
 const auth = require('./_auth');
 const crypto = require('crypto');
+const env = auth.env;
 const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 
@@ -16,7 +17,6 @@ async function firstOf(text) {
   } catch (e) { return true; }
 }
 
-const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
   const TG_TOKEN = env('TG_TOKEN'), TG_CHAT_ID = env('TG_CHAT_ID');
   const sfs = req.headers['sec-fetch-site'];
   if (sfs && sfs !== 'same-origin' && sfs !== 'none') return res.status(403).json({ ok: false, err: 'Forbidden' });   // chặn gọi từ trang web khác
-  if (!auth.ok(req)) return res.status(401).json({ ok: false, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });        // cookie đăng nhập, không còn dùng key
+  if (!(await auth.ok(req))) return res.status(401).json({ ok: false, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });        // cookie đăng nhập, không còn dùng key
   if (!TG_TOKEN || !TG_CHAT_ID) return res.status(500).json({ ok: false, err: 'Thiếu TG_TOKEN hoặc TG_CHAT_ID trên Vercel' });   // kiểm tra SAU khi xác thực để không lộ cấu hình
   let body = {};
   try { body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) { return res.status(400).json({ ok: false, err: 'Dữ liệu không hợp lệ' }); }

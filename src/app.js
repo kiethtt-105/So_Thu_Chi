@@ -1,37 +1,6 @@
 
-const { NAME, TTL_H, STORE } = window.CONFIG || {}, POLL_MS = 10000, TTL = (+TTL_H > 0 ? +TTL_H : 168) * 3600e3; // hạn phiên (giờ) lấy từ biến Vercel APP_TTL_HOURS, mặc định 168h = 7 ngày
+const { NAME, STORE } = window.CONFIG || {}, POLL_MS = 10000; // hạn phiên (APP_TTL_HOURS, mặc định 48h) do cookie ở server quyết định
 const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return !!t; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
-// ===== Khóa phiên đa thiết bị =====
-// Mỗi tab có một SID. Máy chủ giữ danh sách SID được phép:
-//  - đăng nhập mới ('sess.login')  => chỉ còn SID đó, mọi phiên khác bị khóa ngay ở lần đồng bộ kế tiếp
-//  - phiên bị khóa nhập lại mật khẩu ('sess.join') => được thêm vào, dùng song song (tối đa 2 phiên)
-// Hạn dùng của phiên vẫn như cũ (TTL ở trên). Máy chủ chưa hỗ trợ 'sess.*' thì tính năng tự tắt, app chạy như trước.
-const SID = '';   // không dùng khóa phiên theo thiết bị: server bỏ qua kiểm tra khi không có sid
-let KICK = false, announcing = null;
-const pendOf = () => { try { return sessionStorage.pend || ''; } catch (e) { return ''; } };
-function announce(kind) {
-    return null;   // đã tắt khóa phiên
-    try { if (kind) sessionStorage.pend = kind; } catch (e) { }
-    if (announcing || !pendOf()) return announcing;
-    return announcing = (async () => {
-        try {
-            await call([{ op: 'sess.' + pendOf(), sid: SID }], '', 15000);
-            sessionStorage.removeItem('pend');
-        }
-        catch (e) {
-            if (/Sai phiên/.test(e.message || '')) { try { sessionStorage.removeItem('pend'); } catch (_) { } }
-        }
-        finally { announcing = null; }
-    })();
-}
-function kick() {
-    if (KICK) return;
-    KICK = true;
-    try { sessionStorage.removeItem('sess'); } catch (e) { }
-    $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet();
-    const g = $('#lgreet'); if (g) g.textContent = 'Có thiết bị khác vừa đăng nhập nên phiên này bị khóa. Nhập mật khẩu để tiếp tục (dùng song song 2 phiên).';
-    $('#lerr').textContent = '';
-}
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -156,7 +125,7 @@ async function call(ops, rev, ms, fast) {
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 30000);
     let r;
     try {
-        r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', fast: !!fast, sid: SID }) });
+        r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ ops: ops || [], rev: rev || '', fast: !!fast }) });
     }
     catch (e) {
         const x = Error(e && e.name === 'AbortError' ? 'Máy chủ phản hồi quá chậm, chưa nhận được kết quả' : navigator.onLine === false ? 'Không có kết nối mạng' : 'Không kết nối được tới máy chủ');
@@ -188,10 +157,6 @@ async function call(ops, rev, ms, fast) {
     }
     if (j.hub) hubSet(j.hub);
     if (j.crev !== undefined) csSee(j.crev);
-    if (j.sess === false && !pendOf()) {
-        kick();
-        throw Error('Phiên đã bị khóa vì có thiết bị khác đăng nhập');
-    }
     if (!j.ok) {
         if (/Thao tác không hợp lệ/i.test(j.err || ''))
             throw Error('Sai phiên làm việc. Vui lòng tải lại trang');
@@ -263,7 +228,7 @@ async function csReq(cfg) {
     if (!STORE) return null;
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 20000);
     try {
-        const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ cfg, sid: SID }) });
+        const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ cfg }) });
         const j = await r.json();
         if (j && j.ok && j.off) { CS.off = true; return null; }
         return j && j.ok ? j : null;
@@ -390,7 +355,6 @@ async function sync(manual) {
         return;
     if (!manual && S.ready && fails > 3 && ++skip % 5)
         return;
-    if (pendOf() && !announcing) announce();
     inflight = true;
     if (manual || !S.synced) pgSet(!S.synced ? 'Đang tải dữ liệu…' : 'Đang cập nhật…', null, OB.n);
     if (manual)
@@ -455,7 +419,14 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { if (KICK) return; try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); }
+function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); }
+async function logoutAll() {
+    if (!await ask('Đăng xuất tất cả thiết bị?', 'Mọi máy khác phải nhập lại mật khẩu. Máy này vẫn giữ đăng nhập.', { icon: '🔒', ok: 'Đăng xuất' })) return;
+    try {
+        const j = await (await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ logoutAll: 1 }) })).json();
+        toast(j.ok ? 'Đã đăng xuất các thiết bị khác' : (j.err || 'Không thực hiện được'));
+    } catch (e) { toast('Không kết nối được máy chủ'); }
+}
 let LOGIN_BUSY = false;
 document.addEventListener('click', e => {
     const b = e.target.closest('#pwt'); if (!b) return;
@@ -479,11 +450,8 @@ $('#lf').onsubmit = async ev => {
     catch (e) { j = { ok: false, net: true, err: 'Không kết nối được máy chủ' }; }
     LOGIN_BUSY = false;
     if (j.ok) {
-        const kind = KICK ? 'join' : 'login';
-        KICK = false;
         try { sessionStorage.sess = Date.now(); } catch (e) { }
         touch();
-        announce(kind);
         boot();
     }
     else {
@@ -1004,6 +972,7 @@ document.addEventListener('click', e => {
     switch (d.a) {
         case 'new': return openForm();
         case 'lock': return lock();
+        case 'logoutall': return logoutAll();
         case 'retry':
             S.err = '';
             render();
@@ -2411,7 +2380,8 @@ function openSettings() {
 <div class="shh sub"><b>Menu hiển thị</b><button type="button" class="chip" data-visreset>Hiện tất cả</button></div>
 <div class="menu">${TABS.filter(t => t[0] !== 'home').map(([k, l]) => `<label class="row sw">${ic(k)}<span class="m"><b>${l}</b></span><input type="checkbox" role="switch" data-vis="${k}" ${tabOn(k) ? 'checked' : ''} aria-label="Hiện ${l}"></label>`).join('')}</div>
 <p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Lưu riêng trên từng thiết bị.</p>
-${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}`;
+${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}
+<div class="sec">Bảo mật</div><div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔒 Đăng xuất tất cả thiết bị</b><small style="display:block">Giữ lại máy này. Phiên tự hết hạn sau 48 giờ.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div>`;
     const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
 ${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
@@ -3621,13 +3591,6 @@ if (typeof notify === 'function') {
         if (k !== null) {
             u.searchParams.delete(kn);
             history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
-            if (false && k && STORE) {   // server kiểm tra; đúng thì cấp cookie rồi tải lại trang
-                const was = alive();
-                fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: k }) })
-                    .then(r => r.json())
-                    .then(j => { if (j && j.ok && !was) { try { sessionStorage.sess = Date.now(); sessionStorage.pend = 'login'; } catch (e) { } location.reload(); } })
-                    .catch(() => { });
-            }
         }
     }
     catch (e) { }
