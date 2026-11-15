@@ -242,7 +242,7 @@ async function proxy(body) {
 // ---- Đăng nhập: so mật khẩu ở server, giới hạn số lần thử sai ----
 const FAIL_MAX = 5, FAIL_WIN = 900, ALL_MAX = 60, ALL_WIN = 3600;   // 5 lần sai / 15 phút / IP; 60 lần sai / giờ toàn hệ thống
 const memFail = new Map();
-const clientIp = req => String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'x').split(',')[0].trim();
+const clientIp = auth.clientIp;
 async function failWait(ip, has) {
   if (has) {
     try {

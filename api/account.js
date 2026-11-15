@@ -18,7 +18,7 @@ const rd = async (...cmds) => {
 const b64 = b => Buffer.from(b).toString('base64url'), unb = s => Buffer.from(String(s || ''), 'base64url');
 const sha = b => crypto.createHash('sha256').update(b).digest();
 const parse = s => { try { return JSON.parse(s); } catch (e) { return null; } };
-const ipOf = req => String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'x').split(',')[0].trim();
+const ipOf = auth.clientIp;
 function devName(req) {
   const u = String(req.headers['user-agent'] || '');
   const os = /Windows/.test(u) ? 'Windows' : /iPhone|iPad/.test(u) ? 'iOS' : /Android/.test(u) ? 'Android' : /Mac OS X/.test(u) ? 'macOS' : /Linux/.test(u) ? 'Linux' : '';

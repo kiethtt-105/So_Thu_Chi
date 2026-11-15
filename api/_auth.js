@@ -53,4 +53,7 @@ async function ok(req, res) {   // truyền res để tự gia hạn cookie khi 
   if (good && res && +a[1] - Date.now() / 1000 < HOURS * 1800) res.setHeader('Set-Cookie', cookie());   // còn dưới 1/2 hạn: gia hạn
   return good;
 }
-module.exports = { env, ok, secretOk, cookie, clear, revokeAll };
+// IP thật của client. Trên Vercel, x-vercel-forwarded-for / x-real-ip do nền tảng đặt, client không giả được;
+// x-forwarded-for phần đầu thì client tự thêm được nên chỉ dùng làm phương án cuối.
+const clientIp = req => String(req.headers['x-vercel-forwarded-for'] || req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'x').split(',')[0].trim();
+module.exports = { env, ok, secretOk, cookie, clear, revokeAll, clientIp };
