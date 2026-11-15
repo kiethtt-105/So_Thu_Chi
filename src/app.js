@@ -15,7 +15,13 @@ const pm = v => {
     return n ? (neg ? -n : n) : 0;
 };
 
-const amtVal = v => (CALC_RE.test(String(v)) ? calcEval(v) : pm(v));
+const UNIT_OK = /^-?\d+(?:[.,]\d{1,3})?(?:k|nghìn|ngàn|tr|triệu|m|tỷ|ty|b)(?:\d{1,3})?$/;
+const amtVal = v => {
+    v = String(v);
+    if (CALC_RE.test(v)) return calcEval(v);
+    const s = v.toLowerCase().replace(/[₫đ\s]/g, '');
+    return /[^\d.,\-]/.test(s) && !UNIT_OK.test(s) ? null : pm(v);   // có chữ lạ mà không phải đơn vị k/tr/tỷ: báo sai thay vì âm thầm bỏ chữ ("45kk" từng thành 45)
+};
 const isShort = v => /[^\d\s.,\-₫đ]/i.test(v) || CALC_RE.test(v);
 function amtHint(el) {
     if (!isShort(el.value)) return calcShow(el, '');
@@ -1257,7 +1263,9 @@ function openSheet() {
     setTimeout(() => { const a = $('#ov.open #fa'); if (a && !ov.contains(document.activeElement))
         a.focus(); }, 60);
 }
-function formDirty() { if (!E || !E.isNew) return false; const a = $('#fa'), n = $('#fn'); return !!((a && amtVal(a.value)) || (n && n.value.trim()) || (E.imgs && E.imgs.length)); }
+function formDirty() {
+    if (E && !E.isNew && E.orig) { const g = i => { const el = $(i); return el ? el.value : undefined; }, o = E.orig; return (g('#fa') !== undefined && (amtVal(g('#fa')) || 0) !== o.amount) || (g('#fn') !== undefined && g('#fn').trim() !== o.note.trim()) || (g('#fd') !== undefined && g('#fd') !== o.date) || (g('#fc') !== undefined && g('#fc') !== o.acc); }
+    if (!E || !E.isNew) return false; const a = $('#fa'), n = $('#fn'); return !!((a && amtVal(a.value)) || (n && n.value.trim()) || (E.imgs && E.imgs.length)); }
 async function tryClose() { if (formDirty() && !await ask('Đóng mà chưa lưu?', 'Số tiền / ghi chú đang nhập sẽ bị mất.', { ok: 'Đóng', cancel: 'Tiếp tục nhập', icon: '✍️' })) return; closeSheet(); }
 function closeSheet() {
     const ov = $('#ov'), was = ov.classList.contains('open');
@@ -1325,7 +1333,7 @@ function qdSync() {
     const f = $('#fd'); if (!f) return;
     $$('.qd3 [data-qd]').forEach(b => { const d = new Date(); d.setDate(d.getDate() + +b.dataset.qd); b.classList.toggle('on', ymd(d) === f.value); });
 }
-function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16) } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || cfg().tx.type || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
+function openForm(t, ty) { E = t ? { ...t, note: noteTxt(t.note), imgs: splitImg(t.note).imgs, time: (t.at || '').slice(11, 16), orig: { amount: Math.round(+t.amount || 0), note: noteTxt(t.note), date: t.date, acc: t.acc } } : { id: newId(), date: ymd(new Date()), time: hm(new Date()), type: ty || cfg().tx.type || 'Chi', amount: 0, acc: defAcc(), accTo: '', cat: '', sub: '', note: '', imgs: [], isNew: true }; ED = null; form(); openSheet(); }
 // Ô chọn: màn hình rộng hiện thẻ (chip), màn hình hẹp/dài giữ thanh thả (CSS quyết định, xem .pk trong style.css)
 const pkSel = (id, opts, cur, extra) => `<span class="pk"><select id="${id}">${extra || ''}${opts.map(o => `<option value="${esc(o.v)}" ${o.v === cur ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select><span class="chips fw pkc">${opts.map(o => `<button type="button" class="chip${o.v === cur ? ' on' : ''}" data-pk="${id}" data-v="${esc(o.v)}">${esc(o.t)}</button>`).join('')}</span></span>`;
 function form() {
@@ -1622,7 +1630,7 @@ $('#ov').addEventListener('click', async (e) => {
         try { csSet('lastAcc', E.acc); } catch (x) { }
         const stg = (E.staged || []).map(s => ({ name: s.name, blob: s.blob }));
         closeSheet();
-        txSave(row, null, stg).then(r => { if (r && !r.ok && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });
+        txSave(row, null, stg).then(r => { if (r && !r.ok && !r.cancel && !$('#ov').classList.contains('open')) { openForm(row); E.isNew = wasNew; form(); } });
     }
 });
 
@@ -3981,9 +3989,9 @@ async function resumeOutbox(tries) {
 setInterval(() => { if (alive() && (OB.parked.size || navigator.onLine)) resumeOutbox(); }, 45000);
 addEventListener('online', () => { if (alive()) resumeOutbox(); });
 
-const CALC_RE = /[+*\/×÷()]|[\d\w)]\s*-|[\d)]\s*x\s*[\d(]/i;
+const CALC_RE = /[+*\/×÷()]|[\d\w)]\s*-|(?:[\d)]|k|tr|m|b|ty|tỷ)\s*x\s*[\d(]/i;
 function calcEval(s) {
-    s = String(s).toLowerCase().replace(/[₫đ]/g, '').replace(/([\d)])\s*x\s*(?=[\d(])/g, '$1*').replace(/×/g, '*').replace(/÷/g, '/');
+    s = String(s).toLowerCase().replace(/[₫đ]/g, '').replace(/([\d)]|k|tr|m|b|ty|tỷ)\s*x\s*(?=[\d(])/g, '$1*').replace(/×/g, '*').replace(/÷/g, '/');
     const tk = s.match(/\d[\d.,]*\s*(?:nghìn|ngàn|triệu|tr|tỷ|ty|k|m|b)?\d{0,3}|[-+*\/()]/g) || [];
     if (tk.join('').replace(/\s/g, '') !== s.replace(/\s/g, '')) return null;
     let i = 0;
