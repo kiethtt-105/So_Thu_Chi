@@ -514,7 +514,8 @@ async function pkAdd() {
     try {
         const cr = await navigator.credentials.create({ publicKey: { challenge: unb64u(o.challenge), rp: o.rp, user: { id: unb64u(o.user.id), name: o.user.name, displayName: o.user.displayName }, pubKeyCredParams: o.params, authenticatorSelection: o.sel, excludeCredentials: (o.exclude || []).map(id => ({ type: 'public-key', id: unb64u(id) })), attestation: 'none', timeout: 60000 } });
         if (!cr) return;
-        const j = await accCall({ act: 'regverify', cred: { id: cr.id, response: { clientDataJSON: b64u(cr.response.clientDataJSON), attestationObject: b64u(cr.response.attestationObject) } } });
+        if (!cr.response.getPublicKey || !cr.response.getPublicKeyAlgorithm) { toast('Trình duyệt quá cũ, hãy cập nhật để dùng passkey'); return; }
+        const j = await accCall({ act: 'regverify', cred: { id: cr.id, alg: cr.response.getPublicKeyAlgorithm(), publicKey: b64u(cr.response.getPublicKey()), response: { clientDataJSON: b64u(cr.response.clientDataJSON) } } });
         toast(j.ok ? 'Đã thêm passkey' : (j.err || 'Không thêm được passkey'));
     } catch (e) {
         if (e && e.name === 'InvalidStateError') toast('Thiết bị này đã có passkey');

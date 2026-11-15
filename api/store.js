@@ -273,12 +273,11 @@ async function doLogin(req, res, body, has) {
   if (wait) return res.status(429).json({ ok: false, wait, err: 'Thử sai quá nhiều lần' });
   if (!auth.secretOk(String(body.login || ''))) {
     await failAdd(ip, has);
-    await auth.log(req, { e: 'login', ok: false, m: 'password' });
     await new Promise(r => setTimeout(r, 500));
     return res.status(200).json({ ok: false, err: 'Sai mật khẩu' });
   }
   if (has) { try { await rd([['DEL', P + 'lf:' + ip]]); } catch (e) { } }
-  await auth.login(req, res, 'password');   // tạo thiết bị mới + cookie
+  res.setHeader('Set-Cookie', auth.cookie());
   return res.status(200).json({ ok: true });
 }
 
@@ -342,12 +341,12 @@ module.exports = async (req, res) => {
     body = typeof req.body === 'string' ? parse(req.body || '{}') || {} : (req.body || {});
 
     // Khóa sổ: xóa cookie đăng nhập ngay ở server (không cần cookie hợp lệ)
-    if (body.logout) { try { await auth.dropSelf(req); } catch (e) { } res.setHeader('Set-Cookie', auth.clear()); return res.status(200).json({ ok: true }); }
+    if (body.logout) { res.setHeader('Set-Cookie', auth.clear()); return res.status(200).json({ ok: true }); }
     // Đăng xuất tất cả thiết bị KHÁC: cần cookie hợp lệ, cấp lại cookie mới cho chính thiết bị này
     if (body.logoutAll) {
       if (!(await auth.ok(req))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
-      if (!auth.hasRedis) return res.status(500).json({ ok: false, err: 'Cần Redis để đăng xuất tất cả' });
-      const n = await auth.dropOthers(req.did); await auth.log(req, { e: 'outall', ok: true, x: n });
+      if (!(await auth.revokeAll())) return res.status(500).json({ ok: false, err: 'Cần Redis để đăng xuất tất cả' });
+      res.setHeader('Set-Cookie', auth.cookie());
       return res.status(200).json({ ok: true });
     }
     // Đăng nhập (chưa cần cookie)
