@@ -485,11 +485,15 @@ async function accCall(body) {
         return j;
     } catch (e) { return { ok: false, err: 'Không kết nối được máy chủ' }; }
 }
-async function pkProbe() {   // nút passkey (đã có sẵn trong index.html) chỉ hiện khi có passkey và trình duyệt hỗ trợ
+async function pkProbe() {   // passkey là cách chính: chỉ hiện khi trình duyệt hỗ trợ VÀ đã có ít nhất một passkey
     const b = $('#pkb'); if (!b) return;
-    if (!PK_OK) { b.hidden = true; return; }
-    const j = await accCall({ act: 'has' });
-    b.hidden = !(j && j.ok && j.has);
+    let has = false;
+    if (PK_OK) { const j = await accCall({ act: 'has' }); has = !!(j && j.ok && j.has); }
+    b.hidden = !has;
+    const o = $('#lor'); if (o) o.hidden = !has;
+    $('#lf').classList.toggle('haspk', has);
+    setUser();
+    if (has) { const g = $('#lgreet'), n = String(NAME || '').trim(); if (g) g.textContent = n ? 'Xin chào ' + n + ', chạm để mở sổ' : 'Chạm để mở sổ bằng passkey'; }
 }
 async function pkLogin() {
     if (LOGIN_BUSY) return;
@@ -523,14 +527,13 @@ async function pkAdd() {
     }
     secLoad();
 }
-async function secLoad() {   // chỉ thêm vài hàng cùng kiểu với hàng "Đăng xuất tất cả" trong mục Bảo mật
-    const box = $('#seccard'); if (!box) return;
-    if (!PK_OK) { box.innerHTML = ''; return; }
+const secT = t => t ? new Date(t).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+async function secLoad() {
+    if (!$('#sec-pk')) return;
     const j = await accCall({ act: 'info' });
-    const b2 = $('#seccard'); if (!b2) return;
-    if (!j.ok) { b2.innerHTML = ''; return; }
-    const rows = (j.passkeys || []).map(p => `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔑 ${esc(p.n || 'Passkey')}</b><small style="display:block">Tạo ${new Date(p.t).toLocaleDateString('vi-VN')}</small></span><button type="button" class="btn" data-sec="pkdel" data-id="${esc(p.id)}">Xóa</button></div>`).join('');
-    b2.innerHTML = rows + `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔑 Thêm passkey</b><small style="display:block">Mở sổ bằng vân tay / khuôn mặt / mã PIN</small></span><button type="button" class="btn" data-sec="pkadd">Thêm</button></div>`;
+    const box = $('#sec-pk'); if (!box) return;
+    if (!j.ok) { box.innerHTML = `<div class="row"><span class="m"><small>${esc(j.err || 'Không tải được danh sách passkey')}</small></span></div>`; return; }
+    box.innerHTML = (j.passkeys || []).map(p => `<div class="row"><span class="dot">🔑</span><span class="m"><b>${esc(p.n || 'Passkey')}</b><small>Tạo ${secT(p.t)} · ${p.l ? 'dùng ' + secT(p.l) : 'chưa dùng'}</small></span><button type="button" class="chip dgr" data-sec="pkdel" data-id="${esc(p.id)}">Xóa</button></div>`).join('') || '<div class="row"><span class="m"><small>Chưa có passkey nào</small></span></div>';
 }
 document.addEventListener('click', async e => {
     const b = e.target.closest('[data-sec]'); if (!b) return;
@@ -2463,7 +2466,7 @@ function openSettings() {
 <div class="menu">${TABS.filter(t => t[0] !== 'home').map(([k, l]) => `<label class="row sw">${ic(k)}<span class="m"><b>${l}</b></span><input type="checkbox" role="switch" data-vis="${k}" ${tabOn(k) ? 'checked' : ''} aria-label="Hiện ${l}"></label>`).join('')}</div>
 <p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Đồng bộ trên mọi thiết bị.</p>
 ${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}
-<div class="sec">Bảo mật</div><div id="seccard"></div><div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔒 Đăng xuất tất cả thiết bị</b><small style="display:block">Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div>`;
+`;
     const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
 ${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
@@ -2525,12 +2528,19 @@ ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại 
 <div class="sec">Cân đối</div>
 <div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}
 <p class="hint">Các cài đặt này được đồng bộ trên mọi thiết bị.</p>`;
-    const tabs = [['ui', 'Giao diện'], ['tx', 'Ghi chép'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['adv', 'Nâng cao']];
+    const pSec = () => `<div class="sec">Mở sổ nhanh bằng passkey</div>
+<div class="menu" id="sec-pk"><div class="row"><span class="m"><small>Đang tải…</small></span></div></div>
+${PK_OK ? '<div style="margin-top:10px"><button type="button" class="btn p w" data-sec="pkadd">+ Thêm passkey cho máy này</button></div>' : '<p class="hint">Trình duyệt hoặc địa chỉ này không hỗ trợ passkey (cần HTTPS).</p>'}
+<p class="hint">Passkey là cách mở sổ chính: chạm vân tay / khuôn mặt / mã PIN. Mật khẩu vẫn dùng được làm dự phòng.</p>
+<div class="sec">Phiên đăng nhập</div>
+<div style="margin-top:6px"><button type="button" class="btn w" data-a="logoutall">🔒 Đăng xuất tất cả thiết bị khác</button></div>
+<p class="hint">Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</p>`;
+    const tabs = [['ui', 'Giao diện'], ['tx', 'Ghi chép'], ['nt', 'Thông báo'], ['tg', 'Telegram'], ['sec', 'Bảo mật'], ['adv', 'Nâng cao']];
     $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Thông báo</button></div>
-<div class="seg">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : SET_TAB === 'tx' ? pTx() : pUi()}`;
+<div class="seg" style="grid-template-columns:repeat(3,1fr)">${tabs.map(([k, l]) => `<button data-nt="stab:${k}" class="${SET_TAB === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+${SET_TAB === 'adv' ? pAdv() : SET_TAB === 'sec' ? pSec() : SET_TAB === 'tg' ? pTg() : SET_TAB === 'nt' ? pNt() : SET_TAB === 'tx' ? pTx() : pUi()}`;
     openSheet();
-    if (!['adv', 'tg', 'nt', 'tx'].includes(SET_TAB)) secLoad();
+    if (SET_TAB === 'sec') secLoad();
 }
 document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-nt]');
