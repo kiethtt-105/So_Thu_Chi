@@ -145,6 +145,7 @@ async function call(ops, rev, ms, fast) {
         throw x;
     }
     if (j.auth) {   // cookie đăng nhập hết hạn: về màn hình mật khẩu, thay đổi chưa gửi được giữ lại và gửi tiếp sau khi đăng nhập
+        if (Date.now() - LOGOUT_ALL_AT < 10000) { const w = Error('Đang cập nhật phiên, thử lại sau giây lát'); w.net = true; throw w; }   // yêu cầu đã gửi bằng cookie cũ ngay lúc đăng xuất tất cả: đừng tự khóa máy này
         lock();
         const x = Error('Phiên đăng nhập đã hết hạn, hãy nhập lại mật khẩu');
         x.net = true;
@@ -420,10 +421,13 @@ else {
     }
 } return r; }
 function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); }
+let LOGOUT_ALL_AT = 0;
 async function logoutAll() {
     if (!await ask('Đăng xuất tất cả thiết bị?', 'Mọi máy khác phải nhập lại mật khẩu. Máy này vẫn giữ đăng nhập.', { icon: '🔒', ok: 'Đăng xuất' })) return;
+    LOGOUT_ALL_AT = Date.now();
     try {
         const j = await (await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ logoutAll: 1 }) })).json();
+        LOGOUT_ALL_AT = Date.now();
         toast(j.ok ? 'Đã đăng xuất các thiết bị khác' : (j.err || 'Không thực hiện được'));
     } catch (e) { toast('Không kết nối được máy chủ'); }
 }
