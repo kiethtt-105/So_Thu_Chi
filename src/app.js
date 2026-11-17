@@ -526,36 +526,46 @@ async function accCall(body) {
         return j;
     } catch (e) { return { ok: false, err: 'Không kết nối được máy chủ' }; }
 }
-async function pkProbe(auto) {   // có passkey => passkey là cách đăng nhập mặc định: nút lên đầu, tự bật hộp xác thực
-    const b = $('#pkb'); if (!b) return;
-    if (!PK_OK) { b.hidden = true; return; }
-    const j = await accCall({ act: 'has' });
-    const has = !!(j && j.ok && j.has);
-    b.hidden = !has;
-    if (!has) return;
-    const f = $('#lf'), pw = f && f.querySelector('.pwf');
-    if (pw && pw.parentNode === f) f.insertBefore(b, pw);
-    b.textContent = '🔑 Mở sổ bằng passkey';
-    const g = $('#lgreet'); if (g) g.textContent = 'Dùng vân tay / khuôn mặt, hoặc nhập mật khẩu';
-    try { $('#pw').blur(); } catch (e) { }
-    if (auto && !$('#login').classList.contains('hide')) pkLogin();
+const pkFlag = () => { try { return localStorage.pk === '1'; } catch (e) { return false; } };   // "sổ này có passkey": lưu máy để vẽ giao diện ngay, không chờ mạng
+const pkSet = v => { try { v ? localStorage.pk = '1' : localStorage.removeItem('pk'); } catch (e) { } };
+const RC = document.documentElement.classList;   // pkh = hiện nút passkey; pkm = chế độ passkey (ẩn ô mật khẩu)
+let PK_AC = null, PK_BUSY = false;
+function pkMode(on) { RC.toggle('pkm', !!on && PK_OK); setUser(); }
+function showPw(focus) {   // chuyển sang nhập mật khẩu; hủy hộp passkey đang chờ (nếu có)
+    pkMode(false);
+    try { PK_AC && PK_AC.abort(); } catch (e) { }
+    if (focus) { const p = $('#pw'); p && p.focus(); }
+}
+async function pkProbe(auto) {
+    if (!PK_OK) { RC.remove('pkh', 'pkm'); return; }
+    const cached = pkFlag();
+    RC.toggle('pkh', cached); pkMode(cached);
+    if (cached && auto && !$('#login').classList.contains('hide')) pkLogin();
+    const j = await accCall({ act: 'has' });   // kiểm tra lại ở nền, KHÔNG đổi giao diện nếu đang đúng
+    if (!(j && j.ok)) return;                  // lỗi mạng: giữ nguyên
+    pkSet(j.has);                              // lần đầu biết có passkey: chỉ ghi nhớ, lần mở sau mới đổi giao diện (tránh giật)
+    if (!j.has) { RC.remove('pkh'); if (RC.contains('pkm')) showPw(!$('#login').classList.contains('hide')); }
 }
 async function pkLogin() {
-    if (LOGIN_BUSY) return;
-    LOGIN_BUSY = true;
+    if (PK_BUSY || LOGIN_BUSY) return;
+    PK_BUSY = true;
     const er = $('#lerr'); er.textContent = '';
+    const fail = m => { er.textContent = m; showPw(true); };   // lỗi thật: mở ô mật khẩu để vẫn vào được sổ
     try {
         const o = await accCall({ act: 'authopts' });
-        if (!o.ok) { er.textContent = o.err || 'Không đăng nhập được bằng passkey'; return; }
-        const cr = await navigator.credentials.get({ publicKey: { challenge: unb64u(o.challenge), rpId: o.rpId, allowCredentials: (o.allow || []).map(id => ({ type: 'public-key', id: unb64u(id) })), userVerification: 'required', timeout: 60000 } });
+        if (!o.ok) { if (/Chưa có passkey/.test(o.err || '')) { pkSet(false); RC.remove('pkh'); } return fail(o.err || 'Không đăng nhập được bằng passkey'); }
+        PK_AC = new AbortController();
+        const cr = await navigator.credentials.get({ publicKey: { challenge: unb64u(o.challenge), rpId: o.rpId, allowCredentials: (o.allow || []).map(id => ({ type: 'public-key', id: unb64u(id) })), userVerification: 'required', timeout: 60000 }, signal: PK_AC.signal });
         if (!cr) return;
         const r = cr.response;
         const j = await accCall({ act: 'authverify', cred: { id: cr.id, response: { clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) } } });
         if (j.ok) { try { sessionStorage.sess = Date.now(); } catch (e) { } touch(); boot(); }
-        else er.textContent = j.err || 'Passkey không hợp lệ';
+        else fail(j.err || 'Passkey không hợp lệ');
     } catch (e) {
-        if (!(e && e.name === 'NotAllowedError')) er.textContent = 'Không dùng được passkey trên thiết bị này';
-    } finally { LOGIN_BUSY = false; }
+        const n = e && e.name;
+        if (n === 'NotAllowedError' || n === 'AbortError') return;   // người dùng hủy / chuyển sang mật khẩu: im lặng
+        fail('Không dùng được passkey trên thiết bị này');
+    } finally { PK_BUSY = false; }
 }
 async function pkAdd() {
     const o = await accCall({ act: 'regopts' });
@@ -565,6 +575,7 @@ async function pkAdd() {
         if (!cr) return;
         if (!cr.response.getPublicKey || !cr.response.getPublicKeyAlgorithm) { toast('Trình duyệt quá cũ, hãy cập nhật để dùng passkey'); return; }
         const j = await accCall({ act: 'regverify', cred: { id: cr.id, alg: cr.response.getPublicKeyAlgorithm(), publicKey: b64u(cr.response.getPublicKey()), response: { clientDataJSON: b64u(cr.response.clientDataJSON) } } });
+        if (j.ok) pkSet(true);
         toast(j.ok ? 'Đã thêm passkey' : (j.err || 'Không thêm được passkey'));
     } catch (e) {
         if (e && e.name === 'InvalidStateError') toast('Thiết bị này đã có passkey');
@@ -578,6 +589,7 @@ async function secLoad() {   // chỉ thêm vài hàng cùng kiểu với hàng 
     const j = await accCall({ act: 'info' });
     const b2 = $('#seccard'); if (!b2) return;
     if (!j.ok) { b2.innerHTML = ''; return; }
+    pkSet((j.passkeys || []).length > 0);
     const rows = (j.passkeys || []).map(p => `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔑 ${esc(p.n || 'Passkey')}</b><small style="display:block">Tạo ${new Date(p.t).toLocaleDateString('vi-VN')}</small></span><button type="button" class="btn" data-sec="pkdel" data-id="${esc(p.id)}">Xóa</button></div>`).join('');
     b2.innerHTML = rows + `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">🔑 Thêm passkey</b><small style="display:block">Mở sổ bằng vân tay / khuôn mặt / mã PIN</small></span><button type="button" class="btn" data-sec="pkadd">Thêm</button></div>`;
 }
@@ -591,23 +603,27 @@ document.addEventListener('click', async e => {
         return secLoad();
     }
 });
-{ const pb = $('#pkb'); if (pb) pb.onclick = pkLogin; }
-if (!alive()) pkProbe(true);
+{ const pb = $('#pkb'); if (pb) pb.onclick = pkLogin; const pl = $('#pwlink'); if (pl) pl.onclick = () => showPw(true); }
+if (!alive()) { if (!(PK_OK && pkFlag())) { const p = $('#pw'); p && p.focus(); } pkProbe(true); }
 function setUser() {
     const n = String(NAME || '').trim(), ini = Array.from(n)[0] || '';
     $$('.usr').forEach(e => e.classList.toggle('hide', !n));
     $$('[data-usn]').forEach(e => { e.textContent = n; });
     $$('[data-usi]').forEach(e => { e.textContent = ini.toUpperCase(); });
     const g = $('#lgreet');
-    if (g) g.textContent = n ? 'Xin chào ' + n + ', nhập mật khẩu để mở sổ' : 'Nhập mật khẩu để mở sổ';
+    const pk = RC.contains('pkm');
+    if (g) g.textContent = n ? 'Xin chào ' + n + (pk ? ', mở sổ bằng vân tay / khuôn mặt' : ', nhập mật khẩu để mở sổ') : (pk ? 'Mở sổ bằng vân tay / khuôn mặt' : 'Nhập mật khẩu để mở sổ');
 }
 setUser();
 function boot() { try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { } setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); resumeOutbox(); sync(true); if (typeof pushInit === 'function')
     pushInit(); }
 let ACT_T = Date.now(), PT = 0;
 document.addEventListener('visibilitychange', () => { if (document.hidden)
-    return; if (!alive())
-    return lock(); sync(false); });
+    return; if (!alive()) {
+    if (!$('#app').classList.contains('hide'))
+        lock();   // chỉ khóa khi đang ở trong sổ; đang ở màn đăng nhập thì để yên
+    return;
+} sync(false); });
 setInterval(() => { if (!alive()) {
     if (!$('#app').classList.contains('hide'))
         lock();

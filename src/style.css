@@ -19,7 +19,7 @@ svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 #login input{width:100%;text-align:center;font-size:26px;letter-spacing:.45em;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--field)}
 #login input:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent)}
 #login .go{width:100%;margin-top:14px;padding:14px;border-radius:12px;background:var(--acc);color:var(--on-acc);font-weight:700}
-#lerr{height:22px;margin-top:8px;font-size:13px;color:var(--chi)}.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+#lerr{min-height:22px;margin-top:8px;font-size:13px;color:var(--chi)}.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 .wrap{min-height:100vh;padding-bottom:28px}
 .top{position:sticky;top:0;z-index:8;display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .top .brand{display:flex;align-items:center;gap:10px;font:700 16px var(--fd);flex:1;min-width:0}.top #st{display:none}.top .brand>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top .brand small{display:block;font:400 11px var(--fb);color:var(--mut)}
@@ -1547,3 +1547,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=num
   .sheet .stb .rem-t input.tx{order:3;flex:1 1 100%;width:100%}
   .stb .rem-t .sw{margin-left:auto}
 }
+
+/* Đăng nhập: passkey là mặc định, ô mật khẩu chỉ hiện khi bấm "Nhập mật khẩu" */
+#login #pkb{display:none;margin-top:0}
+#login #pwlink{display:none;margin:14px auto 0;padding:8px 14px;background:none;border:0;box-shadow:none;color:var(--acc);font-weight:600;font-size:14px;cursor:pointer}
+html.pkh #login #pkb{display:block;margin-bottom:14px}
+html.pkm #login #pkb{margin-bottom:0}
+html.pkm #login #pwlink{display:block}
+html.pkm #login .pwf,html.pkm #login #lb{display:none}
