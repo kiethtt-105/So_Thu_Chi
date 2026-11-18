@@ -30,6 +30,7 @@ function cleanRow(r) {
   if (typeof r.amount !== 'number' && !(typeof r.amount === 'string' && r.amount.trim())) return { err: 'Thiếu số tiền' };
   const a = Number(r.amount);
   if (!isFinite(a) || Math.abs(a) > MAX_AMT) return { err: 'Số tiền không hợp lệ' };
+  if (Math.abs(a - Math.round(a)) > 1e-6) return { err: 'Số tiền phải là số nguyên (không dùng dấu thập phân)' };
   const amount = Math.round(a);
   if (amount === 0) return { err: 'Số tiền phải khác 0' };
   if (amount < 0 && r.type !== 'Điều chỉnh') return { err: 'Số tiền phải lớn hơn 0' };
