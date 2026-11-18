@@ -12,13 +12,6 @@ svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .thu{color:var(--thu)}.chi{color:var(--chi)}.chuyen{color:var(--chuyen)}.dc{color:var(--dc)}.mut{color:var(--mut)}
 .hb .sens{filter:blur(8px);user-select:none}
 .ib .sun{display:none}html.dark .ib .sun{display:block}html.dark .ib .moon{display:none}
-#login{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:var(--bg)}
-#login form{width:min(380px,100%);text-align:center;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:36px 28px 28px;box-shadow:var(--sh2)}
-#login .logo{width:54px;height:54px;border-radius:15px;margin:auto}#login .logo svg{width:28px;height:28px;stroke-width:2.4}
-#login h1{font:700 26px/1.2 var(--fd);margin:18px 0 4px;letter-spacing:-.02em}#login p{color:var(--mut);margin-bottom:22px}
-#login input{width:100%;text-align:center;font-size:26px;letter-spacing:.45em;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--field)}
-#login input:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent)}
-#login .go{width:100%;margin-top:14px;padding:14px;border-radius:12px;background:var(--acc);color:var(--on-acc);font-weight:700}
 #lerr{min-height:22px;margin-top:8px;font-size:13px;color:var(--chi)}.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 .wrap{min-height:100vh;padding-bottom:28px}
 .top{position:sticky;top:0;z-index:8;display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
@@ -211,7 +204,7 @@ table.rpt tr.mx td{background:color-mix(in srgb,var(--chi) 9%,transparent)}table
 body{background:var(--bg)}
 html.dark body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(560px 340px at 6% 0,#6b7bff1f,transparent 70%),radial-gradient(520px 320px at 100% 100%,#35e3a512,transparent 70%)}
 .logo{background:linear-gradient(135deg,#5B6BFF,#9360FF);color:#fff;box-shadow:0 4px 14px #6b5bff55}
-.btn.p,.pri,#qb .qs,#login .go{background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#B05BFF));border-color:transparent;box-shadow:0 6px 18px color-mix(in srgb,var(--acc) 36%,transparent)}
+.btn.p,.pri,#qb .qs{background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#B05BFF));border-color:transparent;box-shadow:0 6px 18px color-mix(in srgb,var(--acc) 36%,transparent)}
 #cf .bt .ok{background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#B05BFF));box-shadow:0 6px 18px color-mix(in srgb,var(--acc) 32%,transparent)}
 #cf.danger .bt .ok{background:linear-gradient(135deg,var(--chi),#FF8A5B);box-shadow:0 6px 18px color-mix(in srgb,var(--chi) 34%,transparent)}
 .card{transition:border-color .2s,box-shadow .2s}
@@ -339,7 +332,6 @@ html{--z:1}
 
 .logo.pic{background:none;box-shadow:none;overflow:hidden}
 .logo.pic img{width:100%;height:100%;object-fit:contain;display:block;border-radius:inherit;pointer-events:none}
-#login .logo.pic{width:64px;height:64px;border-radius:16px}
 
 @media(max-width:699px){
  .kpis>.kpi.h{grid-column:1/-1}
@@ -402,7 +394,6 @@ html:not(.dark) .insight{background:linear-gradient(135deg,#EAEDFF,#F4ECFF);bord
 html:not(.dark) .cal span{background:#F0F2FD}
 html:not(.dark) .sheet,html:not(.dark) #cf .box{box-shadow:0 30px 70px -20px #2a2f7a66}
 html:not(.dark) .live.ok{background:#E9FBF3;border-color:#BFEBD9}
-html:not(.dark) #login form{box-shadow:0 30px 70px -24px #3b3fd877}
 html:not(.dark) .ph h1{background:linear-gradient(135deg,#171A33 30%,#4a3fd8);-webkit-background-clip:text;background-clip:text;color:transparent}
 @media print{html:not(.dark) body:before{display:none}html:not(.dark) .ph h1{color:#0F1729;background:none}}
 html:not(.dark) .kpi.h>*{position:relative}
@@ -815,15 +806,6 @@ body:has(#ofl.on) #pg{bottom:42px}
 .sheet:has(#fa) .thg:not(:has(.th:not(.add))) .th.add{width:100%;height:46px;grid-auto-flow:column;gap:8px;justify-content:center}
 
 /* ===== Cải tiến màn hình đăng nhập ===== */
-#login .pwf{position:relative}
-#login .pwf input{padding:12px 52px;font-size:22px;letter-spacing:.3em;text-overflow:clip}
-#login .pwf input[type=text]{letter-spacing:.05em}
-#pwt{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:10px;font-size:18px;line-height:1;opacity:.75;transition:opacity .15s,background .15s}
-#pwt:hover,#pwt[aria-pressed=true]{opacity:1;background:var(--soft)}
-#login input:-webkit-autofill,#login input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 100px var(--field) inset;-webkit-text-fill-color:var(--ink);caret-color:var(--ink);border-radius:12px;transition:background-color 9999s}
-#login .go{color:#fff;background:linear-gradient(135deg,#5B64F5,#8B5CF6);box-shadow:0 10px 24px -10px #6c5bffcc}
-#login .go:hover{filter:brightness(1.08)}
-#login .go:active{transform:scale(.98)}
 
 /* ---- Sửa form Thêm giao dịch ---- */
 html:not(.dark) .btn.p{background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#B05BFF));color:#fff;border-color:transparent;box-shadow:0 6px 18px color-mix(in srgb,var(--acc) 36%,transparent)}
@@ -911,9 +893,6 @@ svg line[stroke="var(--line)"]{stroke-dasharray:3 5}
 #toast{border-radius:16px}
 
 /* đăng nhập */
-#login{background:radial-gradient(620px 420px at 14% 8%,#6b7bff40,transparent 70%),radial-gradient(620px 420px at 92% 96%,#e8479b30,transparent 70%),var(--bg)}
-#login form{border-radius:28px;background:color-mix(in srgb,var(--card) 84%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-#login input{border-radius:16px}#login .go{border-radius:16px}
 
 /* thanh điều hướng dưới (điện thoại) */
 #bn{-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);background:color-mix(in srgb,var(--card) 84%,transparent)}
@@ -1549,9 +1528,45 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=num
 }
 
 /* Đăng nhập: passkey là mặc định, ô mật khẩu chỉ hiện khi bấm "Nhập mật khẩu" */
-#login #pkb{display:none;margin-top:0}
-#login #pwlink{display:none;margin:14px auto 0;padding:8px 14px;background:none;border:0;box-shadow:none;color:var(--acc);font-weight:600;font-size:14px;cursor:pointer}
-html.pkh #login #pkb{display:block;margin-bottom:14px}
-html.pkm #login #pkb{margin-bottom:0}
+
+/* ===== Trang đăng nhập: bìa sổ kẻ dòng =====
+   Nền là trang sổ: dòng kẻ ngang mờ + hai đường lề dọc bên trái cột nội dung. Mọi thứ còn lại giữ phẳng, tĩnh.
+   Điều khiển bằng các id/class sẵn có: #pw #pwt #lb #lerr #lgreet #pkb #pwlink và html.pkh (có passkey) / html.pkm (đang ở chế độ passkey). */
+#login{--w:min(400px,calc(100vw - 48px));--mx:max(10px,calc((100vw - var(--w)) / 2 - 24px));--mk:color-mix(in srgb,var(--acc) 42%,transparent);--rl:var(--line);
+  position:fixed;inset:0;z-index:50;overflow-y:auto;display:grid;background:var(--bg);
+  padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left))}
+#login::before{content:"";position:fixed;inset:0;pointer-events:none;animation:lgRule .9s cubic-bezier(.2,.7,.2,1) both;
+  background:
+    linear-gradient(90deg,transparent var(--mx),var(--mk) var(--mx),var(--mk) calc(var(--mx) + 1px),transparent calc(var(--mx) + 1px),transparent calc(var(--mx) + 6px),var(--mk) calc(var(--mx) + 6px),var(--mk) calc(var(--mx) + 7px),transparent calc(var(--mx) + 7px)),
+    repeating-linear-gradient(180deg,transparent 0,transparent 35px,var(--rl) 35px,var(--rl) 36px)}
+html.dark #login{--rl:color-mix(in srgb,var(--line) 55%,transparent)}
+@keyframes lgRule{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0)}}
+#lf{position:relative;z-index:1;margin:auto;width:var(--w);display:flex;flex-direction:column;align-items:stretch;text-align:left}
+#login .logo.pic{width:44px;height:44px;border-radius:12px;margin:0 0 28px}
+#login h1{font:700 clamp(32px,9vw,40px)/1.05 var(--fd);letter-spacing:-.025em;margin:0 0 10px}
+#lgreet{margin:0 0 32px;color:var(--mut);font-size:15px;line-height:1.5;text-wrap:balance}
+#login .pwf{position:relative}
+#login input{width:100%;height:56px;padding:0 56px 0 16px;border-radius:12px;border:1px solid var(--line2);background:var(--card);color:var(--ink);font:600 20px/1 var(--fb);letter-spacing:.14em;text-align:left;text-overflow:clip}
+#login input[type=text]{letter-spacing:.02em}
+#login input::placeholder{font-size:16px;font-weight:500;letter-spacing:0;color:var(--mut);opacity:.9}
+#login input:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 22%,transparent)}
+#login input:-webkit-autofill,#login input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 100px var(--card) inset;-webkit-text-fill-color:var(--ink);caret-color:var(--ink);border-radius:12px;transition:background-color 9999s}
+#pwt{--eye:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:10px;display:grid;place-items:center;font-size:0;color:var(--mut);transition:background .15s,color .15s}
+#pwt[aria-pressed=true]{--eye:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.88 9.88a3 3 0 1 0 4.24 4.24'/%3E%3Cpath d='M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68'/%3E%3Cpath d='M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61'/%3E%3Cpath d='M2 2l20 20'/%3E%3C/svg%3E")}
+#pwt::before{content:"";width:20px;height:20px;background:currentColor;-webkit-mask:var(--eye) center/contain no-repeat;mask:var(--eye) center/contain no-repeat}
+#pwt:hover,#pwt[aria-pressed=true]{background:var(--soft);color:var(--ink)}
+#lerr{min-height:20px;margin:6px 0 0;font-size:13.5px;font-weight:600;line-height:1.45;color:var(--chi)}
+html:not(.dark) #lerr{color:#C41E45}
+#login .go,#login #pkb{display:flex;align-items:center;justify-content:center;gap:10px;height:54px;margin-top:6px;border-radius:12px;font:700 16px/1 var(--fb);transition:transform .12s,filter .15s,border-color .15s}
+#login .go{width:100%;background:var(--acc);color:var(--on-acc);border:0;box-shadow:0 1px 0 color-mix(in srgb,#000 14%,transparent),0 10px 22px -12px color-mix(in srgb,var(--acc) 80%,transparent)}
+#login .go:hover{filter:brightness(1.07)}
+#login .go:active,#login #pkb:active{transform:scale(.985)}
+#login #pkb{display:none;margin-top:12px;border:1px solid var(--line2);background:var(--card);color:var(--ink)}
+#login #pkb:hover{border-color:var(--acc)}
+html.pkh #login #pkb{display:flex}
+html.pkm #login #pkb{margin-top:0;border-color:transparent;background:var(--acc);color:var(--on-acc);box-shadow:0 1px 0 color-mix(in srgb,#000 14%,transparent),0 10px 22px -12px color-mix(in srgb,var(--acc) 80%,transparent)}
+html.pkm #login #pkb:hover{border-color:transparent;filter:brightness(1.07)}
+#login #pwlink{display:none;align-self:flex-start;min-height:44px;margin:12px 0 0 -12px;padding:12px;color:var(--ink);font:600 15px/1 var(--fb);text-decoration:underline;text-underline-offset:4px}
 html.pkm #login #pwlink{display:block}
-html.pkm #login .pwf,html.pkm #login #lb{display:none}
+html.pkm #login .pwf,html.pkm #login #lb,html.pkm #login #lerr{display:none}
+@media(max-height:560px){#login .logo.pic{margin-bottom:16px}#lgreet{margin-bottom:20px}}

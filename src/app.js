@@ -484,7 +484,7 @@ document.addEventListener('click', e => {
     const b = e.target.closest('#pwt'); if (!b) return;
     const i = $('#pw'), show = i.type === 'password';
     i.type = show ? 'text' : 'password';
-    b.textContent = show ? '🙈' : '👁'; b.setAttribute('aria-pressed', show); b.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    b.setAttribute('aria-pressed', show); b.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
     i.focus();
 });
 $('#lf').onsubmit = async ev => {
