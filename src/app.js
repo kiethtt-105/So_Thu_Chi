@@ -2625,8 +2625,13 @@ ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại 
 <div class="sec">Cân đối</div>
 <div class="menu"><div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}</div>
 ${pScan()}`;
-    const tabs = [['ui', '🎨', 'Giao diện'], ['tx', '✍️', 'Ghi chép'], ['nt', '🔔', 'Thông báo'], ['rm', '⏰', 'Nhắc nhở'], ['tg', '✈️', 'Telegram'], ['sec', '🔒', 'Bảo mật'], ['adv', '⚙️', 'Nâng cao']];
-    const pages = { ui: pUi, tx: pTx, nt: pNt, rm: pRm, tg: pTg, sec: pSec, adv: pAdv };
+    const pBk = () => `<div class="sec">Sao lưu sổ</div>
+<div class="menu"><div class="row"><span class="dot">⬇️</span><span class="m"><b>Tải sổ (JSON)</b><small>${S.tx.length} giao dịch, ${S.acc.length} tài khoản, ${S.cat.length} hạng mục. Lấy từ dữ liệu đang hiện trên máy này</small></span><button type="button" class="btn" data-bk="dl">Tải</button></div>
+<div class="row"><span class="dot">☁️</span><span class="m"><b>Sao lưu lên Google Drive ngay</b><small id="bkst">Chép từ Google Sheet sang thư mục SoThuChi-Backup. Tự chạy mỗi ngày cùng lúc cron của máy chủ</small></span><button type="button" class="btn" data-bk="drive">Sao lưu</button></div>
+<div class="row"><span class="dot">♻️</span><span class="m"><b>Khôi phục từ JSON</b><small>Chỉ thêm những mục đang thiếu, không sửa hay xóa gì đang có</small></span><button type="button" class="btn" data-bk="restore">Chọn file</button></div></div>
+<p class="hint">Bản sao trên Drive gồm so-thu-chi.json (mới nhất) và bản theo ngày, giữ 14 ngày gần nhất. Giao dịch đang nằm trong Thùng rác không bị khôi phục lại. Khôi phục nhiều giao dịch một lúc có thể kéo theo nhiều thông báo từ các thiết bị khác.</p>`;
+    const tabs = [['ui', '🎨', 'Giao diện'], ['tx', '✍️', 'Ghi chép'], ['nt', '🔔', 'Thông báo'], ['rm', '⏰', 'Nhắc nhở'], ['tg', '✈️', 'Telegram'], ['sec', '🔒', 'Bảo mật'], ['bk', '💾', 'Sao lưu'], ['adv', '⚙️', 'Nâng cao']];
+    const pages = { ui: pUi, tx: pTx, nt: pNt, rm: pRm, tg: pTg, sec: pSec, bk: pBk, adv: pAdv };
     if (!pages[SET_TAB]) SET_TAB = 'ui';
     const old = $('#sh .stb'), keepTop = old && old.dataset.t === SET_TAB ? old.scrollTop : 0;   // bấm công tắc không bị nhảy lên đầu trang
     $('#sh').innerHTML = `<div class="shh"><h3>Cài đặt</h3><button class="chip" data-nt="open">${ic('bell')}Xem thông báo</button></div>
@@ -2637,6 +2642,91 @@ ${pScan()}`;
     openSheet();
     if (SET_TAB === 'sec') secLoad();
 }
+// ===== Sao lưu / khôi phục JSON =====
+const BK_TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'];
+const bkSame = (x, y) => (x.cat || '') === (y.cat || '') && x.per === y.per;
+function bkRowOk(r) {   // cùng luật với cleanRow ở máy chủ, để một dòng hỏng không làm cả lô bị từ chối
+    if (!r || typeof r !== 'object') return false;
+    const id = String(r.id == null ? '' : r.id), a = Number(r.amount), acc = String(r.acc || '').trim(), to = String(r.accTo || '').trim();
+    if (!id || id.length > 64 || id[0] === '@' || !BK_TYPES.includes(r.type) || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.date || ''))) return false;
+    if (!isFinite(a) || Math.round(a) === 0 || Math.abs(a) > 1e12 || (a < 0 && r.type !== 'Điều chỉnh') || !acc) return false;
+    return r.type !== 'Chuyển khoản' || (!!to && to !== acc);
+}
+function bkDownload() {
+    if (!S.tx.length && !S.acc.length) return toast('Chưa có dữ liệu để tải');
+    const d = new Date(), p = n => String(n).padStart(2, '0'), name = 'so-thu-chi-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.json';
+    const data = { app: 'so-thu-chi', v: 1, at: d.toISOString(), src: 'device', rev: S.rev, tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+    a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 4000);
+    toast('Đã tải ' + name);
+}
+async function bkDrive(btn) {
+    const st = $('#bkst');
+    btn.disabled = true; if (st) st.textContent = 'Đang sao lưu lên Drive…';
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 58000);
+    let msg;
+    try {
+        const j = await (await fetch(STORE, { method: 'POST', credentials: 'same-origin', signal: ac.signal, body: JSON.stringify({ backupNow: 1 }) })).json();
+        if (j.auth) msg = 'Phiên đăng nhập đã hết hạn, hãy đăng nhập lại';
+        else if (j.ok) msg = 'Đã sao lưu ' + j.n + ' giao dịch lúc ' + new Date(j.at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + (j.size ? ' (' + Math.ceil(j.size / 1024) + ' KB)' : '');
+        else msg = 'Không sao lưu được: ' + (j.err || 'lỗi không rõ');
+    } catch (e) { msg = e && e.name === 'AbortError' ? 'Máy chủ phản hồi quá chậm, thử lại sau' : 'Không kết nối được tới máy chủ'; }
+    clearTimeout(tm);
+    btn.disabled = false;
+    const st2 = $('#bkst'); if (st2) st2.textContent = msg; else toast(msg);
+}
+async function bkRestore(file) {
+    let d;
+    try { d = JSON.parse(await file.text()); } catch (e) { return toast('File không phải JSON hợp lệ'); }
+    if (!d || d.app !== 'so-thu-chi' || !Array.isArray(d.tx)) return toast('Đây không phải file sao lưu của Sổ Thu Chi');
+    const haveTx = new Set(S.tx.map(t => String(t.id))), trash = new Set(S.trash.filter(t => t.k === 'gd').map(t => String(t.id)));
+    let bad = 0, had = 0, inTrash = 0;
+    const rows = [];
+    d.tx.forEach(r => {
+        if (!bkRowOk(r)) { bad++; return; }
+        const id = String(r.id);
+        if (haveTx.has(id)) { had++; return; }
+        if (trash.has(id)) { inTrash++; return; }
+        rows.push(r);
+    });
+    const accs = (d.acc || []).filter(x => x && x.name && !S.acc.some(y => y.name === x.name));
+    const cats = (d.cat || []).filter(x => x && x.t && x.p && x.c && !S.cat.some(y => y.t === x.t && y.p === x.p && y.c === x.c));
+    const lims = (d.lim || []).filter(x => x && x.per && x.v > 0 && !S.lim.some(y => bkSame(x, y) && y.v > 0));
+    if (!rows.length && !accs.length && !cats.length && !lims.length) return toast('Sổ đã có đủ những gì trong file này');
+    const skip = [had && had + ' giao dịch đã có', inTrash && inTrash + ' đang trong Thùng rác', bad && bad + ' dòng không hợp lệ'].filter(Boolean).join(', ');
+    const msg = 'Sẽ thêm ' + [rows.length && rows.length + ' giao dịch', accs.length && accs.length + ' tài khoản', cats.length && cats.length + ' hạng mục', lims.length && lims.length + ' hạn mức'].filter(Boolean).join(', ') + '.' + (skip ? ' Bỏ qua: ' + skip + '.' : '') + ' Không có gì đang có bị sửa hay xóa.';
+    if (!await ask('Khôi phục từ file sao lưu?', msg, { icon: '♻️', ok: 'Khôi phục' })) return;
+    const cfgOps = accs.map(x => ({ op: 'acc.save', acc: { name: x.name, type: x.type, open: Number(x.open) || 0, skip: !!x.skip }, old: null }))
+        .concat(cats.map(x => ({ op: 'cat.save', cat: { t: x.t, p: x.p, c: x.c }, old: null })))
+        .concat(lims.map(x => ({ op: 'lim.set', per: x.per, cat: x.cat || '', v: x.v })));
+    if (cfgOps.length) {
+        const r = await commit(cfgOps, { quiet: true });
+        if (!r.ok) return toast('Dừng khôi phục: ' + (r.err || 'không lưu được tài khoản, hạng mục'));
+    }
+    let done = 0;
+    for (let i = 0; i < rows.length; i += 200) {
+        const part = rows.slice(i, i + 200).map(r => Object.assign({}, r)), ids = new Set(part.map(r => String(r.id)));
+        const r = await commit(part.map(row => ({ op: 'tx.save', row })), { quiet: true, local: () => { S.tx = S.tx.filter(t => !ids.has(String(t.id))).concat(part); } });
+        if (!r.ok) return toast('Dừng sau ' + done + '/' + rows.length + ' giao dịch: ' + (r.err || 'không lưu được'));
+        done += part.length;
+        if (rows.length > 200) toast('Đang khôi phục ' + done + '/' + rows.length);
+    }
+    toast('Đã khôi phục ' + rows.length + ' giao dịch' + (accs.length || cats.length || lims.length ? ' và cài đặt' : ''));
+}
+document.addEventListener('click', e => {
+    const b = e.target.closest('[data-bk]');
+    if (!b) return;
+    const k = b.dataset.bk;
+    if (k === 'dl') return bkDownload();
+    if (k === 'drive') return bkDrive(b);
+    if (k === 'restore') {
+        const f = document.createElement('input'); f.type = 'file'; f.accept = 'application/json,.json';
+        f.onchange = () => { if (f.files && f.files[0]) bkRestore(f.files[0]); };
+        f.click();
+    }
+});
 document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-nt]');
     if (!b || b.type === 'checkbox')

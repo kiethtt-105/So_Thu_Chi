@@ -244,6 +244,19 @@ async function proxy(body) {
   return sheet({ ops: Array.isArray(body.ops) ? body.ops : [], rev: body.rev || '', fast: !!body.fast, sid }, 45000);
 }
 
+// ---- Sao lưu JSON lên Google Drive (qua Apps Script, hàm backupPut_ trong Backup.gs) ----
+// Nguồn là Google Sheet (bản gốc), chạy song song với đồng bộ Sheet, không thay thế nó. flush=true: đẩy nốt hàng đợi Redis sang Sheet trước cho bản sao mới nhất.
+async function backupDrive(flush) {
+  if (flush && RU && RT) { try { const sid = (await rd([['GET', P + 'sid']]))[0] || ''; await drain(sid); } catch (e) { } }
+  const j = await sheet({ ops: [], rev: '' }, 30000);
+  if (!j.ok) return { ok: false, err: j.err || 'Không đọc được Google Sheet' };
+  const data = { app: 'so-thu-chi', v: 1, at: new Date().toISOString(), src: 'sheet', rev: String(j.rev || ''), tx: j.tx || [], acc: j.acc || [], cat: j.cat || [], lim: j.lim || [], trash: j.trash || [] };
+  const r = await sheet({ backup: { json: JSON.stringify(data) } }, 40000);
+  if (!r.ok) return { ok: false, err: r.err || 'Apps Script từ chối sao lưu' };
+  if (!r.saved) return { ok: false, err: 'Apps Script chưa có mã sao lưu: thêm Backup.gs, thêm dòng gọi backupPut_ vào doPost rồi Deploy phiên bản mới' };
+  return { ok: true, n: data.tx.length, at: data.at, size: r.size || 0, url: r.url || '' };
+}
+
 // ---- Đăng nhập: so mật khẩu ở server, giới hạn số lần thử sai ----
 const FAIL_MAX = 5, FAIL_WIN = 900, ALL_MAX = 200, ALL_WIN = 3600;   // 5 lần sai / 15 phút / IP; 200 lần sai / giờ toàn hệ thống (đủ cao để người lạ khó khóa nhầm chủ sổ)
 const memFail = new Map();
@@ -334,11 +347,19 @@ module.exports = async (req, res) => {
   try {
     // Cron của Vercel: chạy nền khi không có ai mở app
     if (req.method === 'GET') {
-      if (!CRON_SECRET || !HAS_REDIS) return res.status(200).json({ ok: true, redis: HAS_REDIS, cron: false });   // kiểm tra nhanh
-      if (req.headers.authorization !== 'Bearer ' + CRON_SECRET) return res.status(401).json({ ok: false, err: 'Unauthorized' });
-      const sid = (await rd([['GET', P + 'sid']]))[0] || '';
-      const d = await drain(sid); const p = await pull(sid, false);
-      return res.status(200).json({ ok: true, drain: d, pull: p, hub: await status() });
+      const quick = () => res.status(200).json({ ok: true, redis: HAS_REDIS, cron: false });   // kiểm tra nhanh
+      if (!CRON_SECRET) return quick();
+      if (req.headers.authorization !== 'Bearer ' + CRON_SECRET) return HAS_REDIS ? res.status(401).json({ ok: false, err: 'Unauthorized' }) : quick();
+      const out = { ok: true };
+      if (HAS_REDIS) {
+        try {
+          const sid = (await rd([['GET', P + 'sid']]))[0] || '';
+          out.drain = await drain(sid); out.pull = await pull(sid, false); out.hub = await status();
+        } catch (e) { out.redisErr = String(e && e.message || e); }
+      }
+      // Sao lưu JSON lên Drive mỗi lần cron chạy (1 lần/ngày). Lỗi sao lưu không làm hỏng phần còn lại.
+      out.backup = await backupDrive(false).catch(e => ({ ok: false, err: String(e && e.message || e) }));
+      return res.status(200).json(out);
     }
     if (req.method !== 'POST') return res.status(405).json({ ok: false, err: 'Method not allowed' });
     const sfs = req.headers['sec-fetch-site'];
@@ -359,6 +380,7 @@ module.exports = async (req, res) => {
     // Mọi request còn lại phải có cookie hợp lệ
     if (!(await auth.ok(req, res))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
 
+    if (body.backupNow) return res.status(200).json(await backupDrive(true).catch(e => ({ ok: false, err: String(e && e.message || e) })));   // sao lưu JSON lên Drive ngay
     // Tải ảnh: chuyển sang Apps Script (KEY nằm ở server)
     if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));
     if (body.cfg) return await cfgApi(res, body, HAS_REDIS);   // cài đặt đồng bộ giữa các thiết bị (chỉ lưu trên Redis)
