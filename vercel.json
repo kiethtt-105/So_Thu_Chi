@@ -17,7 +17,7 @@
       "maxDuration": 60
     },
     "api/scan.js": {
-      "maxDuration": 30
+      "maxDuration": 40
     },
     "api/telegram.js": {
       "maxDuration": 20
