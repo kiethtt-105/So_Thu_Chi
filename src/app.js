@@ -5129,6 +5129,55 @@ function promptText(title, ph, def) {
         inp.dispatchEvent(new Event('input', { bubbles: true }));
         inp.dispatchEvent(new Event('change', { bubbles: true }));
     };
+    // ---- Nhập tay: hiểu nhiều kiểu gõ, trả '' (xóa), null (không hợp lệ) hoặc chuỗi chuẩn ISO ----
+    const parseTime = s => {
+        s = String(s || '').trim().toLowerCase().replace(/\s+/g, '');
+        if (!s) return '';
+        let h, mi, m;
+        if ((m = /^(\d{1,2})[:h.,](\d{1,2})?$/.exec(s))) { h = +m[1]; mi = m[2] === undefined ? 0 : +m[2]; }
+        else if (/^\d{1,4}$/.test(s)) { if (s.length <= 2) { h = +s; mi = 0; } else { h = +s.slice(0, -2); mi = +s.slice(-2); } }
+        else return null;
+        return h < 24 && mi < 60 ? P2(h) + ':' + P2(mi) : null;
+    };
+    const refYM = v => { const m = /^(\d{4})-(\d{2})/.exec(v || '') || /^(\d{4})-(\d{2})/.exec(ymd(new Date())); return [+m[1], +m[2]]; };
+    const fullY = y => y === undefined ? undefined : (String(y).length === 2 ? 2000 + +y : +y);
+    const parseDate = (s, ref) => {
+        s = String(s || '').trim();
+        if (!s) return '';
+        const [ry, rm] = refYM(ref);
+        let d, mo, y, m;
+        if ((m = /^(\d{1,2})[\/\-.\s]+(\d{1,2})(?:[\/\-.\s]+(\d{2}|\d{4}))?$/.exec(s))) { d = +m[1]; mo = +m[2]; y = fullY(m[3]); }
+        else if (/^\d+$/.test(s)) {
+            const n = s.length;
+            if (n <= 2) { d = +s; mo = rm; }
+            else if (n === 4) { d = +s.slice(0, 2); mo = +s.slice(2); }
+            else if (n === 6) { d = +s.slice(0, 2); mo = +s.slice(2, 4); y = fullY(s.slice(4)); }
+            else if (n === 8) { d = +s.slice(0, 2); mo = +s.slice(2, 4); y = +s.slice(4); }
+            else return null;
+        } else return null;
+        if (y === undefined) y = ry;
+        const dt = new Date(y, mo - 1, d);
+        if (y < 1900 || y > 2100 || dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+        return ymd(dt);
+    };
+    const parseMonth = (s, ref) => {
+        s = String(s || '').trim();
+        if (!s) return '';
+        const [ry] = refYM(ref);
+        let mo, y, m;
+        if ((m = /^(\d{1,2})(?:[\/\-.\s]+(\d{2}|\d{4}))?$/.exec(s))) { mo = +m[1]; y = fullY(m[2]); }
+        else if (/^\d+$/.test(s)) {
+            const n = s.length;
+            if (n === 4) { mo = +s.slice(0, 2); y = fullY(s.slice(2)); }
+            else if (n === 5) { mo = +s[0]; y = +s.slice(1); }
+            else if (n === 6) { mo = +s.slice(0, 2); y = +s.slice(2); }
+            else return null;
+        } else return null;
+        if (y === undefined) y = ry;
+        return mo >= 1 && mo <= 12 && y >= 1900 && y <= 2100 ? y + '-' + P2(mo) : null;
+    };
+    const PF = { date: 'dd/mm/yyyy', time: 'hh:mm', month: 'mm/yyyy' }, ML = { date: 10, time: 5, month: 7 };
+    const BADMSG = { date: 'Ngày không hợp lệ. Ví dụ: 18/11/2026, 18112026 hoặc 1811', time: 'Giờ không hợp lệ. Ví dụ: 08:30, 0830 hoặc 8h30', month: 'Tháng không hợp lệ. Ví dụ: 11/2026 hoặc 112026' };
     let pop = null, cur = null, t0 = 0;
 
     function closePop(focus) {
@@ -5287,25 +5336,58 @@ function promptText(title, ph, def) {
         if (!r.width || !r.height) return;
         inp._pk = 1;
         const t = inp.type;
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'ddb dpb ' + t;
-        b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
+        // Khung (div) gồm ô gõ tay + biểu tượng ở bên phải: gõ trực tiếp HOẶC bấm biểu tượng / phím ↓ để mở bộ chọn
+        const b = document.createElement('div'), ti = document.createElement('input');
+        b.className = 'ddb dpb dpi ' + t; b.setAttribute('role', 'group');
+        ti.type = 'text'; ti.className = 'dpx'; ti.autocomplete = 'off'; ti.spellcheck = false; ti.maxLength = ML[t]; ti.placeholder = PF[t];
+        ti.setAttribute('inputmode', 'numeric'); ti.setAttribute('enterkeyhint', 'done'); ti.setAttribute('aria-haspopup', 'dialog');
         const lb = inp.getAttribute('aria-label') || (inp.closest('label') && inp.closest('label').firstChild && inp.closest('label').firstChild.nodeType === 3 ? inp.closest('label').firstChild.textContent.trim() : '');
-        if (lb) b.setAttribute('aria-label', lb);
+        ti.setAttribute('aria-label', (lb || PH[t]) + ' (gõ hoặc chọn)');
+        b.appendChild(ti);
         const cs = getComputedStyle(inp), par = inp.parentElement;
         b.style.width = par && r.width >= par.clientWidth - 2 ? '100%' : r.width + 'px';
         b.style.height = r.height + 'px'; b.style.margin = cs.margin; b.style.flex = cs.flex;
-        const upd = () => { const v = inp.value; b.textContent = v ? fmt(t, v) : PH[t]; b.classList.toggle('empty', !v); b.disabled = inp.disabled; };
+        b.focus = o => ti.focus(o);   // mã cũ (đóng bộ chọn) trả tiêu điểm về khung này
+        const show = () => { const v = inp.value; ti.value = v ? fmt(t, v) : ''; b.classList.toggle('empty', !v); };
+        const upd = () => { b.disabled = ti.disabled = inp.disabled; if (document.activeElement !== ti) show(); };   // đang gõ dở thì không ghi đè
         const d1 = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
         Object.defineProperty(inp, 'value', { get() { return d1.get.call(this); }, set(v) { d1.set.call(this, v); upd(); }, configurable: true });
         inp._pku = upd; upd();
         inp.insertAdjacentElement('afterend', b);
         inp.classList.add('dd-native'); inp.tabIndex = -1; inp.setAttribute('aria-hidden', 'true');
-        b.addEventListener('click', e => { e.preventDefault(); if (!b.disabled) openPop(inp, b); });
-        b.addEventListener('keydown', e => { if (['ArrowDown', 'Enter', ' '].includes(e.key) && !pop) { e.preventDefault(); if (!b.disabled) openPop(inp, b); } });
-        // bấm vào chữ của nhãn <label> cũng mở bộ chọn (ô gốc đã ẩn)
+        // Đọc chữ đã gõ -> giá trị chuẩn ISO. Sai thì hoàn lại giá trị cũ và báo; bắt buộc thì không cho để trống
+        const commit = () => {
+            const raw = ti.value.trim(), now = inp.value;
+            const p = t === 'time' ? parseTime(raw) : t === 'month' ? parseMonth(raw, now) : parseDate(raw, now);
+            let bad = p === null || (p === '' && inp.required);
+            if (!bad && p && t === 'date' && ((inp.min && p < inp.min) || (inp.max && p > inp.max))) bad = true;
+            if (bad) {
+                b.classList.add('bad'); setTimeout(() => b.classList.remove('bad'), 700);
+                if (raw) { try { toast(BADMSG[t]); } catch (e) { } }
+                show(); return false;
+            }
+            setVal(inp, p); show(); return true;
+        };
+        const open = () => { if (b.disabled) return; if (!pop || cur.btn !== b) { commit(); openPop(inp, b); } else closePop(true); };
+        ti.addEventListener('focus', () => { closePop(); setTimeout(() => { if (document.activeElement === ti) { try { ti.select(); } catch (e) { } } }, 0); });
+        ti.addEventListener('blur', () => { commit(); });
+        ti.addEventListener('input', e => e.stopPropagation());    // chữ đang gõ chưa phải giá trị thật: không báo cho mã khác
+        ti.addEventListener('change', e => e.stopPropagation());
+        ti.addEventListener('keydown', e => {
+            const k = e.key;
+            if (k === 'Enter') {
+                commit();
+                if (e.ctrlKey || e.metaKey) return;   // Ctrl+Enter: để phím tắt của app chạy sau khi đã ghi nhận giá trị
+                e.preventDefault(); e.stopPropagation();
+                try { ti.select(); } catch (x) { }
+            } else if (k === 'Escape') {
+                if (ti.value !== (inp.value ? fmt(t, inp.value) : '')) { e.preventDefault(); e.stopPropagation(); show(); try { ti.select(); } catch (x) { } }   // đang sửa dở: chỉ hoàn lại, chưa đóng cửa sổ
+            } else if (k === 'ArrowDown' || k === 'F4') { e.preventDefault(); e.stopPropagation(); open(); }
+        });
+        b.addEventListener('click', e => { if (e.target === b) { e.preventDefault(); open(); } });   // bấm biểu tượng bên phải
+        // bấm vào chữ của nhãn <label> thì đưa con trỏ vào ô gõ
         const lab = inp.closest('label');
-        if (lab && !lab._pkl) { lab._pkl = 1; lab.addEventListener('click', e => { if (e.target === lab || (e.target.nodeType === 1 && !e.target.closest('button,input,select,textarea,a'))) { const bb = lab.querySelector('.dpb'); if (bb && !bb.disabled && e.target !== bb) { e.preventDefault(); bb.click(); } } }); }
+        if (lab && !lab._pkl) { lab._pkl = 1; lab.addEventListener('click', e => { if (e.target === lab || (e.target.nodeType === 1 && !e.target.closest('button,input,select,textarea,a,.dpi'))) { const bb = lab.querySelector('.dpb'); if (bb && !bb.disabled) { e.preventDefault(); bb.focus(); } } }); }
     }
     let raf = 0;
     const scan = () => {
