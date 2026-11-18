@@ -18,6 +18,12 @@
     },
     "api/scan.js": {
       "maxDuration": 30
+    },
+    "api/telegram.js": {
+      "maxDuration": 20
+    },
+    "api/account.js": {
+      "maxDuration": 15
     }
   },
   "crons": [

@@ -7,14 +7,16 @@ const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1
 // Các biến này chỉ dùng ở SERVER (api/store.js, api/_auth.js). Build chỉ kiểm tra, KHÔNG ghi vào file công khai.
 const REQUIRED = ['APP_PASS', 'APP_API', 'APP_KEY'];
 const missing = REQUIRED.filter(k => !env(k));
+// Bản Preview thường không có đủ biến môi trường: chỉ cảnh báo, không làm hỏng build. Production / build cục bộ vẫn bắt buộc.
+const strict = !process.env.VERCEL_ENV || process.env.VERCEL_ENV === 'production';
 if (missing.length) {
-  console.error('Thiếu biến môi trường: ' + missing.join(', ') + '\nKhai báo trong Vercel > Settings > Environment Variables.');
-  process.exit(1);
+  console.error((strict ? '' : 'Cảnh báo (Preview): ') + 'Thiếu biến môi trường: ' + missing.join(', ') + '\nKhai báo trong Vercel > Settings > Environment Variables.');
+  if (strict) process.exit(1);
 }
 // Bắt lỗi gõ sai URL Apps Script ngay lúc build (vd thiếu chữ "h" của https)
-if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(env('APP_API'))) {
+if ((strict || env('APP_API')) && !/^https:\/\/script\.google\.com\/.+\/exec$/.test(env('APP_API'))) {
   console.error('APP_API không đúng dạng. Phải là https://script.google.com/macros/s/.../exec (URL Web app trong Apps Script > Deploy > Manage deployments).');
-  process.exit(1);
+  if (strict) process.exit(1);
 }
 if (env('APP_KEY').length < 16) console.warn('Cảnh báo: APP_KEY ngắn (<16 ký tự), nên dùng chuỗi ngẫu nhiên dài.');
 if (!env('CRON_SECRET')) console.warn('Cảnh báo: chưa có CRON_SECRET, cron nền /api/store sẽ không chạy.');
@@ -25,7 +27,7 @@ if (!env('ANTHROPIC_API_KEY')) console.warn('Cảnh báo: chưa có ANTHROPIC_AP
 const cfg = {
   NAME: env('APP_NAME'),
   STORE: '/api/store',
-  TTL_H: Number(env('APP_TTL_HOURS')) > 0 ? Number(env('APP_TTL_HOURS')) : 168
+  TTL_H: Number(env('APP_TTL_HOURS')) > 0 ? Number(env('APP_TTL_HOURS')) : 48   // khớp mặc định 48 giờ của _auth.js
 };
 const configJs = 'self.CONFIG = ' + JSON.stringify(cfg, null, 4) + ';\n';
 

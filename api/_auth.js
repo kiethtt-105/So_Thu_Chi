@@ -5,7 +5,7 @@
 const crypto = require('crypto');
 const env = k => String(process.env[k] || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();   // bỏ dấu nháy / khoảng trắng thừa
 const APP_PASS = env('APP_PASS'), APP_KEY = env('APP_KEY');
-const HOURS = Number(process.env.APP_TTL_HOURS) > 0 ? Number(process.env.APP_TTL_HOURS) : 48;
+const HOURS = Number(env('APP_TTL_HOURS')) > 0 ? Number(env('APP_TTL_HOURS')) : 48;   // dùng env() để bỏ dấu nháy như build.js
 const NAME = 'stc_auth', REV = 'stc:revoked';
 const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;

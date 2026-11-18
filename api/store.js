@@ -110,12 +110,15 @@ async function readState() {
   MISC.forEach(k => { st[k] = misc[k] || []; });
   return { st, rev: String(rev || '0'), crev: String(crev || '0') };
 }
-async function status() {
-  const [q, pullAt, meta] = await rd([['LRANGE', P + 'q', 0, -1], ['GET', P + 'pullAt'], ['GET', P + 'meta']]);
+function hubFrom(q, pullAt, meta) {
   const ids = [];
   (q || []).forEach(s => { const j = parse(s); if (j) j.ops.forEach(x => { const id = x.row ? x.row.id : x.id; if (id) ids.push(id); }); });
   const m = parse(meta) || {};
   return { q: (q || []).length, ids: Array.from(new Set(ids)).slice(0, 500), pullAt: +pullAt || 0, err: m.err || '', dead: m.dead || 0, deadMsg: m.deadMsg || '' };
+}
+async function status() {
+  const [q, pullAt, meta] = await rd([['LRANGE', P + 'q', 0, -1], ['GET', P + 'pullAt'], ['GET', P + 'meta']]);
+  return hubFrom(q, pullAt, meta);
 }
 const setMeta = async patch => {
   const [old] = await rd([['GET', P + 'meta']]);
@@ -221,16 +224,18 @@ function bg(p) {
 // Ghi Redis và Google Sheet SONG SONG: sau khi cả hai xong, nếu Sheet đã nhận thì gỡ việc khỏi hàng đợi (LREM).
 // Sheet lỗi/bận: việc vẫn nằm trong hàng đợi (đã có trong Redis) nên drain() sẽ gửi lại như cũ. Luôn nhả khóa ở cuối, không bao giờ throw.
 async function settle(redisP, sheetP, job, sid) {
-  let rok = true;
+  let rok = true, sok = false;
   try { await redisP; } catch (e) { rok = false; }
   try {
     const j = await sheetP;
     if (j.sess === false) await sessLost(sid);
-    else if (j.ok) { if (rok) await rd([['LREM', P + 'q', '1', job]]); }
+    else if (j.ok) { sok = true; if (rok) await rd([['LREM', P + 'q', '1', job]]); }
     else if (j.net || TRANSIENT.test(j.err || '')) await setMeta({ err: j.err || 'Google Sheet đang bận' });
     // Sheet từ chối thật: giữ nguyên trong hàng đợi, drain() sẽ tách lô / chuyển sang "dead" như cũ
   } catch (e) { }
   finally { await rd([['DEL', P + 'lock']]).catch(() => { }); }
+  // Việc của request khác xếp hàng trong lúc ta giữ khóa sẽ không ai đẩy cho tới lần hỏi sau (cron chỉ chạy 1 lần/ngày): đẩy nốt ngay.
+  if (sok) { try { if (+(await rd([['LLEN', P + 'q']]))[0] > 0) await drain(sid); } catch (e) { } }
 }
 
 // ---- Chuyển thẳng sang Google Sheet (khi không có Redis, hoặc Redis lỗi trước khi ghi gì) ----
@@ -240,7 +245,7 @@ async function proxy(body) {
 }
 
 // ---- Đăng nhập: so mật khẩu ở server, giới hạn số lần thử sai ----
-const FAIL_MAX = 5, FAIL_WIN = 900, ALL_MAX = 60, ALL_WIN = 3600;   // 5 lần sai / 15 phút / IP; 60 lần sai / giờ toàn hệ thống
+const FAIL_MAX = 5, FAIL_WIN = 900, ALL_MAX = 200, ALL_WIN = 3600;   // 5 lần sai / 15 phút / IP; 200 lần sai / giờ toàn hệ thống (đủ cao để người lạ khó khóa nhầm chủ sổ)
 const memFail = new Map();
 const clientIp = auth.clientIp;
 async function failWait(ip, has) {
@@ -359,7 +364,7 @@ module.exports = async (req, res) => {
     if (body.cfg) return await cfgApi(res, body, HAS_REDIS);   // cài đặt đồng bộ giữa các thiết bị (chỉ lưu trên Redis)
     if (Array.isArray(body.ops) && body.ops.length) {          // kiểm tra giao dịch TRƯỚC khi ghi Redis hay chuyển sang Sheet
       const v = cleanOps(body.ops);
-      if (v.err) return res.status(200).json({ ok: false, err: 'Dữ liệu bị từ chối: ' + v.err });
+      if (v.err) return res.status(200).json({ ok: false, reject: true, err: 'Dữ liệu bị từ chối: ' + v.err });
       body.ops = v.ops;
     }
     if (!HAS_REDIS) return res.status(200).json(await proxy(body));
@@ -421,18 +426,28 @@ module.exports = async (req, res) => {
     }
 
     // 3) Thiết bị hỏi (poll): đọc trạng thái + hàng đợi cùng lúc; đẩy hàng đợi (nếu còn) rồi kéo thay đổi từ Sheet (nếu đến hạn); chỉ đọc lại Redis khi có gì đổi
-    let [st, hub] = await Promise.all([readState(), status()]), dirty = false;
+    // Đường nhanh: một lượt Redis duy nhất. Không có gì mới (hàng đợi rỗng, rev khớp, chưa đến hạn kéo Sheet) thì trả "same" ngay,
+    // KHÔNG đọc cả bảng giao dịch (HVALS) mỗi 10 giây như trước.
+    if (body.rev) {
+      const [q0, pa0, me0, has0, rv0, cr0, sr0] = await rd([['LRANGE', P + 'q', 0, -1], ['GET', P + 'pullAt'], ['GET', P + 'meta'], ['EXISTS', P + 'misc'], ['GET', P + 'rev'], ['GET', P + 'cfgrev'], ['GET', P + 'srev']]);
+      if (+has0 && !(q0 || []).length && sr0 && Date.now() - (+pa0 || 0) < PULL_EVERY && String(body.rev) === String(rv0 || '0'))
+        return res.status(200).json({ ok: true, same: true, rev: String(rv0 || '0'), crev: String(cr0 || '0'), hub: hubFrom(q0, pa0, me0) });
+    }
+    let hub = await status(), st = null, dirty = false;
     const sess = {};
-    if (!st) { const p = await pull(sid, true); if (p.sess === false) return res.status(200).json(sessFail()); if (p.err) return res.status(200).json({ ok: false, err: p.err }); dirty = true; }
+    const has = +(await rd([['EXISTS', P + 'misc']]))[0];
+    if (!has) { const p = await pull(sid, true); if (p.sess === false) return res.status(200).json(sessFail()); if (p.err) return res.status(200).json({ ok: false, err: p.err }); dirty = true; }
     else {
       if (hub.q) { const d = await drain(sid); if (d.sess === false) return res.status(200).json(sessFail()); dirty = true; }
       const p = await pull(sid, !body.rev);     // rev rỗng = mở app / bấm làm mới: kéo ngay từ Google Sheet
       if (p.sess === false) return res.status(200).json(sessFail());
       if (!p.skipped) dirty = true;
     }
-    if (dirty) [st, hub] = await Promise.all([readState(), status()]);
+    if (dirty) hub = await status();
+    const [rv, cr] = (await rd([['GET', P + 'rev'], ['GET', P + 'cfgrev']])).map(x => String(x || '0'));
+    if (body.rev && body.rev === rv) return res.status(200).json({ ok: true, same: true, rev: rv, crev: cr, hub });
+    st = await readState();     // chỉ đọc cả bảng giao dịch khi thật sự có thay đổi cần gửi về thiết bị
     if (!st) return res.status(200).json({ ok: false, err: 'Chưa có dữ liệu trên Redis' });
-    if (body.rev && body.rev === st.rev) return res.status(200).json({ ok: true, same: true, rev: st.rev, crev: st.crev, hub });
     return reply(res, st, hub, sess);
   } catch (e) {
     // Redis lỗi trước khi ghi gì sang Sheet: chuyển thẳng sang Google Sheet như chế độ không có Redis

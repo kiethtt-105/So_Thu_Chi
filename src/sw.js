@@ -2,7 +2,7 @@
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
 const V = 'stc-v55';
-const RT = 'stc-rt', RT_MAX = 80;   // cache nền: ảnh đính kèm, thư viện CDN (đọc ảnh HEIC / quét chữ) để dùng lại khi offline
+const RT = 'stc-rt', RT_MAX = 30;   // cache nền: ảnh đính kèm, thư viện CDN (đọc ảnh HEIC / quét chữ) để dùng lại khi offline
 const isLib = h => h === 'cdn.jsdelivr.net' || h === 'cdnjs.cloudflare.com' || h === 'unpkg.com';
 const isImg = h => h === 'drive.google.com' || /(^|\.)googleusercontent\.com$/.test(h);
 async function trim(c, max) { const ks = await c.keys(); for (let i = 0; i < ks.length - max; i++) await c.delete(ks[i]); }
@@ -50,11 +50,13 @@ self.addEventListener('fetch', e => {
       return net;
     })));
   } else if (/(^|\.)(googleapis|gstatic)\.com$/.test(u.hostname)) {
-    e.respondWith(caches.open(V).then(c => c.match(r).then(hit => {
+    // Font: cache ở RT (không bị xóa mỗi lần deploy), có bản thì dùng ngay; offline mà chưa có thì báo lỗi mạng thay vì trả undefined
+    e.respondWith(caches.open(RT).then(c => c.match(r).then(hit => {
       const net = fetch(r)
-        .then(res => { if (res.ok || res.type === 'opaque') c.put(r, res.clone()); return res; })
-        .catch(() => hit);
-      return hit || net;
+        .then(res => { if (res.ok || res.type === 'opaque') { c.put(r, res.clone()); e.waitUntil(trim(c, RT_MAX)); } return res; })
+        .catch(() => hit || Response.error());
+      if (hit) { e.waitUntil(net); return hit; }
+      return net;
     })));
   }
 });
@@ -117,16 +119,19 @@ async function toB64(blob) {
   return btoa(s);
 }
 async function obPost(body) {
-  if (!CFG.STORE) { const x = new Error('Thiếu cấu hình máy chủ'); x.net = true; throw x; }
+  // offline = lỗi chung (mất mạng / hết phiên / Redis lỗi): dừng cả đợt gửi. Không có offline = lỗi riêng của việc này: bỏ qua, giữ lại, làm tiếp việc khác.
+  const fail = (msg, f) => Object.assign(new Error(msg), f);
+  if (!CFG.STORE) throw fail('Thiếu cấu hình máy chủ', { net: true, offline: true });
   let r, j;
   try { r = await fetch(CFG.STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify(body) }); }
-  catch (e) { const x = new Error('Không có kết nối mạng'); x.net = true; throw x; }
-  try { j = await r.json(); } catch (e) { const x = new Error('Lỗi máy chủ'); x.net = true; throw x; }
+  catch (e) { throw fail('Không có kết nối mạng', { net: true, offline: true }); }
+  try { j = await r.json(); } catch (e) { throw fail('Lỗi máy chủ', { net: true }); }
   // Chưa đăng nhập / hết phiên / máy chủ lỗi: KHÔNG bỏ thay đổi, giữ lại và gửi sau khi đăng nhập lại
-  if (j.auth || j.hubErr) { const x = new Error(j.err || 'Chưa đăng nhập hoặc máy chủ lỗi'); x.net = true; throw x; }
+  if (j.auth || j.hubErr) throw fail(j.err || 'Chưa đăng nhập hoặc máy chủ lỗi', { net: true, offline: true });
   if (!j.ok) {
-    const x = new Error(j.err || 'Lỗi máy chủ');
-    if (/chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i.test(j.err || '')) x.net = true;
+    const x = fail(j.err || 'Lỗi máy chủ', {});
+    if (j.reject) x.reject = true;
+    else if (/chờ khóa|giữ khóa|lock|đang bận|busy|time(d)? ?out|quá tải|too many|tạm thời|temporar|unavailable|service invoked/i.test(j.err || '')) { x.net = true; x.offline = true; }
     throw x;
   }
   return j;
@@ -134,13 +139,17 @@ async function obPost(body) {
 async function obSend(job) {
   const files = job.files || [];
   job.urls = job.urls || [];
-  const start = job.urls.length, res = job.urls.slice();
-  if (start < files.length) {
-    await Promise.all(files.map(async (f, i) => {
-      if (i < start) return;
-      const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } }); res[i] = j.url;
-    }));
-    job.urls = res.filter(Boolean);
+  if (job.urls.length < files.length) {
+    // Tải tuần tự, lưu ngay sau từng ảnh: lỗi giữa chừng không phải tải lại ảnh đã xong (tránh ảnh trùng trên Drive)
+    const done = job.done || (job.done = {});
+    job.urls.forEach((u, i) => { if (done[i] == null) done[i] = u; });
+    for (let i = 0; i < files.length; i++) {
+      if (done[i]) continue;
+      const f = files[i];
+      const j = await obPost({ img: { name: f.name, mime: 'image/jpeg', data: await toB64(f.blob) } });
+      done[i] = j.url; await obPut(job);
+    }
+    job.urls = files.map((_, i) => done[i]).filter(Boolean);
     await obPut(job);
   }
   let ops = job.ops;
@@ -157,21 +166,21 @@ function obNote(body) {
 let flushing = null;
 function obFlush() { return flushing || (flushing = obRun().finally(() => { flushing = null; })); }
 async function obRun() {
-  let sent = 0;
+  const skip = new Set();   // việc lỗi riêng trong lượt này: bỏ qua, KHÔNG xóa (app sẽ xử lý và báo lỗi khi mở lại), không chặn các việc sau
   for (let round = 0; round < 10; round++) {
     const { jobs, beats } = await obLoad();
-    if (!jobs.length) break;
-    const ready = jobs.filter(j => Date.now() - (beats[j.id] || 0) > HB);
+    const todo = jobs.filter(j => !skip.has(j.id));
+    if (!todo.length) break;
+    const ready = todo.filter(j => Date.now() - (beats[j.id] || 0) > HB);
     if (!ready.length) { await new Promise(r => setTimeout(r, 3000)); continue; }
     for (const job of ready) {
       await obBeat(job.id);
       const t = setInterval(() => obBeat(job.id), 3000);
-      try { await obSend(job); await obDel(job.id); sent++; }
+      try { await obSend(job); await obDel(job.id); }
       catch (err) {
         clearInterval(t); await obUnbeat(job.id);
-        if (err.net) throw err;                 // lỗi mạng / chưa đăng nhập: giữ trong hàng đợi, thử lại sau
-        await obDel(job.id);                    // máy chủ từ chối thật: bỏ việc này để không chặn các việc sau
-        obNote('Một thay đổi bị máy chủ từ chối: ' + err.message);
+        if (err.offline) throw err;             // mất mạng / hết phiên / Redis lỗi: giữ hết trong hàng đợi, thử lại sau
+        skip.add(job.id);                       // lỗi riêng của việc này (kể cả bị từ chối): giữ nguyên, làm việc khác
         continue;
       }
       clearInterval(t);

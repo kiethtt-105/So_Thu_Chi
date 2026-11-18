@@ -182,7 +182,7 @@ async function call(ops, rev, ms, fast) {
     }
     catch (e) {
         const x = Error('Lỗi máy chủ. Kiểm tra lại cấu hình kết nối');
-        x.net = true;
+        x.net = true; x.srv = true;   // máy chủ có trả lời nhưng không phải JSON (413 / 504 / trang lỗi): đếm để không thử lại vô hạn
         throw x;
     }
     if (j.auth) {   // cookie đăng nhập hết hạn: về màn hình mật khẩu, thay đổi chưa gửi được giữ lại và gửi tiếp sau khi đăng nhập
@@ -203,6 +203,8 @@ async function call(ops, rev, ms, fast) {
         if (/Thao tác không hợp lệ/i.test(j.err || ''))
             throw Error('Sai phiên làm việc. Vui lòng tải lại trang');
         const x = Error(j.err || 'Lỗi máy chủ');
+        if (j.reject)
+            x.reject = true;   // máy chủ từ chối dữ liệu thật sự: thử lại vô ích
         if (TRANSIENT_RE.test(j.err || ''))
             x.retry = true;
         throw x;
@@ -1698,7 +1700,7 @@ const catOk = (t, p, c) => S.cat.some(x => x.t === t && x.p === p && x.c === c);
 function txSave(row, okMsg, files) {
     const prev = S.tx.find(t => t.id === row.id), old = prev && { ...prev }, isNew = !prev;
     return commit([{ op: 'tx.save', row }], {
-        pend: isNew ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…', ok: () => txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx', files: files && files.length ? files : null,
+        pend: isNew ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…', ok: () => txMsg(row), title: isNew ? 'Giao dịch đã được tạo' : 'Giao dịch đã được cập nhật', ico: isNew ? '🧾' : '✏️', tag: 'tx-' + row.id, kind: 'tx', dk: txKey(row), files: files && files.length ? files : null,
         local: () => { S.tx = prev ? S.tx.map(t => t.id === row.id ? row : t) : S.tx.concat(row); },
         undo: () => commit(old ? [{ op: 'tx.save', row: old }] : [{ op: 'tx.purge', id: row.id }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(t => t.id !== row.id); if (old)
                 S.tx.push(old); } })
@@ -1710,7 +1712,7 @@ function txDel(id) {
     if (!found) return Promise.resolve({ ok: false });
     const old = { ...found };
     return commit([{ op: 'tx.del', id }], {
-        pend: 'Đang xóa giao dịch…', ok: () => 'Đã chuyển vào Thùng rác\n' + txMsg(old, true), title: 'Giao dịch đã được xóa', ico: '🗑️', tag: 'tx-' + id, kind: 'tx', local: () => { S.tx = S.tx.filter(x => x.id !== id); },
+        pend: 'Đang xóa giao dịch…', ok: () => 'Đã chuyển vào Thùng rác\n' + txMsg(old, true), title: 'Giao dịch đã được xóa', ico: '🗑️', tag: 'tx-' + id, kind: 'tx', dk: txKey(old), local: () => { S.tx = S.tx.filter(x => x.id !== id); },
         undo: () => {
             const tr = S.trash.find(t => t.k === 'gd' && t.id === id);
             return commit(tr ? [{ op: 'restore', at: tr.at, kind: 'gd' }, { op: 'tx.save', row: old }] : [{ op: 'tx.save', row: old }], { ok: 'Đã hoàn tác', local: () => { S.tx = S.tx.filter(x => x.id !== id).concat(old); } });
@@ -2385,7 +2387,7 @@ const txMsgs = (L, cur) => { const mx = cfg().adv.max || 3; return L.slice(0, mx
 function notifyChanges(nw, up, del) {
     del = del || [];
     const pack = (L, one, many, ico, cur) => {
-        notify(txMsgs(L, cur), { title: L.length === 1 ? one : L.length + ' ' + many, ico, tag: 'sync-' + ico, kind: 'sync', bg: true, tab: 'tx' });
+        notify(txMsgs(L, cur), { title: L.length === 1 ? one : L.length + ' ' + many, ico, tag: 'sync-' + ico, kind: 'sync', bg: true, tab: 'tx', dk: L.map(txKey).sort().join(',') });
     };
     if (nw.length) pack(nw, 'Giao dịch đã được tạo', 'giao dịch đã được tạo', '🧾');
     if (up.length) pack(up, 'Giao dịch đã được cập nhật', 'giao dịch đã được cập nhật', '✏️');
@@ -3719,13 +3721,15 @@ document.addEventListener('pointermove', e => {
         c.style.setProperty('--my', e.clientY - r.top + 'px');
     });
 }, { passive: true });
-async function tgSend(title, text, silent, nodup) {
+// Khóa chống trùng theo NỘI DUNG giao dịch (mã + số tiền + ngày...): hai khoản khác nhau nhưng cùng chữ vẫn được gửi, còn nhiều máy báo cùng một giao dịch thì chỉ một tin đi.
+const txKey = t => [t.id, Math.round(Number(t.amount) || 0), t.date, t.type, t.acc, t.accTo || '', t.sub || t.cat || ''].join(':');
+async function tgSend(title, text, silent, nodup, dk) {
     const t = cfg().tg, pfx = String(t.pfx || '').trim(), tries = t.retry === false ? 1 : 3;
     let last = { ok: false, err: 'Không có kết nối mạng' };
     for (let i = 0; i < tries; i++) {
         if (i) await new Promise(r => setTimeout(r, 1500 * i));
         try {
-            const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: (pfx ? pfx + ' ' : '') + title + '\n' + String(text || ''), silent: !!silent, nodup: !!nodup }) });
+            const r = await fetch('/api/telegram', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: (pfx ? pfx + ' ' : '') + title + '\n' + String(text || ''), silent: !!silent, nodup: !!nodup, dk: String(dk || '') }) });
             let j = {};
             try {
                 j = await r.json();
@@ -3745,19 +3749,19 @@ async function tgSend(title, text, silent, nodup) {
     }
     return last;
 }
-function tgPush(kind, title, text, silent) {
+function tgPush(kind, title, text, silent, dk) {
     const t = cfg().tg;
     if (!kind || !/^https?:$/.test(location.protocol) || !t.on || t.kinds[kind] === false)
         return;
     try {
-        const key = title + '|' + text, now = Date.now(), m = JSON.parse(localStorage.tgdup || '{}');
+        const key = title + '|' + text + '|' + (dk || ''), now = Date.now(), m = JSON.parse(localStorage.tgdup || '{}');
         for (const k in m) if (now - m[k] > 8000) delete m[k];
         if (m[key]) return;
         m[key] = now;
         localStorage.tgdup = JSON.stringify(m);
     }
     catch (e) { }
-    tgSend(title, text, silent);
+    tgSend(title, text, silent, false, dk);
 }
 if (typeof notify === 'function') {
     const _notify = notify;
@@ -3766,7 +3770,7 @@ if (typeof notify === 'function') {
         if (fxOn() && !o.bg) { o.err ? sfx.err() : sfx.ok(); }
         const r = _notify.apply(this, arguments);
         if (!o.kind || kindOn(o.kind))
-            tgPush(o.kind, (o.ico ? o.ico + ' ' : '') + (o.title || 'Sổ Thu Chi'), body, inQuiet());
+            tgPush(o.kind, (o.ico ? o.ico + ' ' : '') + (o.title || 'Sổ Thu Chi'), body, inQuiet(), o.dk);
         return r;
     };
 }
@@ -3930,9 +3934,11 @@ function overlayParked() {
         else if (x.op === 'tx.del' || x.op === 'tx.purge') S.tx = S.tx.filter(t => t.id !== x.id);
     }));
 }
-// Gửi cho tới khi thành công. Mất mạng / máy chủ bận: thử lại mãi. Lỗi lạ: thử lại nhiều lần rồi "cất" lại (không bỏ), tự gửi lại nền.
+// Gửi cho tới khi thành công. Mất mạng / máy chủ bận: thử lại. Máy chủ trả lỗi lạ liên tục (không phải JSON): tối đa 8 lần.
+// Máy chủ TỪ CHỐI thật (e.reject): báo lỗi ngay, hoàn lại dữ liệu, không thử lại, không báo "Đã lưu" giả.
+// Lỗi lạ khác với thao tác an toàn: thử vài lần rồi "cất" lại (không bỏ), tự gửi lại nền.
 async function runJob(job, ops, safe) {
-    let attempt = 0, odd = 0;
+    let attempt = 0, odd = 0, srv = 0, amb = false;   // amb: đã có lần gửi mà không biết máy chủ nhận chưa (mất phản hồi)
     for (; ;) {
         if (job.x) throw cancelErr();
         try {
@@ -3946,43 +3952,56 @@ async function runJob(job, ops, safe) {
             if (e.cancel || job.x) throw e.cancel ? e : cancelErr();
             attempt++;
             if (e.net || e.retry) {
-                if (e.net) { OB.net = true; oflSet(); }
+                if (e.net) { OB.net = true; amb = true; oflSet(); }
+                if (e.srv && ++srv >= 8) { if (!safe) throw e; return { parked: true }; }
                 await waitNet(Math.min(1500 * attempt, 15000) + Math.floor(Math.random() * 1000));
                 continue;
             }
+            if (e.reject) throw e;
             if (!safe) {
-                if (attempt === 1) throw e;
-                return { ok: true, fast: true };
+                if (!amb) throw e;                 // chưa từng gửi mơ hồ: đây là lỗi thật, báo cho người dùng
+                return { ok: true, fast: true };   // lần gửi trước có thể đã tới nơi: lỗi "trùng..." là do chính nó gây ra
             }
             if (++odd >= 6) return { parked: true };
             await waitNet(Math.min(3000 * odd, 20000));
         }
     }
 }
+// Tải ảnh tối đa 2 luồng; lưu URL ngay sau MỖI ảnh xong (job.done) nên lỗi giữa chừng không phải tải lại ảnh đã xong.
 async function upStaged(job) {
-    const n = job.files.length, start = job.urls.length;
-    if (start >= n) return job.urls;
-    const res = job.urls.slice();
-    await Promise.all(job.files.map(async (f, i) => {
-        if (i < start) return;
-        for (let k = 1; ; k++) {
-            if (job.x) throw cancelErr();
-            try { const j = await driveUp(f.blob, f.name); res[i] = j.url; return; }
-            catch (e) {
-                if (!e.net) throw e;
-                OB.net = true; oflSet();
-                await waitNet(Math.min(2000 * k, 20000));
+    const n = job.files.length;
+    if (job.urls.length >= n) return job.urls;
+    const done = job.done || (job.done = {});
+    job.urls.forEach((u, i) => { if (done[i] == null) done[i] = u; });
+    let k = 0;
+    const work = async () => {
+        try {
+            while (k < n) {
+                const i = k++;
+                if (done[i]) continue;
+                const f = job.files[i];
+                for (let t = 1; ; t++) {
+                    if (job.x) throw cancelErr();
+                    try { const j = await driveUp(f.blob, f.name); done[i] = j.url; idb.put(job); break; }
+                    catch (e) {
+                        if (!e.net) throw e;
+                        OB.net = true; oflSet();
+                        await waitNet(Math.min(2000 * t, 20000));
+                    }
+                }
             }
         }
-    }));
-    job.urls = res.filter(Boolean);
+        catch (e) { k = n; throw e; }
+    };
+    await Promise.all([work(), work()]);
+    job.urls = job.files.map((_, i) => done[i]).filter(Boolean);
     idb.put(job);
     return job.urls;
 }
 function commit(ops, o = {}) {
     ops.forEach(x => { if (x.op === 'tx.save' && x.row) x.row.amount = Math.round(Number(x.row.amount) || 0); });   // số tiền luôn nguyên
     const pend = o.pend || 'Đang lưu…', safe = ops.every(x => SAFE_OPS.has(x.op));
-    const job = { id: o.jid || 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ops, pend, files: o.files || null, urls: o.urls || [], t: Date.now() };
+    const job = { id: o.jid || 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ops, pend, files: o.files || null, urls: o.urls || [], done: o.done || null, park: o.park || 0, t: Date.now() };
     OB.parked.delete(job.id);
     if (!OB.n) OB.base = { tx: S.tx.slice(), acc: S.acc.slice(), cat: S.cat.slice(), lim: S.lim.slice(), trash: S.trash.slice() };
     job.x = false; OB.jobs[job.id] = job;
@@ -4002,12 +4021,20 @@ function commit(ops, o = {}) {
         let res = { ok: true }, fast = false, parked = false, taken = false;
         if (job.x) { endHb(); delete OB.jobs[job.id]; OB.ids.delete(job.id); S.busy--; OB.n--; txDone(job, false); barUpdate(); return { ok: false, err: 'Đã hủy', cancel: true }; }
         if (safe && job.persisted && !(await idb.get(job.id))) taken = true;
-        const okNote = () => { if (o.quiet) return; notify((typeof o.ok === 'function' ? o.ok() : o.ok) || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind }); };
+        const okNote = () => { if (o.quiet) return; notify((typeof o.ok === 'function' ? o.ok() : o.ok) || 'Đã lưu', { undo: o.undo, title: o.title, ico: o.ico, tag: o.tag, kind: o.kind, dk: o.dk }); };
         try {
             if (taken) { fast = true; okNote(); }
             else {
                 const j = await runJob(job, ops, safe);
-                if (j.parked) { parked = true; OB.parked.set(job.id, ops); okNote(); }
+                if (j.parked) {
+                    job.park = (job.park || 0) + 1;
+                    if (job.park >= 5) {   // đã cất và thử lại 5 đợt vẫn không được: dừng, báo thật và hoàn lại dữ liệu theo sổ
+                        res = { ok: false, err: 'Không gửi được sau nhiều lần thử' };
+                        toast('Một thay đổi không gửi được sau nhiều lần thử và đã bị bỏ. Hãy kiểm tra lại sổ.');
+                        try { apply(await call([], '')); } catch (_) { }
+                    }
+                    else { parked = true; OB.parked.set(job.id, ops); idb.put(job); toast('Chưa lưu được lên máy chủ, app sẽ tự thử lại ở nền'); }
+                }
                 else { if (j.fast) fast = true; else apply(j); okNote(); }
             }
         }
@@ -4016,6 +4043,7 @@ function commit(ops, o = {}) {
             else {
                 // Máy chủ từ chối thật sự (vd trùng tên): hoàn lại dữ liệu và báo ngay trong cửa sổ đang mở
                 res = { ok: false, err: e.message };
+                toast('Không lưu được: ' + e.message);
                 try { apply(await call([], '')); } catch (_) { }
             }
         }
@@ -4038,7 +4066,7 @@ async function resumeOutbox(tries) {
     if (busy.length && tries < 8) setTimeout(() => resumeOutbox(tries + 1), 5000);
     const js = mine.filter(j => !busy.includes(j)).sort((a, b) => a.t - b.t);
     js.forEach(j => commit(j.ops, {
-        jid: j.id, quiet: true, files: j.files, urls: j.urls, noPersist: true,
+        jid: j.id, quiet: true, files: j.files, urls: j.urls, done: j.done, park: j.park, noPersist: true,
         local: () => j.ops.forEach(x => { if (x.op === 'tx.save') S.tx = S.tx.filter(t => t.id !== x.row.id).concat(x.row); else if (x.op === 'tx.del' || x.op === 'tx.purge') S.tx = S.tx.filter(t => t.id !== x.id); })
     }));
 }
@@ -4483,17 +4511,18 @@ async function scanMany(fs) {
     if (fs.length === 1) return scanImg(fs[0]);
     const ctl = E0.ctl = new AbortController(), out = [];
     let k = 0, done = 0, bad = 0;
+    const errs = new Set();   // lý do AI lỗi (hết hạn mức, quá tải...) để báo đúng thay vì chỉ nói "không đọc được"
     const show = () => { E0.scan = 'Đang đọc ' + done + '/' + fs.length + ' ảnh…'; if (E === E0) renderScan(); };
     E0.review = E0.batch = null; show();
     const work = async () => {
         while (k < fs.length && !ctl.signal.aborted) {
             const i = k++;
-            try { const r = await readOne(fs[i], ctl.signal, { batch: true }); if (r.d && !r.notDoc) out[i] = r; else bad++; }
+            try { const r = await readOne(fs[i], ctl.signal, { batch: true }); if (r.d && !r.notDoc) out[i] = r; else { bad++; if (r.aiErr) errs.add(r.aiErr); } }
             catch (e) { if (e.cancel) return; bad++; }
             done++; show();
         }
     };
-    await Promise.all([work(), work(), work()]);
+    await Promise.all([work(), new Promise(r => setTimeout(r, 700)).then(work)]);   // 2 luồng, lệch nhau một nhịp: đỡ chạm hạn mức AI
     const cancelled = ctl.signal.aborted;
     E0.scan = ''; E0.ctl = null;
     const items = out.filter(Boolean).map(r => {
@@ -4504,7 +4533,7 @@ async function scanMany(fs) {
     if (E !== E0) { toast('Đã đọc xong ' + items.length + ' ảnh nhưng form đã đóng'); return; }
     if (cancelled) toast('Đã hủy quét');
     else if (!items.length) toast('Không đọc được ảnh nào, bạn thử lại hoặc nhập tay nhé');
-    else if (bad) toast('Có ' + bad + ' ảnh không đọc được hoặc không phải hóa đơn');
+    else if (bad) toast('Có ' + bad + ' ảnh không đọc được hoặc không phải hóa đơn' + (errs.size ? ' · ' + [...errs][0] : ''));
     E0.batch = items.length ? items : null;
     renderScan();
 }
