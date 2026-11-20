@@ -549,12 +549,11 @@ function showPw(focus) {   // chuyển sang nhập mật khẩu; hủy hộp pas
 async function pkProbe(auto) {
     if (!PK_OK) { RC.remove('pkh', 'pkm'); return; }
     const cached = pkFlag();
-    RC.toggle('pkh', cached); pkMode(cached);
-    if (cached && auto && !$('#login').classList.contains('hide')) pkLogin();
+    RC.toggle('pkh', cached); pkMode(false);   // luôn ưu tiên mật khẩu; passkey chỉ là nút phụ bên dưới, không tự bật hộp passkey
     const j = await accCall({ act: 'has' });   // kiểm tra lại ở nền, KHÔNG đổi giao diện nếu đang đúng
     if (!(j && j.ok)) return;                  // lỗi mạng: giữ nguyên
-    pkSet(j.has);                              // lần đầu biết có passkey: chỉ ghi nhớ, lần mở sau mới đổi giao diện (tránh giật)
-    if (!j.has) { RC.remove('pkh'); if (RC.contains('pkm')) showPw(!$('#login').classList.contains('hide')); }
+    pkSet(j.has);
+    RC.toggle('pkh', !!j.has);                 // có passkey thì hiện nút phụ ngay (giao diện mật khẩu không bị đổi nên không giật)
 }
 async function pkLogin() {
     if (PK_BUSY || LOGIN_BUSY) return;
@@ -614,7 +613,7 @@ document.addEventListener('click', async e => {
     }
 });
 { const pb = $('#pkb'); if (pb) pb.onclick = pkLogin; const pl = $('#pwlink'); if (pl) pl.onclick = () => showPw(true); }
-if (!alive()) { if (!(PK_OK && pkFlag())) { const p = $('#pw'); p && p.focus(); } pkProbe(true); }
+if (!alive()) { const p = $('#pw'); p && p.focus(); pkProbe(true); }
 function setUser() {
     const n = String(NAME || '').trim(), ini = Array.from(n)[0] || '';
     $$('.usr').forEach(e => e.classList.toggle('hide', !n));

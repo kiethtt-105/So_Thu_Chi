@@ -5,18 +5,41 @@ const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 
 // Nhiều thiết bị cùng mở sẽ cùng gửi một thông báo: chỉ cho tin ĐẦU TIÊN đi trong 90 giây.
-// Bỏ qua các dòng số dư (💰) và giờ tạo (🕒) vì mỗi máy tính ra hơi khác nhau. Redis lỗi thì cứ gửi (không chặn nhầm).
+// Bỏ qua các dòng số dư (💰) và giờ tạo (🕒) vì mỗi máy tính ra hơi khác nhau.
+// Không có Redis: chống trùng trong bộ nhớ của instance (cùng cách với giới hạn đăng nhập ở store.js). Tốt nhất có thể, không bền giữa các lần khởi động.
+const memTg = new Map();
+function memFirst(key) {
+  const now = Date.now();
+  for (const [k, t] of memTg) if (now - t > 90000) memTg.delete(k);
+  if (memTg.has(key)) return false;
+  memTg.set(key, now);
+  return true;
+}
+// Hỏi Apps Script (Code.gs: dedupe_) xem tin này đã được gửi trong 90 giây qua chưa. Trả về true/false, hoặc null nếu không hỏi được / Code.gs chưa cập nhật.
+async function gsFirst(key) {
+  const api = env('APP_API'), k = env('APP_KEY');
+  if (!api || !k) return null;
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 8000);
+  try {
+    const r = await fetch(api, { method: 'POST', signal: ac.signal, body: JSON.stringify({ key: k, dedupe: key }) });
+    const j = JSON.parse(await r.text());
+    return j && j.ok && typeof j.first === 'boolean' ? j.first : null;
+  } catch (e) { return null; } finally { clearTimeout(tm); }
+}
 async function firstOf(text, dk) {
-  if (!RU || !RT) return true;
   const norm = text.split('\n').filter(l => !/^(💰|🕒)/u.test(l.trim())).join('\n');
   // Có dk (khóa theo nội dung giao dịch): dedupe theo dk + tiêu đề, nên hai khoản khác nhau cùng chữ vẫn được gửi. Không có: theo nội dung như cũ.
   const base = dk ? 'k|' + dk + '|' + text.split('\n')[0] : norm;
   const key = 'stc:tgd:' + crypto.createHash('sha1').update(base).digest('hex');
+  const g = await gsFirst(key);   // ưu tiên Apps Script: dùng chung cho mọi instance Vercel, không cần Redis
+  if (g !== null) return g;
+  if (!RU || !RT) return memFirst(key);
   try {
     const r = await fetch(RU + '/pipeline', { method: 'POST', headers: { Authorization: 'Bearer ' + RT, 'Content-Type': 'application/json' }, body: JSON.stringify([['SET', key, '1', 'NX', 'EX', '90']]) });
     const j = await r.json();
-    return !(Array.isArray(j) && j[0] && !j[0].error && j[0].result === null);
-  } catch (e) { return true; }
+    if (!Array.isArray(j) || !j[0] || j[0].error) return memFirst(key);   // Redis lỗi: quay về bộ nhớ
+    return j[0].result !== null;
+  } catch (e) { return memFirst(key); }
 }
 
 
