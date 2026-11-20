@@ -13,9 +13,11 @@
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Sổ Thu Chi">
 <link rel="stylesheet" href="style.css">
 </head><body>
+<noscript><p style="padding:32px;font:16px system-ui">Sổ Thu Chi cần bật JavaScript để hoạt động.</p></noscript>
 <section id="login"><form id="lf"><div class="logo pic"><img src="icons/icon.png" alt="" draggable="false"></div>
 <h1>Sổ Thu Chi</h1><p id="lgreet">Nhập mật khẩu để mở sổ</p>
-<div class="pwf"><input id="pw" type="password" autocomplete="current-password" placeholder="Mật khẩu" aria-label="Mật khẩu"><button type="button" id="pwt" aria-label="Hiện mật khẩu" aria-pressed="false" title="Hiện / ẩn mật khẩu"></button></div>
+<div class="pwf"><input id="pw" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="Mật khẩu" aria-label="Mật khẩu"><button type="button" id="pwt" aria-label="Hiện mật khẩu" aria-pressed="false" title="Hiện / ẩn mật khẩu"></button></div>
+<div id="lcaps" role="status" hidden>⇪ Đang bật Caps Lock</div>
 <div id="lerr" role="alert"></div>
 <button class="go" id="lb">Mở sổ</button>
 <button type="button" id="pkb" hidden><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg><span>Mở sổ bằng passkey</span></button>

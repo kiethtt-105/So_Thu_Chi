@@ -187,7 +187,7 @@ async function call(ops, rev, ms, fast) {
     }
     if (j.auth) {   // cookie đăng nhập hết hạn: về màn hình mật khẩu, thay đổi chưa gửi được giữ lại và gửi tiếp sau khi đăng nhập
         if (Date.now() - LOGOUT_ALL_AT < 10000) { const w = Error('Đang cập nhật phiên, thử lại sau giây lát'); w.net = true; throw w; }   // yêu cầu đã gửi bằng cookie cũ ngay lúc đăng xuất tất cả: đừng tự khóa máy này
-        lock();
+        lockExpired();
         const x = Error('Phiên đăng nhập đã hết hạn, hãy nhập lại mật khẩu');
         x.net = true;
         throw x;
@@ -493,6 +493,8 @@ $('#lf').onsubmit = async ev => {
     if (!pw || LOGIN_BUSY) return;
     if (!STORE) { $('#lerr').textContent = 'Thiếu file config.js'; return; }
     LOGIN_BUSY = true;
+    const lb = $('#lb'), lbt = lb.textContent;
+    lb.disabled = true; lb.textContent = 'Đang mở sổ…'; $('#lerr').textContent = '';   // báo đang xử lý: máy chủ khởi động nguội có thể mất vài giây
     let j;
     try {
         const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: pw }) });
@@ -500,7 +502,7 @@ $('#lf').onsubmit = async ev => {
         catch (e) { j = { ok: false, net: true, err: 'Máy chủ trả lỗi ' + r.status + (r.status === 404 ? ' (không thấy /api/store, kiểm tra thư mục api/ và deploy lại)' : ' (xem Logs trên Vercel)') }; }
     }
     catch (e) { j = { ok: false, net: true, err: 'Không kết nối được máy chủ' }; }
-    LOGIN_BUSY = false;
+    LOGIN_BUSY = false; lb.disabled = false; lb.textContent = lbt;
     if (j.ok) {
         try { sessionStorage.sess = Date.now(); } catch (e) { }
         touch();
@@ -514,6 +516,12 @@ $('#lf').onsubmit = async ev => {
         $('#pw').select();
     }
 };
+{   // gợi ý Caps Lock + xóa lỗi cũ khi bắt đầu gõ lại
+    const pw = $('#pw'), cp = $('#lcaps');
+    const caps = e => { if (cp && e.getModifierState) cp.hidden = !e.getModifierState('CapsLock'); };
+    if (pw) { pw.addEventListener('keydown', caps); pw.addEventListener('keyup', caps); pw.addEventListener('blur', () => { if (cp) cp.hidden = true; }); pw.addEventListener('input', () => { $('#lerr').textContent = ''; }); }
+}
+const lockExpired = () => { lock(); const le = $('#lerr'); if (le) le.textContent = 'Phiên đăng nhập đã hết hạn, hãy nhập lại mật khẩu'; };
 // ===== Passkey (WebAuthn): đăng nhập nhanh, gọi /api/account =====
 const ACC = STORE ? STORE.replace(/[^/]*$/, 'account') : '';
 const PK_OK = !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
@@ -524,7 +532,7 @@ async function accCall(body) {
     try {
         const r = await fetch(ACC, { method: 'POST', credentials: 'same-origin', body: JSON.stringify(body) });
         let j; try { j = await r.json(); } catch (e) { return { ok: false, err: 'Máy chủ trả lỗi ' + r.status }; }
-        if (j.auth) lock();
+        if (j.auth) lockExpired();
         return j;
     } catch (e) { return { ok: false, err: 'Không kết nối được máy chủ' }; }
 }
@@ -855,8 +863,20 @@ function balPlan(L) {
     const mv = (f, t, v) => { T.push({ from: f.n, to: t.n, amount: v }); f.d -= v; t.d -= v; };
     neg.forEach(f => { const t = pos.find(p => p.d === f.d && f.d > 0); if (t) mv(f, t, f.d); });
     // Không ghép một phần: trước đây thiếu 15.000 + dư 328 bị ghép thành "chuyển 328", để lại điều chỉnh lẻ 14.672. Chỉ gợi ý chuyển khoản khi hai số bằng nhau đúng từng đồng.
+    // Một nơi thiếu = tổng hai nơi dư (hoặc ngược lại): chia thành hai khoản chuyển, vẫn đúng từng đồng
+    const pairs = (A, B, one, tos) => { A.forEach(a => { if (a.d <= 0) return; for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) { const x = B[i], y = B[j]; if (x.d > 0 && y.d > 0 && x.d + y.d === a.d) { one(a, x, x.d); one(a, y, y.d); return; } } }); };
+    pairs(neg, pos, (f, t, v) => mv(f, t, v));
+    pairs(pos, neg, (t, f, v) => mv(f, t, v));
     const A = neg.filter(x => x.d > 0).map(x => ({ n: x.n, d: -x.d })).concat(pos.filter(x => x.d > 0).map(x => ({ n: x.n, d: x.d })));
     return { T, A };
+}
+// Đoán nguyên nhân số lẻ: trùng đúng số tiền với một giao dịch gần đây của chính tài khoản đó
+function reconHint(name, d) {
+    const amt = Math.abs(d), lim = Date.now() - 60 * 864e5;
+    const t = S.tx.filter(x => (x.acc === name || x.accTo === name) && Math.round(+x.amount) === amt && Date.parse(x.date) >= lim && (x.type === 'Chi' || x.type === 'Thu')).sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (!t) return '';
+    const lb = noteTxt(t.note) || t.sub || t.cat || t.type;
+    return '💡 Trùng số tiền với ' + t.type + ' “' + esc(lb) + '” ngày ' + t.date.slice(8) + '/' + t.date.slice(5, 7) + ': xem có ghi 2 lần hoặc ghi nhầm không';
 }
 function recon() {
     const D = diffs();
@@ -880,14 +900,20 @@ function reconUpdate() {
     let h = '';
     if (bad.length) {
         if (PL.T.length) h += '<div class="ch" style="margin-top:0">Gợi ý chuyển khoản <small>không bắt buộc</small></div>' + PL.T.map((t, i) => rowH('⇄', esc(t.from) + ' → ' + esc(t.to), num(t.amount), 't:' + i, 'Ghi')).join('') + '<p class="note">Một nơi thiếu và một nơi dư đúng cùng số tiền thường là do đã chuyển giữa hai nơi mà chưa ghi sổ. Không đúng thì bỏ qua, không sao cả.</p>';
-        if (PL.A.length) h += '<div class="ch"' + (PL.T.length ? '' : ' style="margin-top:0"') + '>Còn lệch, chưa rõ lý do</div>' + PL.A.map((x, i) => rowH('⚖️', esc(x.n), sgn(x.d), 'a:' + i, 'Ghi điều chỉnh')).join('') + '<p class="note"><b>Điều chỉnh</b> chỉ sửa số dư của đúng 1 tài khoản cho khớp thực tế, không tính là thu hay chi. <b>Chuyển khoản</b> là tiền đi từ tài khoản này sang tài khoản kia, tổng tiền không đổi.</p>';
+        if (PL.A.length) h += '<div class="ch"' + (PL.T.length ? '' : ' style="margin-top:0"') + '>Còn lệch, chưa rõ lý do</div>' + PL.A.map((x, i) => rowH('⚖️', esc(x.n), sgn(x.d) + (reconHint(x.n, x.d) ? '<br>' + reconHint(x.n, x.d) : ''), 'a:' + i, 'Ghi điều chỉnh')).join('') + '<p class="note"><b>Điều chỉnh</b> chỉ sửa số dư của đúng 1 tài khoản cho khớp thực tế, không tính là thu hay chi. <b>Chuyển khoản</b> là tiền đi từ tài khoản này sang tài khoản kia, tổng tiền không đổi.</p>';
         if (cnt > 1) h += '<button type="button" class="btn p w" data-bdo="all">Ghi tất cả (' + cnt + ')</button>';
     } else h += has.length ? empty('Đã khớp', 'Số dư thực tế trùng với hệ thống.') : '<p class="mut" style="margin-bottom:6px">Nhập số dư thực tế ở bên trái để so với sổ.</p>';
-    $('#rbtn').innerHTML = h + '<button type="button" class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>';
+    const miss = D.some(x => !x.has);
+    $('#rbtn').innerHTML = (miss ? '<button type="button" class="btn w" data-bdo="fill" style="margin-bottom:12px">✓ Điền sẵn số hệ thống vào ô còn trống</button>' : '') + h + '<button type="button" class="btn w" data-bdo="form">Chuyển tiền giữa các tài khoản</button>';
 }
 async function doBal(k) {
     if (k === 'form')
         return openForm(null, 'Chuyển khoản');
+    if (k === 'fill') {   // chỉ cần sửa tài khoản nào lệch, khỏi gõ lại những tài khoản đã khớp
+        S.acc.forEach((a, i) => { if (S.act[a.name] === undefined) { const v = bal(a); S.act[a.name] = v; const el = $('.ba[data-i="' + i + '"]'); if (el) el.value = num(v); } });
+        reconUpdate();
+        return;
+    }
     const today = ymd(new Date()), L = diffs().filter(x => x.has && x.diff !== 0);
     if (!L.length)
         return;
@@ -1364,8 +1390,65 @@ const cbHtml = (kind, L) => L.length
     : '<div class="cbe">Không thấy kết quả. Thử từ khác, hoặc thêm ở mục Hạng mục.</div>';
 function catFields(ty, cat, sub) {
     return `<div class="cbw"><span class="l">Hạng mục</span><div class="cb"><input id="fp" data-cb="p" autocomplete="off" placeholder="Chọn hoặc gõ…" value="${esc(cat)}"><div class="cbl hide"></div></div></div>
-<div class="cbw"><span class="l">Chi tiết</span><div class="cb"><input id="fs" data-cb="s" autocomplete="off" placeholder="Chọn hoặc gõ…" value="${esc(sub)}"><div class="cbl hide"></div></div></div>`;
+<div class="cbw"><span class="l">Chi tiết</span><div class="cb"><input id="fs" data-cb="s" autocomplete="off" placeholder="Chọn hoặc gõ…" value="${esc(sub)}"><div class="cbl hide"></div></div></div>
+<div class="sg" id="sg" aria-live="polite"></div>`;
 }
+// ===== Gợi ý hạng mục thông minh: học từ lịch sử (ghi chú, số tiền, giờ trong ngày, tài khoản), tự điền khi đủ chắc chắn =====
+const SG = { list: [], tm: 0 };
+const sgTok = s => nz(s).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+function sgCompute() {
+    const g = i => ($(i) || {}).value || '', ty = E.type, note = g('#fn').trim(), amt = amtVal(g('#fa')) || 0, acc = g('#fc') || E.acc;
+    const hh = parseInt((g('#fh') || E.time || '').slice(0, 2), 10), nn = sgTok(note), nk = nz(note).replace(/\s+/g, ' ').trim(), now = Date.now();
+    const par = new Set(S.cat.filter(x => x.t === ty).map(x => x.p)), M = new Map();
+    S.tx.forEach(h => {
+        if (h.type !== ty || !h.cat || h.id === E.id || !par.has(h.cat)) return;
+        const sub = h.sub && catOk(ty, h.cat, h.sub) ? h.sub : '';
+        let s = 0, n = 0;
+        const hn = noteTxt(h.note), hk = nz(hn).replace(/\s+/g, ' ').trim();
+        if (nk && hk) {
+            if (hk === nk) n += 6;
+            else if (nn.length) {
+                const ht = sgTok(hn), inter = nn.filter(w => ht.some(x => x === w || (w.length >= 3 && x.startsWith(w)))).length;
+                if (inter && ht.length) n += 4 * (inter / nn.length) * (0.5 + 0.5 * inter / Math.max(inter, ht.length));
+            }
+        }
+        if (amt) { if (+h.amount === amt) s += 2.5; else if (Math.abs(h.amount - amt) / amt <= 0.1) s += 1; }
+        if (!isNaN(hh) && h.at) { const h2 = +String(h.at).slice(11, 13), d = Math.abs(hh - h2), dd = Math.min(d, 24 - d); s += dd === 0 ? 1 : dd === 1 ? 0.8 : dd === 2 ? 0.4 : 0; }
+        if (acc && h.acc === acc) s += 0.6;
+        const age = Math.max(0, (now - Date.parse(h.date)) / 864e5) || 0, w = 0.6 + 0.4 / (1 + age / 90);
+        const k = h.cat + '|' + sub, o = M.get(k) || { cat: h.cat, sub, s: 0, n: 0 };
+        o.s += s * w; o.n += n * w; M.set(k, o);
+    });
+    return [...M.values()].filter(x => x.s + x.n > 0).sort((a, b) => (b.s + b.n) - (a.s + a.n)).slice(0, 4);
+}
+function sgUpdate() {
+    const box = $('#sg');
+    if (!box) return;
+    if (!E || !E.isNew || !$('#fp')) { box.innerHTML = ''; return; }
+    const L = sgCompute(); SG.list = L;
+    const top = L[0], sec = L[1];
+    if (!E.catTouched && top && top.n >= 3.5 && (!sec || top.n >= sec.n * 1.6) && (E.cat !== top.cat || E.sub !== top.sub)) {   // ghi chú khớp rõ với lịch sử: tự điền, không cần bấm
+        E.cat = top.cat; E.sub = top.sub; E.auto = true;
+        $('#fp').value = E.cat; const fs = $('#fs'); if (fs) fs.value = E.sub;
+    }
+    const cur = E.cat + '|' + E.sub, hasNote = !!($('#fn') && $('#fn').value.trim()), chips = L.filter(x => hasNote ? (x.n > 0 || x.s >= 3) : x.s + x.n >= 1.5).slice(0, 3);   // đã gõ ghi chú mà không khớp gì: chỉ giữ gợi ý thật sự phổ biến
+    box.innerHTML = chips.length ? `<span class="sgl">${E.auto && !E.catTouched ? '✨ Tự điền theo lịch sử, bấm để đổi:' : 'Gợi ý:'}</span>` + chips.map(x => `<button type="button" class="chip${x.cat + '|' + x.sub === cur ? ' on' : ''}" data-sg="${SG.list.indexOf(x)}">${emo(x.cat)} ${esc(x.sub || x.cat)}</button>`).join('') : '';
+}
+$('#ov').addEventListener('click', e => {
+    const b = e.target.closest('[data-sg]');
+    if (!b || !E) return;
+    const x = SG.list[+b.dataset.sg];
+    if (!x) return;
+    pull(); E.cat = x.cat; E.sub = x.sub; E.catTouched = true; E.auto = false; form();
+    const f = $('#fa'); if (f && !E.amount) f.focus();
+});
+$('#ov').addEventListener('input', e => {
+    if (!E || !E.isNew) return;
+    const t = e.target;
+    if (t.dataset && t.dataset.cb) { E.catTouched = true; E.auto = false; return; }   // người dùng tự gõ hạng mục: không tự điền đè nữa
+    if (t.id === 'fn' || t.id === 'fa') { clearTimeout(SG.tm); SG.tm = setTimeout(() => { if (E && $('#sg')) sgUpdate(); }, t.id === 'fn' ? 250 : 400); }
+});
+$('#ov').addEventListener('change', e => { if (E && E.isNew && (e.target.id === 'fh' || e.target.id === 'fc') && $('#sg')) sgUpdate(); });
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 function defAcc() { let a = ''; try { a = cfg().tx.acc || localStorage.lastAcc || ''; } catch (e) { } return S.acc.some(x => x.name === a) ? a : ((S.acc.find(x => x.type !== HELD) || S.acc[0] || {}).name || ''); }
 $('#ov').addEventListener('click', e => {
@@ -1404,6 +1487,7 @@ ${ty === 'Chuyển khoản' ? (noAcc ? '' : accBox('ft', 'Đến tài khoản', 
 <div class="sec2"><button type="button" class="btn" data-tplsave>☆ Lưu mẫu</button>${E.isNew ? '' : '<button type="button" class="btn" data-dup>⧉ Nhân đôi</button><button type="button" class="btn d" data-del>🗑 Xóa</button>'}</div></div>`;
     renderAtt();
     fitAmtSoon();
+    sgUpdate();
 }
 $('#ov').addEventListener('click', e => {
     if (!E || !e.target.closest('[data-reload]')) return;
@@ -1478,6 +1562,7 @@ const cbClose = () => $$('#ov .cbl').forEach(b => b.classList.add('hide'));
 function cbPick(el) {
     pull();
     const k = el.dataset.cbo, p = el.dataset.p, c = el.dataset.c;
+    E.catTouched = true; E.auto = false;
     E.cat = p;
     if (k === 'p') { if (E.sub && !catOk(E.type, p, E.sub)) E.sub = ''; }
     else E.sub = c;
@@ -2264,7 +2349,9 @@ function toast(t, u, o) {
     const e = $('#toast');
     e.innerHTML = `<span class="ni">${esc(o.ico || '🔔')}</span><span class="nb"><b>${esc(o.title || 'Sổ Thu Chi')}</b><span>${esc(t)}</span></span>`;
     e.classList.toggle('u', !!u);
-    e.classList.toggle('err', !!o.err);
+    const isErr = o.err != null ? !!o.err : /^(Lỗi|Dừng|Một thay đổi không|Không (lưu|thêm|xóa|thực hiện|kết nối|tạo|dùng|gửi))/.test(String(t));   // thông báo lỗi tự nhận ra để tô màu + đọc to cho trình đọc màn hình
+    e.classList.toggle('err', isErr);
+    e.setAttribute('role', isErr ? 'alert' : 'status');
     if (u) {
         const b = document.createElement('button');
         b.type = 'button';
@@ -2285,7 +2372,10 @@ function toast(t, u, o) {
     e.appendChild(x);
     e.classList.add('on');
     clearTimeout(toast.i);
-    toast.i = setTimeout(toastHide, u ? 6000 : o.sticky ? 9000 : 3000);
+    const ms = Math.max(u ? 6000 : o.sticky ? 9000 : 3000, Math.min(isErr ? 12000 : 9000, 1800 + String(t).length * 55));   // đủ thời gian đọc theo độ dài
+    toast.i = setTimeout(toastHide, ms);
+    e.onmouseenter = () => clearTimeout(toast.i);                                   // rê chuột vào thì giữ lại
+    e.onmouseleave = () => { clearTimeout(toast.i); toast.i = setTimeout(toastHide, 2500); };
 }
 (() => {
     const e = $('#toast');
@@ -5275,6 +5365,23 @@ function promptText(title, ph, def) {
     };
     const PF = { date: 'dd/mm/yyyy', time: 'hh:mm', month: 'mm/yyyy' }, ML = { date: 10, time: 5, month: 7 };
     const BADMSG = { date: 'Ngày không hợp lệ. Ví dụ: 18/11/2026, 18112026 hoặc 1811', time: 'Giờ không hợp lệ. Ví dụ: 08:30, 0830 hoặc 8h30', month: 'Tháng không hợp lệ. Ví dụ: 11/2026 hoặc 112026' };
+    // Tự chèn dấu khi đang gõ: 1811 -> 18/11/, 5 -> 05/, 0830 -> 08:30, 8h30 -> 08:30. Chỉ chạy khi gõ ở cuối ô và không phải đang xóa.
+    const MSEG = { date: [2, 2, 4], month: [2, 4], time: [2, 2] }, MLIM = { date: [3, 1, 9], month: [1, 9], time: [2, 5] };
+    function maskIn(t, s) {
+        const seg = MSEG[t], lim = MLIM[t], sep = t === 'time' ? ':' : '/';
+        let out = '', i = 0, n = 0;
+        for (const ch of String(s)) {
+            if (i >= seg.length) break;
+            if (/\d/.test(ch)) {
+                if (n === 0 && seg[i] === 2 && +ch > lim[i]) { out += '0' + ch; n = 2; } else { out += ch; n++; }   // số đầu quá lớn không thể là 2 chữ số: tự thêm số 0
+                if (n === seg[i]) { i++; n = 0; if (i < seg.length) out += sep; }
+            } else if (n > 0 && i < seg.length - 1) {   // người dùng tự gõ dấu phân cách: chuẩn hóa thành dấu của ô
+                if (n === 1) out = out.slice(0, -1) + '0' + out.slice(-1);
+                out += sep; i++; n = 0;
+            }
+        }
+        return out;
+    }
     let pop = null, cur = null, t0 = 0;
 
     function closePop(focus) {
@@ -5454,7 +5561,7 @@ function promptText(title, ph, def) {
         inp.classList.add('dd-native'); inp.tabIndex = -1; inp.setAttribute('aria-hidden', 'true');
         // Đọc chữ đã gõ -> giá trị chuẩn ISO. Sai thì hoàn lại giá trị cũ và báo; bắt buộc thì không cho để trống
         const commit = () => {
-            const raw = ti.value.trim(), now = inp.value;
+            const raw = ti.value.trim().replace(/[\/:\-.\s]+$/, ''), now = inp.value;   // bỏ dấu thừa ở cuối ("18/11/" -> "18/11")
             const p = t === 'time' ? parseTime(raw) : t === 'month' ? parseMonth(raw, now) : parseDate(raw, now);
             let bad = p === null || (p === '' && inp.required);
             if (!bad && p && t === 'date' && ((inp.min && p < inp.min) || (inp.max && p > inp.max))) bad = true;
@@ -5468,7 +5575,12 @@ function promptText(title, ph, def) {
         const open = () => { if (b.disabled) return; if (!pop || cur.btn !== b) { commit(); openPop(inp, b); } else closePop(true); };
         ti.addEventListener('focus', () => { closePop(); setTimeout(() => { if (document.activeElement === ti) { try { ti.select(); } catch (e) { } } }, 0); });
         ti.addEventListener('blur', () => { commit(); });
-        ti.addEventListener('input', e => e.stopPropagation());    // chữ đang gõ chưa phải giá trị thật: không báo cho mã khác
+        ti.addEventListener('input', e => {
+            e.stopPropagation();   // chữ đang gõ chưa phải giá trị thật: không báo cho mã khác
+            if (/^delete/.test(e.inputType || '') || ti.selectionStart !== ti.value.length) return;   // xóa / sửa giữa chừng: không tự chèn
+            const m = maskIn(t, ti.value);
+            if (m !== ti.value) ti.value = m;
+        });
         ti.addEventListener('change', e => e.stopPropagation());
         ti.addEventListener('keydown', e => {
             const k = e.key;

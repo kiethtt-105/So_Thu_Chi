@@ -1590,3 +1590,10 @@ html.pkm #login .pwf,html.pkm #login #lb,html.pkm #login #lerr{display:none}
 #pg[data-p=a] .pgs span:nth-of-type(2),#pg[data-p=b] .pgs span:nth-of-type(2){color:var(--mut);border-color:var(--line);background:var(--soft)}
 #pg[data-p=a] .pgs span:nth-of-type(1),#pg[data-p=b] .pgs span:nth-of-type(1),#pg[data-p=c] .pgs span:nth-of-type(2),#pg[data-p=ok] .pgs span{color:var(--thu);border-color:color-mix(in srgb,var(--thu) 45%,transparent);background:color-mix(in srgb,var(--thu) 12%,transparent)}
 #pg[data-p=ok] .pgs i{background:var(--thu)}
+
+/* UX: gợi ý Caps Lock, nút đăng nhập đang xử lý */
+#lcaps{margin:8px 2px 0;font-size:13px;font-weight:600;color:var(--dc)}#lcaps[hidden]{display:none}
+#login .go:disabled{opacity:.72;cursor:progress;filter:none}
+
+/* gợi ý hạng mục */
+.sg{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 6px}.sg:empty{display:none}.sgl{font-size:12px;font-weight:600;color:var(--mut)}
