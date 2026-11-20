@@ -759,6 +759,51 @@ function issueBanner() {
     return `<div class="warn ${e ? 'err' : ''}">⚠️ ${e ? e + ' dòng dữ liệu bị lỗi (chưa được tính vào số liệu)' : ''}${e && w ? ' · ' : ''}${w ? w + ' dòng cần lưu ý' : ''}. <button data-a="issues">Xem chi tiết</button></div>`;
 }
 
+// ===== Đề xuất cho bạn (Tổng quan): việc nên làm ngay, bấm một lần là làm =====
+const HS = { rec: [] };
+const hsDis = () => { try { const a = JSON.parse(localStorage.hs_dis || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+// Khoản định kỳ (tiền nhà, internet, gói cước…): ≥3 tháng trước đều có, mỗi tháng 1-2 lần, số tiền và ngày gần như cố định, tháng này chưa thấy
+function recurDetect() {
+    const today = new Date(), tm = ymd(today).slice(0, 7), dn = today.getDate(), from = shift(tm, -6), G = new Map(), dis = new Set(hsDis());
+    const key = t => t.type + '|' + t.cat + '|' + (t.sub || '') + '|' + nz(noteTxt(t.note)).replace(/[^a-z0-9]+/g, ' ').trim();
+    S.tx.forEach(t => { if ((t.type !== 'Chi' && t.type !== 'Thu') || !t.cat) return; const m = mOf(t); if (m < from) return; const k = key(t); if (!G.has(k)) G.set(k, []); G.get(k).push(t); });
+    const out = [];
+    G.forEach((L, k) => {
+        if (dis.has(tm + '|' + k)) return;
+        const past = L.filter(t => mOf(t) < tm), per = {};
+        past.forEach(t => { (per[mOf(t)] = per[mOf(t)] || []).push(t); });
+        if (Object.keys(per).length < 3 || Object.values(per).some(a => a.length > 2)) return;
+        const amts = past.map(t => Math.round(+t.amount)).sort((a, b) => a - b), med = amts[amts.length >> 1];
+        if (!med || amts.some(a => Math.abs(a - med) / med > 0.15)) return;
+        const days = past.map(t => +t.date.slice(8)).sort((a, b) => a - b), dmed = days[days.length >> 1];
+        if (days.some(d => Math.abs(d - dmed) > 4) || dn < dmed - 1) return;
+        const last = past.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+        if (S.tx.some(t => t.type === last.type && t.cat === last.cat && (t.sub || '') === (last.sub || '') && mOf(t) === tm && Math.abs(t.amount - med) / med <= 0.15)) return;
+        out.push({ key: tm + '|' + k, type: last.type, cat: last.cat, sub: last.sub || '', note: noteTxt(last.note), acc: S.acc.some(a => a.name === last.acc) ? last.acc : '', amount: med, day: dmed, n: Object.keys(per).length });
+    });
+    return out.sort((a, b) => b.n - a.n || b.amount - a.amount).slice(0, 2);
+}
+function homeSuggest() {
+    const today = new Date(), tm = ymd(today).slice(0, 7);
+    if (!S.ready || S.m !== tm || !S.tx.length) { HS.rec = []; return ''; }
+    const R = [], rr = (ico, title, sub, btn) => `<div class="rr"><span style="min-width:0;flex:1"><b style="font-weight:500">${ico} ${title}</b><small class="sens" style="display:block">${sub}</small></span>${btn}</div>`;
+    HS.rec = recurDetect();
+    HS.rec.forEach((r, i) => R.push(rr(r.type === 'Thu' ? '💰' : '🔁', 'Ghi ' + esc(r.sub || r.cat) + ' tháng này?', 'Thường khoảng ngày ' + r.day + ', ~' + vnd(r.amount) + ' (' + r.n + ' tháng liền)', `<button type="button" class="btn" data-hs="${i}">Ghi ngay</button><button type="button" class="chip" data-hsx="${i}" aria-label="Bỏ qua gợi ý này" title="Bỏ qua tháng này">×</button>`)));
+    const dim = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(), left = dim - today.getDate() + 1;
+    limCalc().filter(x => x.per === 'Tháng' && x.v > 0 && x.used / x.v >= 0.8).sort((a, b) => b.used / b.v - a.used / a.v).slice(0, 2).forEach(x => {
+        const r = x.used / x.v, rem = x.v - x.used;
+        R.push(rr(x.used > x.v ? '🚨' : '⚠️', esc(x.name) + (x.used > x.v ? ' đã vượt hạn mức' : ' đã dùng ' + Math.round(r * 100) + '% hạn mức tháng'), x.used > x.v ? 'Vượt ' + vnd(x.used - x.v) : 'Còn ' + vnd(rem) + ' cho ' + left + ' ngày, tối đa ~' + vnd(rem / left) + '/ngày', '<button type="button" class="btn" data-tab="lim">Xem</button>'));
+    });
+    const unc = stx().filter(t => inM(t, S.m) && (t.type === 'Chi' || t.type === 'Thu') && !t.cat).length;
+    if (unc) R.push(rr('🏷️', unc + ' giao dịch chưa phân loại', 'Phân loại để biểu đồ và hạn mức chính xác hơn', '<button type="button" class="btn" data-tab="tx">Xem</button>'));
+    if (today.getHours() >= 20 && !S.tx.some(t => t.date === ymd(today))) R.push(rr('📝', 'Hôm nay chưa ghi khoản nào', 'Ghi nhanh trước khi quên', '<button type="button" class="btn" data-a="new">Thêm</button>'));
+    return R.length ? `<div class="card" id="hsc"><div class="ch">💡 Đề xuất cho bạn</div>${R.join('')}</div>` : '';
+}
+document.addEventListener('click', e => {
+    const b = e.target.closest('[data-hs]'), x = e.target.closest('[data-hsx]');
+    if (b) { const r = HS.rec[+b.dataset.hs]; if (r) qOpen({ type: r.type, amount: r.amount, acc: r.acc, cat: r.cat, sub: r.sub, note: r.note }); }
+    else if (x) { const r = HS.rec[+x.dataset.hsx]; if (r) { const a = hsDis(); a.push(r.key); try { localStorage.hs_dis = JSON.stringify(a.slice(-60)); } catch (er) { } render(); } }
+});
 function home() {
     const { thu, chi } = sums(S.m), total = ownAcc().reduce((s, a) => s + bal(a), 0), M = stx().filter(t => inM(t, S.m)), rows = group(chiM(S.m), t => t.cat || 'Chưa phân loại'), mx = rows[0] ? rows[0][1] : 1;
     const months = [];
@@ -771,7 +816,7 @@ function home() {
     const cmx = Math.max(1, ...Object.values(dc)), sh = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'tr' : Math.round(n / 1e3) + 'k';
     const dnum = S.m === ymd(new Date()).slice(0, 7) ? new Date().getDate() : dim, big = chiM(S.m).sort((a, b) => b.amount - a.amount)[0], LC = limCalc(), rec = M.slice().sort(byTime).slice(0, 6);
     const limHtml = LC.map(x => limBar(x, (x.cat ? emo(x.cat) + ' ' : '') + esc(x.name) + ' · ' + (x.per === 'Ngày' ? 'hôm nay' : 'tháng'))).join(''), ov = LC.filter(x => x.over).length;
-    return head('Tổng quan', mlabel(S.m) + ' · ' + M.length + ' giao dịch') + issueBanner() +
+    return head('Tổng quan', mlabel(S.m) + ' · ' + M.length + ' giao dịch') + issueBanner() + homeSuggest() +
         `<div class="kpis">${kpi('Tổng tài sản', vnd(total), '', ownAcc().length + ' tài khoản', 'h')}${kpi('Thu', vnd(thu), 'thu', 'Tháng này')}${kpi('Chi', vnd(chi), 'chi', 'TB ' + vnd(chi / dnum) + '/ngày')}${kpi('Còn lại', vnd(thu - chi), thu - chi < 0 ? 'chi' : '', 'Tiết kiệm ' + (thu ? Math.round((thu - chi) / thu * 100) : 0) + '%')}</div>
 <div class="grid a"><div class="card"><div class="ch">Thu chi 12 tháng <small><span class="thu">■</span> thu &nbsp;<span class="chi">■</span> chi</small></div><svg viewBox="0 0 480 154" width="100%" role="img" aria-label="Biểu đồ thu chi 12 tháng">${ch}</svg></div>
 <div class="card"><div class="ch">Cơ cấu chi tiêu <small>${big ? 'Lớn nhất ' + num(big.amount) : ''}</small></div>${donut(rows, chi)}</div></div>
