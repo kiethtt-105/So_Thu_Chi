@@ -65,12 +65,37 @@ function devName(req) {
   const br = /Edg\//.test(u) ? 'Edge' : /Firefox|FxiOS/.test(u) ? 'Firefox' : /CriOS|Chrome/.test(u) ? 'Chrome' : /Safari/.test(u) ? 'Safari' : 'Trình duyệt';
   return br + (os ? ' · ' + os : '');
 }
+// Báo Telegram thẳng từ server (telegram.js cần cookie đăng nhập nên không dùng được ở đây). Tắt: đặt ALERT_LOGIN=0 trên Vercel.
+async function tgAlert(text, silent) {
+  const T = env('TG_TOKEN'), C = env('TG_CHAT_ID');
+  if (!T || !C || env('ALERT_LOGIN') === '0') return;
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 5000);
+  try {
+    await fetch('https://api.telegram.org/bot' + T + '/sendMessage', { method: 'POST', signal: ac.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: C, text, disable_notification: !!silent }) });
+  } catch (e) { } finally { clearTimeout(tm); }
+}
+const vnTime = t => new Date(t).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
+const parseList = a => (a || []).map(s => { try { return JSON.parse(s); } catch (e) { return null; } }).filter(Boolean);
 async function logLogin(req, method, good) {   // không bao giờ ném lỗi, không làm hỏng đăng nhập nếu Redis lỗi
   if (!RU || !RT) return;
-  const key = good ? LH : LHF, max = good ? 50 : 20;
+  const key = good ? LH : LHF, max = good ? 50 : 20, now = Date.now(), ip = clientIp(req), d = devName(req);
   try {
-    await redis(['LPUSH', key, JSON.stringify({ t: Date.now(), ip: clientIp(req), d: devName(req), m: method, ok: good ? 1 : 0 })]);
+    let alert = null;
+    if (good) {
+      const prev = parseList(await redis(['LRANGE', LH, '0', '-1']));
+      // Có lịch sử mà chưa từng thấy đúng cặp (IP + trình duyệt) này => báo. Chưa có lịch sử (mới bật tính năng) thì không báo.
+      if (prev.length && !prev.some(p => p.ip === ip && p.d === d)) {
+        const known = prev.some(p => p.d === d);
+        alert = { silent: known, text: (known ? 'ℹ️ Đăng nhập từ IP mới' : '🚨 Đăng nhập từ thiết bị MỚI') + ' — Sổ Thu Chi\n' + d + '\nIP: ' + ip + '\nCách: ' + method + '\n🕒 ' + vnTime(now) + '\nKhông phải bạn? Vào Cài đặt → Đăng nhập và thiết bị → Thu hồi, rồi đổi mật khẩu.' };
+      }
+    }
+    await redis(['LPUSH', key, JSON.stringify({ t: now, ip, d, m: method, ok: good ? 1 : 0 })]);
     await redis(['LTRIM', key, '0', String(max - 1)]);
+    if (!good) {   // sai mật khẩu liên tiếp từ cùng một IP trong 15 phút: báo ở lần thứ 3 và lần thứ 5 (lần 5 là bị khóa)
+      const n = parseList(await redis(['LRANGE', LHF, '0', '-1'])).filter(p => p.ip === ip && now - p.t < 900000).length;
+      if (n === 3 || n === 5) alert = { silent: false, text: '⚠️ Sai mật khẩu ' + n + ' lần liên tiếp — Sổ Thu Chi\nIP: ' + ip + '\n' + d + (n >= 5 ? '\nIP này đã bị khóa 15 phút.' : '') + '\n🕒 ' + vnTime(now) };
+    }
+    if (alert) await tgAlert(alert.text, alert.silent);
   } catch (e) { }
 }
 async function loginList() {   // null = chưa có Redis
