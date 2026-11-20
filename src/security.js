@@ -1,5 +1,5 @@
 // Phần "Đăng nhập và thiết bị" trong Cài đặt: lịch sử đăng nhập + thu hồi đăng nhập trên máy khác.
-// Nạp sau app.js (dùng chung $, esc, ask, toast, STORE, lockExpired, LOGOUT_ALL_AT). Passkey vẫn nằm ở app.js (secLoad).
+// Nạp sau app.js (dùng chung $, esc, ask, toast, STORE, lockExpired, LOGOUT_ALL_AT).
 const SES = STORE ? STORE.replace(/[^/]*$/, 'sessions') : '';
 let HIST_ALL = false;
 

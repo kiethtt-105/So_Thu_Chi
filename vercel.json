@@ -16,9 +16,6 @@
     "api/store.js": {
       "maxDuration": 60
     },
-    "api/scan.js": {
-      "maxDuration": 40
-    },
     "api/telegram.js": {
       "maxDuration": 20
     },

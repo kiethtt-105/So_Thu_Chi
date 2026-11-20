@@ -1,5 +1,6 @@
 const { NAME, STORE } = window.CONFIG || {}, POLL_MS = 10000; // hạn phiên (APP_TTL_HOURS, mặc định 48h) do cookie ở server quyết định
-const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return !!t; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
+const SESS_MS = (+(window.CONFIG || {}).TTL_H || 48) * 3600e3;   // đăng nhập lưu ở localStorage để mở tab mới không bị hỏi lại
+const alive = () => { let t = 0; try { t = +localStorage.sess || 0; } catch (e) { } return t > 0 && Date.now() - t < SESS_MS; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { localStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -467,7 +468,7 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe();  }
+function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } try { sessionStorage.clear(); localStorage.removeItem('sess'); } catch (e) { } $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe();  }
 let LOGOUT_ALL_AT = 0;
 // logoutAll() và phần Bảo mật trong Cài đặt: xem security.js
 let LOGIN_BUSY = false;
@@ -495,8 +496,7 @@ $('#lf').onsubmit = async ev => {
     catch (e) { j = { ok: false, net: true, err: 'Không kết nối được máy chủ' }; }
     LOGIN_BUSY = false; lb.disabled = false; lb.textContent = lbt;
     if (j.ok) {
-        try { sessionStorage.sess = Date.now(); } catch (e) { }
-        touch();
+        try { localStorage.sess = Date.now(); } catch (e) { }
         boot();
     }
     else {
@@ -559,7 +559,7 @@ async function pkLogin() {
         if (!cr) return;
         const r = cr.response;
         const j = await accCall({ act: 'authverify', cred: { id: cr.id, response: { clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) } } });
-        if (j.ok) { try { sessionStorage.sess = Date.now(); } catch (e) { } touch(); boot(); }
+        if (j.ok) { try { localStorage.sess = Date.now(); } catch (e) { } touch(); boot(); }
         else fail(j.err || 'Passkey không hợp lệ');
     } catch (e) {
         const n = e && e.name;
@@ -1536,7 +1536,7 @@ function form() {
     const accBox = (id, lb, extra) => noAcc
         ? `<div class="w nodata"><span>${S.err ? 'Chưa tải được tài khoản: ' + esc(S.err) : 'Đang tải danh sách tài khoản…'}</span><button type="button" class="chip" data-reload>Tải lại</button></div>`
         : `<label class="w">${lb}${pkSel(id, S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc).map(n => ({ v: n, t: n })), id === 'ft' ? E.accTo : E.acc, extra)}</label>`;
-    $('#sh').innerHTML = `<div id="scanrow"></div><div class="tfh"><h3>${E.isNew ? 'Thêm giao dịch' : 'Sửa giao dịch'}</h3><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div></div>${tplRow()}
+    $('#sh').innerHTML = `<div class="tfh"><h3>${E.isNew ? 'Thêm giao dịch' : 'Sửa giao dịch'}</h3><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div></div>${tplRow()}
 <div class="tf"><div class="tf-l"><div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
 <div class="qk"><button type="button" class="chip" data-k="000" title="Thêm 000 vào cuối số tiền">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div><div class="sg" id="sga"></div>
 <div class="f">
@@ -2344,7 +2344,6 @@ function cfg() {
         rp: { on: true, at: '06:00', ...c.rp },
         rm: Array.isArray(c.rm) ? c.rm : [],
         adv: { max: 3, hist: 40, ...(c.adv || {}), f: { date: true, acc: true, cat: true, note: true, img: true, bal: true, ...((c.adv || {}).f) }, quiet: { on: false, from: '22:00', to: '06:00', ...((c.adv || {}).quiet) } },
-        scan: { ai: true, hint: true, ocr: true, auto: false, ...(c.scan || {}) },
         tx: { acc: '', type: 'Chi', dup: true, tol: 0, ...(c.tx || {}) },
         tg: { on: true, retry: true, pfx: '', ...(c.tg || {}), kinds: { tx: true, sync: true, limit: true, report: true, remind: true, err: true, ...((c.tg || {}).kinds) } }
     };
@@ -2753,13 +2752,6 @@ ${c.rm.map(r => `<div class="rem"><div class="rem-t"><input type="time" class="t
     const quietBlock = () => `<div class="sec">Giờ yên tĩnh</div>
 <div class="menu">${sw('adv.quiet.on', '🌙', 'Bật giờ yên tĩnh', 'Không bật chuông thông báo hệ thống, Telegram gửi im lặng. Thông báo vẫn được lưu', A.quiet.on)}
 <div class="row"><span class="m"><b>Từ – đến</b><small>Qua nửa đêm vẫn đúng</small></span><input type="time" class="tm" data-cfg="adv.quiet.from" value="${esc(A.quiet.from)}"><input type="time" class="tm" data-cfg="adv.quiet.to" value="${esc(A.quiet.to)}"></div></div>`;
-    const pScan = () => `<div class="sec">Quét ảnh bằng AI</div>
-<div class="menu">${sw('scan.ai', '✨', 'Dùng AI đọc ảnh', 'Gửi ảnh lên máy chủ của bạn để AI đọc hóa đơn, bill. Tắt nếu không muốn gửi ảnh cho AI', c.scan.ai)}
-${sw('scan.hint', '🏷️', 'Gợi ý tài khoản và hạng mục cho AI', 'AI chọn đúng tên tài khoản, hạng mục của bạn. Tắt thì AI chỉ đọc số tiền, ngày, ghi chú', c.scan.hint)}
-${sw('scan.ocr', '🔤', 'Dự phòng đọc chữ trên máy', 'Dùng khi AI lỗi hoặc đang tắt. Chậm hơn và kém chính xác hơn', c.scan.ocr)}
-${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem lại nếu AI chắc mọi trường. Có ô nghi ngờ thì vẫn hiện để bạn kiểm tra', c.scan.auto)}</div>
-<div class="sec">Không tính vào thu chi</div>
-<p class="hint">Để một tài khoản không cộng vào thu chi (tiền giữ hộ, quỹ chung, chuyển nội bộ…): vào tab Tài khoản, bấm tài khoản, bật “Không tính vào thu chi”. Cài đặt này lưu trong Google Sheet nên mọi thiết bị và trang TongQuan đều giống nhau.</p>`;
     const pAdv = () => `<div class="sec">Nội dung thông báo</div>
 <div class="menu">${FL.map(([k, i, t]) => sw('adv.f:' + k, i, t, 'Hiện trong thông báo giao dịch', A.f[k] !== false)).join('')}</div>
 <p class="hint">Mã, số tiền và loại giao dịch luôn hiện. Web và Telegram dùng chung nội dung này nên luôn giống nhau.</p>
@@ -2774,8 +2766,7 @@ ${sw('scan.auto', '⚡', 'Tự điền khi AI chắc chắn', 'Bỏ bước xem 
 <div class="row"><span class="m"><b>Loại mặc định</b><small>Loại được chọn sẵn khi mở form</small></span></div>${segx('type', ['Chi', 'Thu'], T.type)}
 ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại nếu cùng ngày, loại, số tiền, tài khoản vừa ghi trong 30 phút', T.dup !== false)}</div>
 <div class="sec">Cân đối</div>
-<div class="menu"><div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}</div>
-${pScan()}`;
+<div class="menu"><div class="row"><span class="m"><b>Coi như khớp nếu lệch không quá</b><small>Bỏ qua chênh lệch lẻ khi so số dư thực tế với sổ</small></span></div>${segx('tol', [0, 1000, 5000, 10000], T.tol, v => v ? num(v) : 'Đúng từng đồng')}</div>`;
     const pBk = () => `<div class="sec">Sao lưu sổ</div>
 <div class="menu"><div class="row"><span class="dot">⬇️</span><span class="m"><b>Tải sổ (JSON)</b><small>${S.tx.length} giao dịch, ${S.acc.length} tài khoản, ${S.cat.length} hạng mục. Lấy từ dữ liệu đang hiện trên máy này</small></span><button type="button" class="btn" data-bk="dl">Tải</button></div>
 <div class="row"><span class="dot">☁️</span><span class="m"><b>Sao lưu lên Google Drive ngay</b><small id="bkst">Chép từ Google Sheet sang thư mục SoThuChi-Backup. Tự chạy mỗi ngày cùng lúc cron của máy chủ</small></span><button type="button" class="btn" data-bk="drive">Sao lưu</button></div>
@@ -3011,8 +3002,6 @@ document.addEventListener('change', e => {
             c.tg.retry = t.checked;
         else if (g === 'tg.pfx')
             c.tg.pfx = t.value.trim().slice(0, 20);
-        else if (g.startsWith('scan.'))
-            c.scan[g.slice(5)] = t.checked;
         else if (g.startsWith('adv.f:'))
             c.adv.f[g.slice(6)] = t.checked;
         else if (g === 'adv.quiet.on')
@@ -3168,7 +3157,6 @@ function renderAtt() {
         + (E.staged || []).map(s => th(s.url, s.url, 'Ảnh chờ tải', { tag: `<small>${s.kb} KB · chờ tải</small>`, attr: `data-imgst="${s.id}"` })).join('')
         + pd.map(p => p.err ? `<span class="chip att-i bad">⚠️ ${esc(p.err)}<button type="button" data-imgx="${p.id}" aria-label="Đóng">×</button></span>` : `<span class="th wait"><i class="spn"></i><small>Đang xử lý…</small></span>`).join('')
         + `<label class="th add" title="Thêm ảnh (JPG, PNG, WebP, HEIC)"><b>＋</b><small>Thêm / dán ảnh</small><input type="file" id="fimg" accept="image/*,.heic,.heif" multiple hidden></label></div>`;
-    renderScan();
 }
 
 document.addEventListener('click', e => {
@@ -4456,402 +4444,10 @@ document.addEventListener('click', e => {
 addEventListener('resize', () => { if (innerWidth >= 700) document.documentElement.classList.remove('sdo'); });
 
 const fold = s => String(s || '').normalize('NFC').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
-let _tess, _ow, _owT, _ocrLog;
-function tessLib() {
-    if (window.Tesseract) return Promise.resolve(window.Tesseract);
-    return _tess || (_tess = new Promise((ok, no) => {
-        const sc = document.createElement('script');
-        sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-        sc.onload = () => window.Tesseract ? ok(window.Tesseract) : no(Error('Không tải được bộ đọc chữ'));
-        sc.onerror = () => { _tess = null; no(Error('Cần có mạng để quét ảnh (lần đầu tải bộ đọc chữ)')); };
-        document.head.appendChild(sc);
-    }));
-}
-async function ocrWorker() {
-    const T = await tessLib();
-    if (!_ow) _ow = T.createWorker('vie+eng', 1, { logger: m => _ocrLog && _ocrLog(m) }).catch(e => { _ow = null; throw e; });
-    clearTimeout(_owT);
-    const w = await _ow;
-    _owT = setTimeout(() => { const p = _ow; _ow = null; p && p.then(x => x.terminate()).catch(() => { }); }, 120000);
-    return w;
-}
-async function ocrPrep(blob) {
-    const im = await loadBmp(blob), w0 = im.width || im.naturalWidth, h0 = im.height || im.naturalHeight;
-    const k = Math.min(2.5, Math.max(1, 1200 / w0));
-    const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
-    const x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
-    if (im.close) im.close();
-    const d = x.getImageData(0, 0, c.width, c.height), p = d.data; let sum = 0;
-    for (let i = 0; i < p.length; i += 4) { const g = (p[i] * .299 + p[i + 1] * .587 + p[i + 2] * .114); p[i] = p[i + 1] = p[i + 2] = g; sum += g; }
-    if (sum / (p.length / 4) < 110) for (let i = 0; i < p.length; i += 4) { p[i] = p[i + 1] = p[i + 2] = 255 - p[i]; }
-    x.putImageData(d, 0, 0);
-    return c;
-}
-const OCR_HINT = [
-    [/an uong|com |pho |bun |banh|lau |tra sua|cafe|ca phe|coffee|quan an|nha hang|restaurant|grabfood|shopeefood|highlands|starbucks|kfc|lotteria|phuc long/, /an|uong|food|thuc pham/],
-    [/grab|xang|petrol|taxi|xe om|gui xe|ve xe|xanh sm|gojek|vietjet|bamboo|vietnam airlines|toll|bot /, /di chuyen|xe|giao thong|xang|travel/],
-    [/tien dien|tien nuoc|internet|wifi|viettel|vnpt|fpt|vinaphone|mobifone|cuoc |tien nha|thue nha|phong tro/, /hoa don|tien ich|nha|dien|nuoc|vien thong/],
-    [/sieu thi|coopmart|winmart|bach hoa|circle k|ministop|7-eleven|family ?mart|mua sam|shopee|lazada|tiki/, /mua sam|sieu thi|cho|tap hoa|shopping/],
-    [/thuoc|nha thuoc|benh vien|phong kham|pharmacy|bao hiem/, /suc khoe|y te|thuoc/],
-    [/netflix|spotify|youtube|cgv|phim|karaoke|du lich|khach san|hotel|resort/, /giai tri|du lich|vui choi|entertainment/],
-    [/hoc phi|khoa hoc|sach |school|udemy|giao duc/, /hoc|giao duc|education/],
-    [/luong|salary|payroll/, /luong|salary/],
-    [/thuong|bonus/, /thuong/],
-    [/hoan tien|refund|cashback/, /hoan|khac/]
-];
-function ocrCat(ty, tx) {
-    const L = (S.cat || []).filter(c => c.t === ty); if (!L.length) return null;
-    let best = null, bs = 0;
-    L.forEach(c => { const cc = fold(c.c), pp = fold(c.p); let s = 0; if (cc.length >= 3 && tx.includes(cc)) s += 5; if (pp.length >= 3 && tx.includes(pp)) s += 2; if (s > bs) { bs = s; best = c; } });
-    if (best) return best;
-    for (const [re, pr] of OCR_HINT) if (re.test(tx)) { const hit = L.find(c => pr.test(fold(c.p + ' ' + c.c))); if (hit) return hit; }
-    return null;
-}
-function ocrParse(text) {
-    const lines = String(text || '').normalize('NFC').split(/\r?\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
-    const fl = lines.map(fold), all = fl.join('\n');
-    const pad = n => String(n).padStart(2, '0');
-    const dOk = (d, m, y) => { if (y < 100) y += 2000; if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return ''; const t = new Date(y, m - 1, d); return t.getMonth() === m - 1 ? y + '-' + pad(m) + '-' + pad(d) : ''; };
-    let date = '', time = '', m;
-    const reA = /(?:^|[^\d])(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4}|\d{2})(?!\d)/g, reB = /(?:^|[^\d])(\d{4})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{1,2})(?!\d)/g,
-        reC = /(\d{1,2})\s*(?:thang|th)\s*(\d{1,2})[\s,]*(?:nam\s*)?(\d{4})/g, reT = /(?:^|[^\d])(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)/g;
-    while (!date && (m = reA.exec(all))) date = dOk(+m[1], +m[2], +m[3]);
-    while (!date && (m = reB.exec(all))) date = dOk(+m[3], +m[2], +m[1]);
-    while (!date && (m = reC.exec(all))) date = dOk(+m[1], +m[2], +m[3]);
-    while (!time && (m = reT.exec(all))) if (+m[1] < 24 && +m[2] < 60) time = pad(+m[1]) + ':' + m[2];
-
-    const KEY = /tong cong|tong tien|tong thanh toan|thanh tien|so tien|gia tri|thanh toan|total|amount|grand|can thanh toan|tien hang/;
-    const BAD = /so du|balance|phi |fee|vat|thue|giam gia|discount|tien thua|tien khach|ma giao dich|ma tham chieu|so tai khoan|stk|so the|sdt|so dien thoai|hotline|ma so thue|mst|so hoa don|ma don|order|ref/;
-    let best = null;
-    fl.forEach((ln0, i) => {
-        const ln = ln0.replace(reA, ' ').replace(reB, ' ').replace(reT, ' '), key = KEY.test(ln), prevKey = i > 0 && KEY.test(fl[i - 1]) && !key, bad = BAD.test(ln);
-        const re = /([+\-−–]?)(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{1,2}(?!\d))?/g; let n;
-        while ((n = re.exec(ln))) {
-            const digits = n[2].replace(/[.,]/g, ''), v = +digits, sep = /[.,]/.test(n[2]);
-            if (v < 1000 || v >= 1e11) continue;
-            const cur = /^\s*(vnd|vn d|d\b|₫|dong)/.test(ln.slice(n.index + n[0].length));
-            if (!sep && !cur && !key) continue;
-            const sc = (key ? 10 : 0) + (prevKey ? 6 : 0) + (cur ? 6 : 0) + (n[1] ? 3 : 0) + (sep ? 2 : 0) - (bad ? 12 : 0) - (v >= 1e10 ? 5 : 0);
-            if (sc >= 0 && (!best || sc > best.sc || (sc === best.sc && v > best.v))) best = { v, sc, sign: n[1] };
-        }
-    });
-    let type = 'Chi';
-    if (best && best.sign === '+') type = 'Thu';
-    else if (!(best && best.sign)) {
-        const IN = /nhan duoc|da nhan|tien vao|ghi co|credit|received|nhan tien|hoan tien|refund|cashback|luong|bien dong so du \+|so tien nhan|nguoi gui|ben gui|tu tai khoan|tai khoan nhan|nap tien|thu nhap|tra no|loi nhuan|lai suat|co tien|\+\s?\d/,
-            OUT = /chuyen tien thanh cong|chuyen khoan thanh cong|ghi no|debit|da chuyen|tien ra|thanh toan|hoa don|payment|nguoi nhan|ben nhan|nguoi huong|den tai khoan|toi tai khoan|rut tien/;
-        const hasIn = IN.test(all), hasOut = OUT.test(all);
-        if (hasIn && !hasOut) type = 'Thu';
-        else if (hasIn && hasOut && /(nguoi gui|ben gui|nhan duoc|da nhan|ghi co|received)/.test(all) && !/(da chuyen|chuyen tien thanh cong|chuyen khoan thanh cong|ghi no)/.test(all)) type = 'Thu';
-    }
-
-    const alias = OCR_ALIAS.find(a => a[0].test(all)) || null;
-    const isBank = !!alias || /ngan hang|napas|so tai khoan|\bstk\b|chuyen (tien|khoan)|ma giao dich|ma tham chieu|internet banking|mobile banking|vietqr|qr pay|bien lai|so du/.test(all);
-    const lab = re => { for (let i = 0; i < fl.length; i++) { const k = re.exec(fl[i]); if (k) { let v = lines[i].slice(k.index + k[0].length).replace(/^[\s:.\-]+/, '').trim(); if (!v && lines[i + 1]) v = lines[i + 1]; if (v && /[a-zà-ỹ]{2}/i.test(v)) return v; } } return ''; };
-    const content = lab(/(noi dung(?: chuyen (?:tien|khoan))?|loi nhan|message|dien giai|mo ta|description)\s*[:\-]?/), who = lab(/(ten nguoi nhan|nguoi nhan|nguoi huong|ben nhan|nha cung cap|cua hang|merchant|beneficiary)\s*[:\-]?/);
-    let note = [who, content].filter(Boolean).join(' · ');
-    if (!note) { const i = lines.findIndex(l => (l.match(/[A-Za-zÀ-ỹ]/g) || []).length >= 4 && (l.match(/\d/g) || []).length <= 3); if (i >= 0) note = lines[i]; }
-    return { amount: best ? best.v : 0, date, time, type, note: note.slice(0, 120), tx: fold(note + ' ' + all), alias, isBank };
-}
-
-const OCR_ALIAS = [
-    [/vietcombank|\bvcb\b/, 'bank'], [/techcombank|\btcb\b/, 'bank'], [/\bmb ?bank\b|\bmbb\b|quan doi/, 'bank'], [/\bbidv\b/, 'bank'], [/vietinbank|\bctg\b/, 'bank'],
-    [/agribank/, 'bank'], [/\bacb\b/, 'bank'], [/vpbank/, 'bank'], [/tpbank/, 'bank'], [/sacombank|\bstb\b/, 'bank'], [/\bocb\b/, 'bank'], [/\bshb\b/, 'bank'],
-    [/hdbank/, 'bank'], [/\bmsb\b|maritime/, 'bank'], [/\bvib\b/, 'bank'], [/seabank/, 'bank'], [/eximbank/, 'bank'], [/lpbank|lienviet/, 'bank'], [/cake/, 'bank'], [/timo/, 'bank'],
-    [/momo/, 'wallet'], [/zalo ?pay/, 'wallet'], [/shopee ?pay|airpay/, 'wallet'], [/viettel ?money/, 'wallet'], [/vnpay/, 'wallet']
-];
-function ocrAcc(r) {
-    if (!r || !(r.isBank || r.alias)) return null;
-    const own = S.acc.filter(a => a.type !== HELD), nm = a => fold(a.name);
-    let hit = null;
-    if (r.alias) hit = own.find(a => r.alias[0].test(nm(a)));
-    if (!hit && r.alias && r.alias[1] === 'wallet') hit = own.find(a => a.type === 'Ví điện tử');
-    if (!hit) {
-        const banks = own.filter(a => a.type === 'Ngân hàng');
-        let last = ''; try { last = localStorage.lastAcc || ''; } catch (e) { }
-        hit = banks.find(a => a.name === last) || banks[0] || null;
-    }
-    return hit ? hit.name : null;
-}
-const SCAN_CANCEL = () => Object.assign(Error('Đã hủy'), { cancel: true });
-// "Dạy" AI bằng chính lịch sử của người dùng: các giao dịch đã lưu (kể cả đã sửa tay) là ví dụ mẫu
-function scanExamples() {
-    const seen = new Set(), out = [];
-    const rows = S.tx.filter(t => (t.type === 'Chi' || t.type === 'Thu') && t.cat && t.sub)
-        .sort((a, b) => String(b.at || b.date).localeCompare(String(a.at || a.date)));
-    for (const t of rows) {
-        const note = String(noteTxt(t.note) || '').replace(/\s+/g, ' ').trim().slice(0, 60);
-        if (!note) continue;
-        const k = note.toLowerCase() + '|' + t.cat + '|' + t.sub;
-        if (seen.has(k)) continue; seen.add(k);
-        out.push({ t: t.type, n: note, a: t.acc, p: t.cat, c: t.sub, m: Math.round(t.amount) });
-        if (out.length >= 80) break;
-    }
-    return out;
-}
-async function aiScan(blob, signal, full) {   // full = quét nhiều ảnh (cần tự phân loại để lưu thẳng); quét một ảnh chỉ đọc số tiền + thời gian
-    const SC = cfg().scan;
-    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 40000);
-    if (signal) { if (signal.aborted) ctl.abort(); else signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
-    try {
-        const res = await fetch('/api/scan', {
-            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-            body: JSON.stringify({ image: await b64(blob), mime: 'image/jpeg', today: todayS(), accounts: SC.hint ? S.acc.filter(a => a.type !== HELD).map(a => ({ n: a.name, t: a.type })) : [], cats: full && SC.hint ? S.cat.map(c => ({ t: c.t, p: c.p, c: c.c })) : [], examples: SC.hint ? scanExamples() : [] })
-        });
-        let j = null;
-        try { j = await res.json(); } catch (e) { }
-        if (j && j.ok && j.data) return Object.assign({}, j.data, { ai: true, full: !!full });
-        return { aiFail: (j && j.err) || (res.status === 404 ? 'chưa có /api/scan, cần deploy lại thư mục api/' : 'máy chủ trả lỗi ' + res.status) };
-    } catch (e) { if (signal && signal.aborted) throw SCAN_CANCEL(); return { aiFail: e && e.name === 'AbortError' ? 'AI phản hồi quá chậm' : 'không kết nối được máy chủ AI' }; }
-    finally { clearTimeout(tm); }
-}
-// Chuẩn hóa kết quả (AI hoặc OCR) về một "bản nháp" giao dịch
-const VN_STOP = new Set(['chuyen', 'khoan', 'tien', 'thanh', 'toan', 'nguyen', 'tran', 'huynh', 'pham', 'hoang', 'phan', 'dang', 'bui', 'duong', 'ngo', 'van', 'thi', 'cho', 'cua', 'nhan', 'gui', 'noi', 'dung', 'ngan', 'hang', 'bank', 'the', 'and']);
-const vnTok = s => [...new Set(String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !/^\d+$/.test(w) && !VN_STOP.has(w)))];
-function histAsk(d) {
-    if ((d.type !== 'Chi' && d.type !== 'Thu') || (d.cat && d.sub)) return;
-    const tk = vnTok(d.note), nk = tk.join(' '), agg = new Map();
-    S.tx.forEach(t => {
-        if (t.type !== d.type || !t.cat || !t.sub) return;
-        const tt = vnTok(noteTxt(t.note));
-        let sc = 0;
-        if (nk && tt.join(' ') === nk) sc += 3;
-        sc += tt.filter(w => tk.includes(w)).length;
-        if (d.amount && t.amount === d.amount) sc += 1;
-        if (sc < 1 || (!tk.length && sc < 1)) return;
-        const k = t.cat + '\u0001' + t.sub, a = agg.get(k) || { p: t.cat, c: t.sub, s: 0, n: 0 };
-        a.s += sc; a.n++; agg.set(k, a);
-    });
-    const opts = [...agg.values()].sort((a, b) => b.s - a.s || b.n - a.n).slice(0, 3).map(a => ({ p: a.p, c: a.c }));
-    if (opts.length) d.ask = (d.ask || []).concat({ f: 'category', q: 'Hạng mục nào hợp? (gợi ý từ lịch sử của bạn)', opts });
-}
-function scanDraft(r) {
-    let d;
-    if (r.ai) d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: r.acc || '', accTo: r.accTo || '', cat: r.cat || '', sub: r.sub || '', note: r.note || '', unsure: (r.unsure || []).filter(k => r.full || k === 'amount' || k === 'date' || k === 'account'), ask: (r.ask || []).filter(a => a.f === 'account') };
-    else {
-        const g = (r.type === 'Chi' || r.type === 'Thu') ? ocrCat(r.type, r.tx) : null;
-        d = { type: r.type || 'Chi', amount: r.amount || 0, date: r.date || '', time: r.time || '', acc: ocrAcc(r) || '', accTo: '', cat: g ? g.p : '', sub: g ? g.c : '', note: r.note || '', unsure: ['account', 'amount'] };
-        if (!g && d.type !== 'Chuyển khoản') d.unsure.push('category');
-    }
-    if (r.ai && r.model) d.model = r.model;
-    if (!d.amount && !d.unsure.includes('amount')) d.unsure.push('amount');
-    if (!d.date && !d.unsure.includes('date')) d.unsure.push('date');
-    try { histAsk(d); } catch (e) { }
-    return d;
-}
-const draftOk = d => d.amount > 0 && (d.type === 'Chuyển khoản' ? !!(d.acc && d.accTo) : !!(d.cat && d.sub));
-async function readOne(f, sig, o) {
-    const small = await squeeze(f);
-    const st = { id: Math.random().toString(36).slice(2), blob: small, name: '', url: URL.createObjectURL(small), kb: Math.round(small.size / 1024) };
-    if (o.onSt) o.onSt(st);
-    if (sig.aborted) throw SCAN_CANCEL();
-    if (o.msg && cfg().scan.ai) o.msg('AI đang đọc ảnh…');
-    let r = await aiScan(small, sig, !!o.batch), aiErr = '';
-    if (r && r.aiFail) { aiErr = r.aiFail; r = null; }
-    if (r && r.notDoc) return { st, notDoc: true };
-    if (false) {   // đã tắt: bắt buộc dùng AI, không dự phòng OCR
-        o.msg('Đang tải bộ đọc chữ… (lần đầu hơi lâu)');
-        const w = await ocrWorker();
-        _ocrLog = p => { if (p && p.status === 'recognizing text') o.msg('Đang đọc chữ ' + Math.round((p.progress || 0) * 100) + '%'); };
-        o.msg('Đang đọc chữ…');
-        const res = await w.recognize(await ocrPrep(small));
-        _ocrLog = null;
-        if (sig.aborted) throw SCAN_CANCEL();
-        r = ocrParse((res.data && res.data.text) || '');
-    }
-    const d = r ? scanDraft(r) : null;
-    if (d && !r.ai) { d.ocr = true; d.aiErr = aiErr; }
-    return { st, d, aiErr };
-}
-const dFmt = d => (d.date ? d.date.split('-').reverse().join('/') : 'chưa rõ ngày') + (d.time ? ' ' + d.time : '');
-const dupOf = d => (d && d.amount && d.date) ? S.tx.find(t => t.amount === d.amount && t.type === d.type && t.date === d.date && (!d.acc || t.acc === d.acc)) : null;
-const rvHas = d => ({ type: true, amount: !!d.amount, dt: !!(d.date || d.time), acc: !!d.acc, note: !!d.note, cat: d.type !== 'Chuyển khoản' && !!(d.cat && d.sub) });
-const rvSel = d => {
-    const u = k => !d.unsure.includes(k);
-    let p = {}; try { p = JSON.parse(localStorage.rvpref || '{}') || {}; } catch (e) { }
-    const f = (k, sure) => sure && p[k] !== false;
-    return { type: f('type', true), amount: f('amount', u('amount')), dt: f('dt', u('date')), acc: f('acc', u('account')), note: f('note', true), cat: f('cat', u('category')) };
-};
-const rvRemember = x => {
-    const h = rvHas(x.d), uk = { amount: 'amount', dt: 'date', acc: 'account', cat: 'category' };
-    let p = {}; try { p = JSON.parse(localStorage.rvpref || '{}') || {}; } catch (e) { }
-    Object.keys(h).forEach(k => { if (h[k] && !x.d.unsure.includes(uk[k])) p[k] = !!x.sel[k]; });
-    try { csSet('rvpref', JSON.stringify(p)); } catch (e) { }
-};
-const rvN = rv => { const h = rvHas(rv.d); return Object.keys(h).filter(f => h[f] && rv.sel[f]).length; };
-function applyDraft(d, sel) {
-    pull();
-    const on = k => !sel || sel[k] !== false;
-    if (on('type') && (E.type === 'Chi' || E.type === 'Thu') && d.type !== E.type) { E.type = d.type; E.cat = E.sub = ''; }
-    if (on('amount') && d.amount) E.amount = d.amount;
-    if (on('dt')) { if (d.date) E.date = d.date; if (d.time) E.time = d.time; }
-    if (on('note') && d.note && !E.note) E.note = d.note;
-    if (on('cat') && d.type === E.type && (E.type === 'Chi' || E.type === 'Thu') && !E.cat && d.cat && d.sub) { E.cat = d.cat; E.sub = d.sub; }
-    if (on('acc') && d.acc) E.acc = d.acc;
-    if (on('acc') && E.type === 'Chuyển khoản' && d.accTo) E.accTo = d.accTo;
-    form();
-    const m = { amount: '#fa', date: '#fd', account: '#fc', category: '#fp' }, sk = { amount: 'amount', date: 'dt', account: 'acc', category: 'cat' };
-    d.unsure.forEach(k => {
-        if (!on(sk[k])) return;
-        const el = $(m[k]); if (!el) return;
-        const box = el.closest('.amtw, label, .cbw'); if (box) box.classList.add('unsure');
-        if (k === 'category' && $('#fs')) $('#fs').closest('.cbw').classList.add('unsure');
-    });
-}
-function scanCard() {
-    const flag = (d, k) => d.unsure.includes(k) ? ' <em class="uns" title="AI không chắc, hãy kiểm tra">⚠</em>' : '';
-    const row = (l, v, k, d) => `<div class="rvr"><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></div>`;
-    if (E.review) {
-        const d = E.review.d, ck = d.type === 'Chuyển khoản', sel = E.review.sel, has = rvHas(d);
-        const fr = (f, l, v, k) => `<label class="rvr${has[f] ? '' : ' off'}"><input type="checkbox" data-rvf="${f}" ${sel[f] && has[f] ? 'checked' : ''} ${has[f] ? '' : 'disabled'}><span>${l}</span><b>${v}${k ? flag(d, k) : ''}</b></label>`;
-        return `<div class="rvc"><div class="rvh"><span>${d.ocr ? '⚠️ AI không dùng được' + (d.aiErr ? ' (' + esc(d.aiErr) + ')' : '') + '. Đây là kết quả đọc chữ tạm trên máy, dễ sai, hãy kiểm tra kỹ' : '✨ AI đọc được' + (d.model ? ' (' + esc(d.model) + ')' : '') + ' — tick ô đúng rồi bấm điền'}</span><a href="#" class="rvt" data-lb="${esc(E.review.st.url)}" title="Xem ảnh gốc để đối chiếu"><img src="${esc(E.review.st.url)}" alt=""></a></div>`
-            + (dupOf(d) ? `<div class="rvdup">⚠️ Có thể đã ghi rồi: ${esc(txLine(dupOf(d)))}</div>` : '')
-            + fr('type', 'Loại', esc(d.type)) + fr('amount', 'Số tiền', d.amount ? num(d.amount) + ' ₫' : '—', 'amount') + fr('dt', 'Ngày giờ', esc(dFmt(d)), 'date')
-            + fr('acc', 'Tài khoản', esc(d.acc || '—') + (ck && d.accTo ? ' → ' + esc(d.accTo) : ''), 'account') + (d.note ? fr('note', 'Ghi chú', esc(d.note)) : '')
-            + (has.cat ? fr('cat', 'Hạng mục', esc(d.cat + ' › ' + d.sub), 'category') : '')
-            + (d.ask || []).filter(a => a.f === 'category' ? !ck && !d.cat : !d.acc).map(a => `<div class="rvq"><div style="font-weight:600;margin-top:8px">🤔 ${esc(a.q)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">` + a.opts.map((o, i) => `<button type="button" class="btn" data-rvq="${a.f}" data-oi="${i}">${esc(a.f === 'category' ? o.p + ' › ' + o.c : o)}</button>`).join('') + '</div></div>').join('')
-            + `<div class="rvall"><button type="button" class="chip" data-rvall="1">Chọn hết</button><button type="button" class="chip" data-rvall="0">Bỏ hết</button></div><div class="rvb"><button type="button" class="btn p" data-rv="ok">Điền ${rvN(E.review)} ô đã chọn</button><button type="button" class="btn" data-rv="no">Bỏ qua</button></div></div>`;
-    }
-    const n = E.batch.filter(x => x.on).length;
-    return `<div class="rvc"><div class="rvh">✨ AI đọc được ${E.batch.length} ảnh — chọn giao dịch để lưu</div>`
-        + E.batch.map((x, i) => { const d = x.d, ok = draftOk(d); return `<div class="bri${ok ? '' : ' bad'}"><label><input type="checkbox" data-bk="${i}" ${x.on ? 'checked' : ''} ${ok ? '' : 'disabled'}><img src="${esc(x.st.url)}" alt=""><span><b>${esc(d.type)} ${d.amount ? num(d.amount) + ' ₫' : '—'}${d.unsure.length ? ' <em class="uns" title="Có ô AI không chắc">⚠</em>' : ''}</b><small>${esc(dFmt(d))} · ${esc(d.acc || 'chưa rõ tài khoản')}${d.type === 'Chuyển khoản' ? ' → ' + esc(d.accTo || '?') : ' · ' + esc(d.cat ? d.cat + ' › ' + d.sub : 'chưa rõ hạng mục')}</small>${ok ? '' : '<small class="need">Thiếu thông tin — bấm Sửa để bổ sung</small>'}${dupOf(d) ? '<small class="need">⚠️ Có thể trùng giao dịch đã có (đã bỏ chọn)</small>' : ''}</span></label><button type="button" class="chip" data-bfix="${i}">Sửa</button></div>`; }).join('')
-        + `<div class="rvb"><button type="button" class="btn p" data-bsave ${n ? '' : 'disabled'}>Lưu ${n} giao dịch</button><button type="button" class="btn" data-bno>Bỏ qua</button></div></div>`;
-}
-function renderScan() {
-    const r = $('#scanrow'); if (!r || !E) return;
-    if (!E.isNew) { r.innerHTML = ''; return; }
-    if (!E.scan && (E.review || (E.batch && E.batch.length))) { r.innerHTML = scanCard(); return; }
-    r.innerHTML = `<div class="scanw"><label class="scanb${E.scan ? ' busy' : ''}">${E.scan ? '<i class="spn"></i>' : '<span>📷</span>'}<span><b>${E.scan ? esc(E.scan) : 'Quét ảnh để tự điền giao dịch'}</b><small>${E.scan ? 'AI đang đọc, thường mất vài giây…' : 'Chụp, chọn (được nhiều ảnh) hoặc dán (Ctrl+V) hóa đơn, bill ngân hàng, biên lai'}</small></span><input type="file" id="fscan" accept="image/*,.heic,.heif" multiple hidden ${E.scan ? 'disabled' : ''}></label>${E.scan && E.ctl ? '<button type="button" class="btn scanx" data-scancancel>Hủy</button>' : ''}</div>`;
-}
-async function scanImg(f) {
-    const E0 = E; if (!E0) return;
-    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) { toast('Chỉ quét được file ảnh (JPG, PNG, WebP, HEIC)'); return; }
-    const ctl = E0.ctl = new AbortController(), t0 = Date.now();
-    let base = 'Đang xử lý ảnh…', st = null;
-    const txt = () => base + (/^AI/.test(base) ? ' ' + Math.round((Date.now() - t0) / 1000) + 's' : '');
-    const msg = m => { base = m; E0.scan = txt(); if (E === E0) renderScan(); };
-    const tick = setInterval(() => { if (E === E0 && E0.scan) { const b = $('#scanrow b'); if (b) b.textContent = txt(); } }, 1000);
-    try {
-        E0.review = E0.batch = null;
-        msg('Đang xử lý ảnh…');
-        const r = await readOne(f, ctl.signal, { ocr: true, msg, onSt: s => { st = s; (E0.staged = E0.staged || []).push(s); s.name = imgName(); if (E === E0) renderAtt(); } });
-        E0.scan = '';
-        if (r.notDoc) { if (E === E0) renderScan(); toast('Ảnh này không giống hóa đơn hay bill giao dịch (ảnh vẫn được đính kèm)'); return; }
-        const d = r.d;
-        if (E !== E0) { toast(d && d.amount ? 'Đã đọc ảnh: ' + num(d.amount) + ' ₫' : 'Đã đọc ảnh nhưng form đã đóng'); return; }
-        if (!d || !d.amount) { renderScan(); toast(r.aiErr ? 'AI lỗi: ' + r.aiErr + '. Thử quét lại sau (ảnh vẫn được đính kèm)' : 'AI không nhận ra số tiền trong ảnh, bạn nhập tay giúp nhé (ảnh vẫn được đính kèm)'); return; }
-        if (cfg().scan.auto && r.st && draftOk(d) && !d.unsure.length) {
-            (E0.staged = E0.staged || []).some(s => s === r.st) || E0.staged.push(r.st);
-            applyDraft(d); r.st.name = imgName(); E0.review = null;
-            toast('Đã tự điền ' + d.type + ' ' + num(d.amount) + ' ₫ — kiểm tra rồi bấm Lưu');
-            return;
-        }
-        E0.review = { d, st: r.st, sel: rvSel(d) };
-        renderScan();
-    }
-    catch (e) { _ocrLog = null; E0.scan = ''; if (E === E0) renderScan(); toast(e.cancel ? 'Đã hủy quét' + (st ? ' (ảnh vẫn được đính kèm)' : '') : 'Không quét được: ' + e.message); }
-    finally { clearInterval(tick); E0.ctl = null; }
-}
-async function scanMany(fs) {
-    const E0 = E; if (!E0) return;
-    fs = fs.filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)).slice(0, 12);
-    if (!fs.length) return toast('Chỉ quét được file ảnh (JPG, PNG, WebP, HEIC)');
-    if (fs.length === 1) return scanImg(fs[0]);
-    const ctl = E0.ctl = new AbortController(), out = [];
-    let k = 0, done = 0, bad = 0;
-    const errs = new Set();   // lý do AI lỗi (hết hạn mức, quá tải...) để báo đúng thay vì chỉ nói "không đọc được"
-    const show = () => { E0.scan = 'Đang đọc ' + done + '/' + fs.length + ' ảnh…'; if (E === E0) renderScan(); };
-    E0.review = E0.batch = null; show();
-    const work = async () => {
-        while (k < fs.length && !ctl.signal.aborted) {
-            const i = k++;
-            try { const r = await readOne(fs[i], ctl.signal, { batch: true }); if (r.d && !r.notDoc) out[i] = r; else { bad++; if (r.aiErr) errs.add(r.aiErr); } }
-            catch (e) { if (e.cancel) return; bad++; }
-            done++; show();
-        }
-    };
-    await Promise.all([work(), new Promise(r => setTimeout(r, 700)).then(work)]);   // 2 luồng, lệch nhau một nhịp: đỡ chạm hạn mức AI
-    const cancelled = ctl.signal.aborted;
-    E0.scan = ''; E0.ctl = null;
-    const items = out.filter(Boolean).map(r => {
-        const d = r.d; if (d.type !== 'Chuyển khoản' && !d.acc) { d.acc = defAcc(); if (!d.unsure.includes('account')) d.unsure.push('account'); }
-        r.st.name = [d.date || todayS(), nz(d.sub || d.cat || d.type).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'giao-dich', d.amount || 0, Date.now().toString(36) + Math.random().toString(36).slice(2, 5)].join('_') + '.jpg';
-        return { st: r.st, d, on: draftOk(d) && !dupOf(d) };
-    });
-    if (E !== E0) { toast('Đã đọc xong ' + items.length + ' ảnh nhưng form đã đóng'); return; }
-    if (cancelled) toast('Đã hủy quét');
-    else if (!items.length) toast('Không đọc được ảnh nào, bạn thử lại hoặc nhập tay nhé');
-    else if (bad) toast('Có ' + bad + ' ảnh không đọc được hoặc không phải hóa đơn' + (errs.size ? ' · ' + [...errs][0] : ''));
-    E0.batch = items.length ? items : null;
-    renderScan();
-}
-$('#ov').addEventListener('click', e => {
-    if (!E) return;
-    const q = s => e.target.closest(s);
-    if (q('[data-scancancel]')) { if (E.ctl) E.ctl.abort(); return; }
-    const rq = q('[data-rvq]');
-    if (rq && E.review) {
-        const d = E.review.d, a = (d.ask || []).find(x => x.f === rq.dataset.rvq), o = a && a.opts[+rq.dataset.oi];
-        if (o) {
-            if (a.f === 'category') { d.cat = o.p; d.sub = o.c; d.unsure = d.unsure.filter(k => k !== 'category'); E.review.sel.cat = true; }
-            else { d.acc = o; d.unsure = d.unsure.filter(k => k !== 'account'); E.review.sel.acc = true; }
-            renderScan();
-        }
-        return;
-    }
-    const ra = q('[data-rvall]');
-    if (ra && E.review) {
-        const h = rvHas(E.review.d), on = ra.dataset.rvall === '1';
-        Object.keys(h).forEach(k => { if (h[k]) E.review.sel[k] = on; });
-        renderScan();
-        return;
-    }
-    const rv = q('[data-rv]');
-    if (rv) {
-        const x = E.review; E.review = null;
-        if (x && rv.dataset.rv === 'ok') rvRemember(x);
-        if (rv.dataset.rv === 'ok' && x) { (E.staged = E.staged || []).some(s => s === x.st) || E.staged.push(x.st); applyDraft(x.d, x.sel); x.st.name = imgName(); toast('Đã điền ' + rvN(x) + ' ô đã chọn — kiểm tra lại rồi bấm Lưu'); }
-        else { if (x) E.staged = (E.staged || []).filter(s => s !== x.st), renderAtt(); renderScan(); }
-        return;
-    }
-    if (q('[data-bno]')) { E.batch = null; renderScan(); return; }
-    const bf = q('[data-bfix]');
-    if (bf) { const x = E.batch.splice(+bf.dataset.bfix, 1)[0]; if (!E.batch.length) E.batch = null; (E.staged = E.staged || []).push(x.st); applyDraft(x.d); x.st.name = imgName(); return; }
-    if (q('[data-bsave]')) {
-        const E0 = E, items = E0.batch.filter(x => x.on);
-        if (!items.length) return toast('Chưa chọn giao dịch nào');
-        items.forEach((x, i) => {
-            const d = x.d, ck = d.type === 'Chuyển khoản', row = { id: newId(i), date: d.date || todayS(), type: d.type, amount: d.amount, acc: d.acc || defAcc(), accTo: ck ? d.accTo : '', cat: ck ? '' : d.cat, sub: ck ? '' : d.sub, note: joinImg(d.note || '', []) };
-            if (d.time) row.at = row.date + 'T' + d.time + ':00';
-            txSave(row, null, [{ name: x.st.name, blob: x.st.blob }]);
-        });
-        E0.batch = E0.batch.filter(x => !x.on);
-        if (!E0.batch.length) { E0.batch = null; closeSheet(); } else renderScan();
-        toast('Đã lưu ' + items.length + ' giao dịch');
-    }
-});
-$('#ov').addEventListener('change', e => {
-    const c = e.target.closest && e.target.closest('[data-rvf]');
-    if (!c || !E || !E.review) return;
-    E.review.sel[c.dataset.rvf] = c.checked;
-    const b = $('#scanrow [data-rv="ok"]'); if (b) b.textContent = 'Điền ' + rvN(E.review) + ' ô đã chọn';
-});
-$('#ov').addEventListener('change', e => {
-    if (E && e.target.dataset && e.target.dataset.bk != null && E.batch) { E.batch[+e.target.dataset.bk].on = e.target.checked; renderScan(); }
-});
-['input', 'change', 'click'].forEach(t => $('#ov').addEventListener(t, e => { const b = e.target.closest && e.target.closest('.unsure'); if (b) b.classList.remove('unsure'); }));
-$('#ov').addEventListener('change', e => {
-    if (e.target.id !== 'fscan' || !E) return;
-    const fs = [...e.target.files]; e.target.value = '';
-    if (fs.length) scanMany(fs);
-});
-
 function takeImages(fs) {
     if (!E || !fs.length) return;
-    const empty = E.isNew && !E.scan && !amtVal((($('#fa') || {}).value) || '');
-    if (empty) scanMany(fs);
-    else fs.forEach(attach);
-    if (fs.length > 1 && !empty) toast('Đang xử lý ' + fs.length + ' ảnh song song…');
+    fs.forEach(attach);
+    if (fs.length > 1) toast('Đang xử lý ' + fs.length + ' ảnh song song…');
 }
 document.addEventListener('paste', e => {
     if (!E || !$('#ov').classList.contains('open') || $('#cf').classList.contains('open')) return;
