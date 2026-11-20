@@ -70,15 +70,30 @@ async function backupDrive() {
 // ---- Đăng nhập: giới hạn thử sai theo IP (trong bộ nhớ; chỉ làm chậm kẻ đoán mò, không bền giữa các lần khởi động) ----
 const FAIL_MAX = 5, FAIL_WIN = 900 * 1000;
 const memFail = new Map();
+const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL, RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+async function rd(...cmds) {   // Redis REST pipeline; lỗi thì ném để bên gọi quay về bộ nhớ
+  const r = await fetch(RU + '/pipeline', { method: 'POST', headers: { Authorization: 'Bearer ' + RT, 'Content-Type': 'application/json' }, body: JSON.stringify(cmds) });
+  const j = await r.json();
+  if (!Array.isArray(j) || j.some(x => !x || x.error)) throw new Error('redis');
+  return j.map(x => x.result);
+}
 async function doLogin(req, res, body) {
-  const ip = auth.clientIp(req), m = memFail.get(ip);
-  if (m && m.exp > Date.now() && m.n >= FAIL_MAX) return res.status(429).json({ ok: false, wait: Math.ceil((m.exp - Date.now()) / 1000), err: 'Thử sai quá nhiều lần' });
+  const ip = auth.clientIp(req), rk = 'stc:lf:' + ip, useR = !!(RU && RT), m = memFail.get(ip);
+  let blocked = 0;   // số giây còn bị khóa
+  if (useR) {
+    try { const [n, ttl] = await rd(['GET', rk], ['TTL', rk]); if (+n >= FAIL_MAX) blocked = Math.max(+ttl, 1); }
+    catch (e) { /* Redis lỗi: dùng bộ nhớ bên dưới */ }
+  }
+  if (!blocked && m && m.exp > Date.now() && m.n >= FAIL_MAX) blocked = Math.ceil((m.exp - Date.now()) / 1000);
+  if (blocked) return res.status(429).json({ ok: false, wait: blocked, err: 'Thử sai quá nhiều lần' });
   if (!auth.secretOk(String(body.login || ''))) {
     if (m && m.exp > Date.now()) m.n++; else memFail.set(ip, { n: 1, exp: Date.now() + FAIL_WIN });
+    if (useR) { try { await rd(['SET', rk, '0', 'EX', String(FAIL_WIN / 1000), 'NX'], ['INCR', rk]); } catch (e) { } }
     await new Promise(r => setTimeout(r, 500));
     return res.status(200).json({ ok: false, err: 'Sai mật khẩu' });
   }
   memFail.delete(ip);
+  if (useR) { try { await rd(['DEL', rk]); } catch (e) { } }
   res.setHeader('Set-Cookie', auth.cookie());
   return res.status(200).json({ ok: true });
 }
@@ -100,7 +115,11 @@ module.exports = async (req, res) => {
     if (body.login !== undefined) return await doLogin(req, res, body);
     if (!(await auth.ok(req, res))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
 
-    if (body.logoutAll) return res.status(200).json({ ok: false, err: 'Đã bỏ Redis nên không còn "đăng xuất tất cả". Muốn đăng xuất mọi thiết bị: đổi APP_PASS (hoặc APP_KEY) trên Vercel rồi Redeploy.' });
+    if (body.logoutAll) {   // ghi mốc thu hồi vào Redis; cấp lại cookie cho máy này (iat mới >= mốc) nên máy này vẫn đăng nhập
+      if (!(await auth.revokeAll())) return res.status(200).json({ ok: false, err: 'Chưa cấu hình Redis (KV_REST_API_URL / KV_REST_API_TOKEN) nên không đăng xuất tất cả được. Cách khác: đổi APP_PASS hoặc APP_KEY trên Vercel rồi Redeploy.' });
+      res.setHeader('Set-Cookie', auth.cookie());
+      return res.status(200).json({ ok: true });
+    }
     if (body.backupNow) return res.status(200).json(await backupDrive().catch(e => ({ ok: false, err: String(e && e.message || e) })));
     if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));
     if (body.cfg) return res.status(200).json({ ok: true, off: true });   // cài đặt chỉ còn lưu trên từng máy (localStorage)

@@ -630,7 +630,7 @@ setInterval(() => { if (!alive()) {
     if (!$('#app').classList.contains('hide'))
         lock();
     return;
-} if (Date.now() - ACT_T > 120000 && ++PT % 2) return; sync(false); }, POLL_MS);
+} if (document.hidden && ++PT % 4) return; if (Date.now() - ACT_T > 120000 && ++PT % 2) return; sync(false); }, POLL_MS);
 addEventListener('focus', () => { if (alive()) sync(false); });
 document.addEventListener('pointerenter', () => { if (alive()) sync(false); }, { once: false, passive: true });
 document.addEventListener('focusout', () => setTimeout(() => { if (S.dirty && !typing()) {
@@ -2655,7 +2655,7 @@ function bkRowOk(r) {   // cùng luật với cleanRow ở máy chủ, để m�
 function bkDownload() {
     if (!S.tx.length && !S.acc.length) return toast('Chưa có dữ liệu để tải');
     const d = new Date(), p = n => String(n).padStart(2, '0'), name = 'so-thu-chi-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.json';
-    const data = { app: 'so-thu-chi', v: 1, at: d.toISOString(), src: 'device', rev: S.rev, tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash };
+    const data = { app: 'so-thu-chi', v: 1, at: d.toISOString(), src: 'device', rev: S.rev, tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, goals: GOALS, tpl: TPL };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
     a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click();
@@ -2694,7 +2694,12 @@ async function bkRestore(file) {
     const accs = (d.acc || []).filter(x => x && x.name && !S.acc.some(y => y.name === x.name));
     const cats = (d.cat || []).filter(x => x && x.t && x.p && x.c && !S.cat.some(y => y.t === x.t && y.p === x.p && y.c === x.c));
     const lims = (d.lim || []).filter(x => x && x.per && x.v > 0 && !S.lim.some(y => bkSame(x, y) && y.v > 0));
-    if (!rows.length && !accs.length && !cats.length && !lims.length) return toast('Sổ đã có đủ những gì trong file này');
+    // mục tiêu / mẫu giao dịch chỉ nằm trên máy: gộp thêm cái còn thiếu
+    const gl = (Array.isArray(d.goals) ? d.goals : []).filter(g => g && g.id && g.name && !GOALS.some(y => y.id === g.id));
+    const tp = (Array.isArray(d.tpl) ? d.tpl : []).filter(t => t && typeof t === 'object' && !TPL.some(y => JSON.stringify(y) === JSON.stringify(t)));
+    if (gl.length) { GOALS.push(...gl); goalsSave(); }
+    if (tp.length) { TPL.push(...tp); tplSaveLS(); }
+    if (!rows.length && !accs.length && !cats.length && !lims.length) return toast(gl.length || tp.length ? 'Đã khôi phục ' + [gl.length && gl.length + ' mục tiêu', tp.length && tp.length + ' mẫu'].filter(Boolean).join(', ') : 'Sổ đã có đủ những gì trong file này');
     const skip = [had && had + ' giao dịch đã có', inTrash && inTrash + ' đang trong Thùng rác', bad && bad + ' dòng không hợp lệ'].filter(Boolean).join(', ');
     const msg = 'Sẽ thêm ' + [rows.length && rows.length + ' giao dịch', accs.length && accs.length + ' tài khoản', cats.length && cats.length + ' hạng mục', lims.length && lims.length + ' hạn mức'].filter(Boolean).join(', ') + '.' + (skip ? ' Bỏ qua: ' + skip + '.' : '') + ' Không có gì đang có bị sửa hay xóa.';
     if (!await ask('Khôi phục từ file sao lưu?', msg, { icon: '♻️', ok: 'Khôi phục' })) return;
@@ -4050,7 +4055,9 @@ async function runJob(job, ops, safe) {
             if (e.reject) throw e;
             if (!safe) {
                 if (!amb) throw e;                 // chưa từng gửi mơ hồ: đây là lỗi thật, báo cho người dùng
-                return { ok: true, fast: true };   // lần gửi trước có thể đã tới nơi: lỗi "trùng..." là do chính nó gây ra
+                // lần gửi trước có thể đã tới nơi: chỉ lỗi kiểu "trùng / đã tồn tại" mới là do chính nó gây ra. Lỗi khác là lỗi thật.
+                if (!/trùng|đã tồn tại|đã có|duplicate|already/i.test(e.message || '')) throw e;
+                try { return await call([], ''); } catch (_) { return { ok: true, fast: true }; }   // kéo lại sổ để giao diện khớp với server
             }
             if (++odd >= 6) return { parked: true };
             await waitNet(Math.min(3000 * odd, 20000));

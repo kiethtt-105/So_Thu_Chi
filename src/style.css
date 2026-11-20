@@ -13,7 +13,7 @@ svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .hb .sens{filter:blur(8px);user-select:none}
 .ib .sun{display:none}html.dark .ib .sun{display:block}html.dark .ib .moon{display:none}
 #lerr{min-height:22px;margin-top:8px;font-size:13px;color:var(--chi)}.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
-.wrap{min-height:100vh;padding-bottom:28px}
+.wrap{min-height:100vh;min-height:100dvh;padding-bottom:28px}
 .top{position:sticky;top:0;z-index:8;display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .top .brand{display:flex;align-items:center;gap:10px;font:700 16px var(--fd);flex:1;min-width:0}.top #st{display:none}.top .brand>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top .brand small{display:block;font:400 11px var(--fb);color:var(--mut)}
 .logo{width:32px;height:32px;border-radius:9px;background:var(--acc);display:grid;place-items:center;color:var(--on-acc);flex:none}
@@ -320,7 +320,7 @@ html{--z:1}
 @media(min-width:4600px){html{--z:2.5;zoom:var(--z)}}
 @media(min-width:7000px){html{--z:3.5;zoom:var(--z)}}
 
-.wrap{min-height:calc(100vh / var(--z))}
+.wrap{min-height:calc(100vh / var(--z));min-height:calc(100dvh / var(--z))}
 .sheet{max-height:calc(92dvh / var(--z))}
 #cf .msg{max-height:calc(40dvh / var(--z))}
 #toast{width:min(450px,calc((100vw - 24px) / var(--z)))}

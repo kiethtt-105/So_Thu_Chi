@@ -66,8 +66,7 @@ module.exports = async (req, res) => {
         return send(200, { ok: true, has: +n > 0 });
       }
       case 'authopts': {
-        const rl = 'stc:pk:rl:' + ipOf(req), [n] = await rd(['INCR', rl]);
-        if (+n === 1) await rd(['EXPIRE', rl, '300']);
+        const rl = 'stc:pk:rl:' + ipOf(req), [, n] = await rd(['SET', rl, '0', 'EX', '300', 'NX'], ['INCR', rl]);   // SET NX gắn TTL, INCR giữ nguyên TTL: không bao giờ có key vô hạn
         if (+n > 30) return send(429, { ok: false, err: 'Thử quá nhiều lần, hãy đợi vài phút' });
         const [ids] = await rd(['HKEYS', KEY]);
         if (!ids.length) throw new UErr('Chưa có passkey nào được đăng ký');
