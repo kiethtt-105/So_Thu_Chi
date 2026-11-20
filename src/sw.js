@@ -1,12 +1,12 @@
 
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
-const V = 'stc-v57';
+const V = 'stc-v58';
 const RT = 'stc-rt', RT_MAX = 80;   // cache nền: ảnh đính kèm, thư viện CDN (đọc ảnh HEIC / quét chữ) để dùng lại khi offline
 const isLib = h => h === 'cdn.jsdelivr.net' || h === 'cdnjs.cloudflare.com' || h === 'unpkg.com';
 const isImg = h => h === 'drive.google.com' || /(^|\.)googleusercontent\.com$/.test(h);
 async function trim(c, max) { const ks = await c.keys(); for (let i = 0; i < ks.length - max; i++) await c.delete(ks[i]); }
-const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
+const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'app.js', 'security.js', 'manifest.webmanifest', 'icons/icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(

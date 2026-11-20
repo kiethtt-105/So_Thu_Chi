@@ -470,15 +470,7 @@ else {
 } return r; }
 function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } sessionStorage.clear(); localStorage.removeItem('sess'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe();  }
 let LOGOUT_ALL_AT = 0;
-async function logoutAll() {
-    if (!await ask('Đăng xuất tất cả thiết bị?', 'Mọi máy khác phải nhập lại mật khẩu. Máy này vẫn giữ đăng nhập.', { icon: '🔒', ok: 'Đăng xuất' })) return;
-    LOGOUT_ALL_AT = Date.now();
-    try {
-        const j = await (await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ logoutAll: 1 }) })).json();
-        LOGOUT_ALL_AT = Date.now();
-        toast(j.ok ? 'Đã đăng xuất các thiết bị khác' : (j.err || 'Không thực hiện được'));
-    } catch (e) { toast('Không kết nối được máy chủ'); }
-}
+// logoutAll() và phần Bảo mật trong Cài đặt: xem security.js
 let LOGIN_BUSY = false;
 document.addEventListener('click', e => {
     const b = e.target.closest('#pwt'); if (!b) return;
@@ -2724,9 +2716,7 @@ function openSettings() {
 <div class="menu">${TABS.filter(t => t[0] !== 'home').map(([k, l]) => `<label class="row sw">${ic(k)}<span class="m"><b>${l}</b></span><input type="checkbox" role="switch" data-vis="${k}" ${tabOn(k) ? 'checked' : ''} aria-label="Hiện ${l}"></label>`).join('')}</div>
 <p class="hint">Tắt mục nào thì mục đó ẩn khỏi menu trái và menu Thêm trên điện thoại. Thanh dưới điện thoại luôn giữ đủ 4 ô, mục kế tiếp tự bù vào. Mục đang mở vẫn hiện. Đồng bộ trên mọi thiết bị.</p>
 ${INST ? `<div class="sec">Ứng dụng</div><div class="menu"><button class="row" data-nt="install"><span class="dot">⬇️</span><span class="m"><b>Cài đặt ứng dụng</b><small>Mở như ứng dụng riêng, có biểu tượng trên máy</small></span></button></div>` : ''}`;
-    const pSec = () => `<div class="sec">Đăng nhập và thiết bị</div>
-<div id="seccard"></div>
-<div class="menu"><div class="row"><span class="dot">🔒</span><span class="m"><b>Đăng xuất tất cả thiết bị</b><small>Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Đăng xuất</button></div></div>`;
+    const pSec = () => secSection();   // security.js
     const pNt = () => `<div class="sec">Thông báo trên thiết bị</div>
 <div class="menu"><div class="row"><span class="dot">🔔</span><span class="m"><b>Thông báo của trình duyệt</b><small>${stat}</small></span>${p === 'default' ? '<button class="chip on" data-nt="enable">Bật</button>' : p === 'granted' ? '<button class="chip" data-nt="test">Gửi thử</button>' : ''}</div>
 ${p === 'granted' ? sw('sys', '🖥️', 'Hiện popup hệ thống', 'Tắt thì chỉ còn thông báo trong ứng dụng và Telegram', c.sys) : ''}
@@ -2802,7 +2792,7 @@ ${pScan()}`;
     const nb = $('#sh .stb'); if (nb && keepTop) nb.scrollTop = keepTop;
     const on = $('#sh .stn .on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
     openSheet();
-    if (SET_TAB === 'sec') secLoad();
+    if (SET_TAB === 'sec') { secLoad(); secHistLoad(); }
 }
 // ===== Sao lưu / khôi phục JSON =====
 const BK_TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'];

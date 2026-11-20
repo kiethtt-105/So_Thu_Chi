@@ -56,4 +56,34 @@ async function ok(req, res) {   // truyền res để tự gia hạn cookie khi 
 // IP thật của client. Trên Vercel, x-vercel-forwarded-for / x-real-ip do nền tảng đặt, client không giả được;
 // x-forwarded-for phần đầu thì client tự thêm được nên chỉ dùng làm phương án cuối.
 const clientIp = req => String(req.headers['x-vercel-forwarded-for'] || req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'x').split(',')[0].trim();
-module.exports = { env, ok, secretOk, cookie, clear, revokeAll, clientIp };
+
+// ---- Lịch sử đăng nhập (Redis). Thành công: stc:lh (50 mục). Thất bại: stc:lhf (20 mục, riêng để kẻ đoán mò không đẩy mất lịch sử thật). ----
+const LH = 'stc:lh', LHF = 'stc:lhf';
+function devName(req) {
+  const u = String(req.headers['user-agent'] || '');
+  const os = /Windows/.test(u) ? 'Windows' : /iPhone|iPad/.test(u) ? 'iOS' : /Android/.test(u) ? 'Android' : /Mac OS X/.test(u) ? 'macOS' : /Linux/.test(u) ? 'Linux' : '';
+  const br = /Edg\//.test(u) ? 'Edge' : /Firefox|FxiOS/.test(u) ? 'Firefox' : /CriOS|Chrome/.test(u) ? 'Chrome' : /Safari/.test(u) ? 'Safari' : 'Trình duyệt';
+  return br + (os ? ' · ' + os : '');
+}
+async function logLogin(req, method, good) {   // không bao giờ ném lỗi, không làm hỏng đăng nhập nếu Redis lỗi
+  if (!RU || !RT) return;
+  const key = good ? LH : LHF, max = good ? 50 : 20;
+  try {
+    await redis(['LPUSH', key, JSON.stringify({ t: Date.now(), ip: clientIp(req), d: devName(req), m: method, ok: good ? 1 : 0 })]);
+    await redis(['LTRIM', key, '0', String(max - 1)]);
+  } catch (e) { }
+}
+async function loginList() {   // null = chưa có Redis
+  if (!RU || !RT) return null;
+  const rows = [];
+  for (const k of [LH, LHF]) {
+    const a = await redis(['LRANGE', k, '0', '-1']);
+    (a || []).forEach(s => { try { rows.push(JSON.parse(s)); } catch (e) { } });
+  }
+  return rows.sort((x, y) => y.t - x.t).slice(0, 60);
+}
+async function clearLogins() {
+  if (!RU || !RT) return false;
+  try { await redis(['DEL', LH, LHF]); return true; } catch (e) { return false; }
+}
+module.exports = { env, ok, secretOk, cookie, clear, revokeAll, revokedAt, clientIp, devName, logLogin, loginList, clearLogins };

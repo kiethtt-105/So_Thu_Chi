@@ -85,6 +85,7 @@ module.exports = async (req, res) => {
         if (!verifySig(rec, Buffer.concat([ad, hash]), unb(r.signature)) || ((cnt || rec.c) && cnt <= rec.c)) throw new UErr('Passkey không hợp lệ');
         rec.c = cnt; rec.l = Date.now();
         await rd(['HSET', KEY, cid, JSON.stringify(rec)]);
+        await auth.logLogin(req, 'Passkey', true);
         res.setHeader('Set-Cookie', auth.cookie());   // giống đăng nhập mật khẩu
         return send(200, { ok: true });
       }

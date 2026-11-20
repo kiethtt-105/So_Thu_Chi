@@ -89,11 +89,12 @@ async function doLogin(req, res, body) {
   if (!auth.secretOk(String(body.login || ''))) {
     if (m && m.exp > Date.now()) m.n++; else memFail.set(ip, { n: 1, exp: Date.now() + FAIL_WIN });
     if (useR) { try { await rd(['SET', rk, '0', 'EX', String(FAIL_WIN / 1000), 'NX'], ['INCR', rk]); } catch (e) { } }
-    await new Promise(r => setTimeout(r, 500));
+    await Promise.all([auth.logLogin(req, 'Sai mật khẩu', false), new Promise(r => setTimeout(r, 500))]);
     return res.status(200).json({ ok: false, err: 'Sai mật khẩu' });
   }
   memFail.delete(ip);
   if (useR) { try { await rd(['DEL', rk]); } catch (e) { } }
+  await auth.logLogin(req, 'Mật khẩu', true);
   res.setHeader('Set-Cookie', auth.cookie());
   return res.status(200).json({ ok: true });
 }
