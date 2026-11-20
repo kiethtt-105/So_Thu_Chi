@@ -1421,18 +1421,39 @@ function sgCompute() {
     });
     return [...M.values()].filter(x => x.s + x.n > 0).sort((a, b) => (b.s + b.n) - (a.s + a.n)).slice(0, 4);
 }
+const sgFreq = arr => { const m = new Map(); arr.forEach(x => m.set(x, (m.get(x) || 0) + 1)); return [...m].sort((a, b) => b[1] - a[1]); };
+// Số tiền / ghi chú hay dùng cho hạng mục đã chọn: bấm một lần là điền, khỏi gõ lại
+function sgExtra() {
+    const ba = $('#sga'), bn = $('#sgn');
+    if (!ba && !bn) return;
+    if (!E || !E.isNew || !E.cat) { if (ba) ba.innerHTML = ''; if (bn) bn.innerHTML = ''; SG.amts = []; SG.notes = []; return; }
+    const H = S.tx.filter(h => h.type === E.type && h.cat === E.cat && (!E.sub || h.sub === E.sub) && h.id !== E.id);
+    const amt = amtVal(($('#fa') || {}).value || ''), note = (($('#fn') || {}).value || '').trim();
+    SG.amts = amt ? [] : sgFreq(H.map(h => Math.round(+h.amount)).filter(Boolean)).filter(x => x[1] >= 2).slice(0, 3).map(x => x[0]);
+    SG.notes = note ? [] : sgFreq(H.map(h => noteTxt(h.note).trim()).filter(t => t && t.length <= 40)).filter(x => x[1] >= 2).slice(0, 3).map(x => x[0]);
+    if (ba) ba.innerHTML = SG.amts.length ? '<span class="sgl">Số tiền hay dùng:</span>' + SG.amts.map((v, i) => `<button type="button" class="chip" data-sga="${i}">${short(v)}</button>`).join('') : '';
+    if (bn) bn.innerHTML = SG.notes.length ? '<span class="sgl">Ghi chú hay dùng:</span>' + SG.notes.map((v, i) => `<button type="button" class="chip" data-sgn="${i}">${esc(v)}</button>`).join('') : '';
+}
 function sgUpdate() {
     const box = $('#sg');
     if (!box) return;
-    if (!E || !E.isNew || !$('#fp')) { box.innerHTML = ''; return; }
+    if (!E || !E.isNew || !$('#fp')) { box.innerHTML = ''; sgExtra(); return; }
     const L = sgCompute(); SG.list = L;
     const top = L[0], sec = L[1];
     if (!E.catTouched && top && top.n >= 3.5 && (!sec || top.n >= sec.n * 1.6) && (E.cat !== top.cat || E.sub !== top.sub)) {   // ghi chú khớp rõ với lịch sử: tự điền, không cần bấm
         E.cat = top.cat; E.sub = top.sub; E.auto = true;
         $('#fp').value = E.cat; const fs = $('#fs'); if (fs) fs.value = E.sub;
+        if (!E.accTouched) {   // hạng mục này gần như luôn trả từ một tài khoản: tự chọn luôn
+            const H = S.tx.filter(h => h.type === E.type && h.cat === top.cat && (!top.sub || h.sub === top.sub)), f = sgFreq(H.map(h => h.acc))[0], sel = $('#fc');
+            if (f && sel && f[1] >= 3 && f[1] / H.length >= 0.7 && f[0] !== sel.value && S.acc.some(a => a.name === f[0])) {
+                sel.value = f[0]; E.acc = f[0];
+                if (sel.nextElementSibling) sel.nextElementSibling.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.v === f[0]));
+            }
+        }
     }
     const cur = E.cat + '|' + E.sub, hasNote = !!($('#fn') && $('#fn').value.trim()), chips = L.filter(x => hasNote ? (x.n > 0 || x.s >= 3) : x.s + x.n >= 1.5).slice(0, 3);   // đã gõ ghi chú mà không khớp gì: chỉ giữ gợi ý thật sự phổ biến
     box.innerHTML = chips.length ? `<span class="sgl">${E.auto && !E.catTouched ? '✨ Tự điền theo lịch sử, bấm để đổi:' : 'Gợi ý:'}</span>` + chips.map(x => `<button type="button" class="chip${x.cat + '|' + x.sub === cur ? ' on' : ''}" data-sg="${SG.list.indexOf(x)}">${emo(x.cat)} ${esc(x.sub || x.cat)}</button>`).join('') : '';
+    sgExtra();
 }
 $('#ov').addEventListener('click', e => {
     const b = e.target.closest('[data-sg]');
@@ -1448,7 +1469,14 @@ $('#ov').addEventListener('input', e => {
     if (t.dataset && t.dataset.cb) { E.catTouched = true; E.auto = false; return; }   // người dùng tự gõ hạng mục: không tự điền đè nữa
     if (t.id === 'fn' || t.id === 'fa') { clearTimeout(SG.tm); SG.tm = setTimeout(() => { if (E && $('#sg')) sgUpdate(); }, t.id === 'fn' ? 250 : 400); }
 });
-$('#ov').addEventListener('change', e => { if (E && E.isNew && (e.target.id === 'fh' || e.target.id === 'fc') && $('#sg')) sgUpdate(); });
+$('#ov').addEventListener('change', e => { if (E && E.isNew && e.target.id === 'fc') E.accTouched = true; if (E && E.isNew && (e.target.id === 'fh' || e.target.id === 'fc') && $('#sg')) sgUpdate(); });
+$('#ov').addEventListener('click', e => {
+    const a = e.target.closest('[data-sga]'), n = e.target.closest('[data-sgn]');
+    if (!E || !(a || n)) return;
+    if (a) { const v = SG.amts[+a.dataset.sga], f = $('#fa'); if (v && f) { f.value = num(v); f.dispatchEvent(new Event('input', { bubbles: true })); fitAmtSoon(); f.focus(); } }
+    else { const v = SG.notes[+n.dataset.sgn], f = $('#fn'); if (v && f) { f.value = v; f.dispatchEvent(new Event('input', { bubbles: true })); f.focus(); } }
+    sgExtra();
+});
 const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 function defAcc() { let a = ''; try { a = cfg().tx.acc || localStorage.lastAcc || ''; } catch (e) { } return S.acc.some(x => x.name === a) ? a : ((S.acc.find(x => x.type !== HELD) || S.acc[0] || {}).name || ''); }
 $('#ov').addEventListener('click', e => {
@@ -1475,14 +1503,14 @@ function form() {
         : `<label class="w">${lb}${pkSel(id, S.acc.map(a => a.name).filter(n => id !== 'ft' || n !== E.acc).map(n => ({ v: n, t: n })), id === 'ft' ? E.accTo : E.acc, extra)}</label>`;
     $('#sh').innerHTML = `<div id="scanrow"></div><div class="tfh"><h3>${E.isNew ? 'Thêm giao dịch' : 'Sửa giao dịch'}</h3><div class="seg">${TYPES.map(x => `<button data-ty="${x}" class="${x === ty ? 'on' : ''}">${x === 'Chuyển khoản' ? 'Chuyển' : x}</button>`).join('')}</div></div>${tplRow()}
 <div class="tf"><div class="tf-l"><div class="amtw"><input class="amt money ${CLS[ty]}" ${ty === 'Điều chỉnh' ? 'data-neg="1"' : ''} id="fa" inputmode="${ty === 'Điều chỉnh' ? 'text' : 'numeric'}" placeholder="0" value="${E.amount ? num(E.amount) : ''}" aria-label="Số tiền"><span class="cur" aria-hidden="true">₫</span></div>
-<div class="qk"><button type="button" class="chip" data-k="000" title="Thêm 000 vào cuối số tiền">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div>
+<div class="qk"><button type="button" class="chip" data-k="000" title="Thêm 000 vào cuối số tiền">+000</button><small>Gõ 50k, 1.5tr hoặc phép tính như 45k*3+20k</small></div><div class="sg" id="sga"></div>
 <div class="f">
 <label>Ngày<input type="date" id="fd" value="${E.date}"></label><label>Giờ<input type="time" id="fh" value="${E.time || ''}"></label>
 <div class="w qd3">${[['0', 'Hôm nay'], ['-1', 'Hôm qua'], ['-2', 'Hôm kia']].map(([n, t]) => { const d = new Date(); d.setDate(d.getDate() + +n); return `<button type="button" class="chip${E.date === ymd(d) ? ' on' : ''}" data-qd="${n}">${t}</button>`; }).join('')}</div></div></div>
 <div class="tf-r f">
 ${accBox('fc', ty === 'Chuyển khoản' ? 'Từ tài khoản' : 'Tài khoản')}
 ${ty === 'Chuyển khoản' ? (noAcc ? '' : accBox('ft', 'Đến tài khoản', '<option value="">Chọn…</option>')) : ty === 'Điều chỉnh' ? '' : catFields(ty, E.cat, E.sub)}
-<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="w" id="att"></div></div></div>
+<label class="w">Ghi chú<input id="fn" value="${esc(E.note)}" placeholder="Không bắt buộc"></label><div class="sg" id="sgn"></div><div class="w" id="att"></div></div></div>
 <div class="sfoot"><button class="btn p w" data-save title="Ctrl + Enter">${E.isNew ? 'Lưu giao dịch' : 'Lưu thay đổi'}</button>
 <div class="sec2"><button type="button" class="btn" data-tplsave>☆ Lưu mẫu</button>${E.isNew ? '' : '<button type="button" class="btn" data-dup>⧉ Nhân đôi</button><button type="button" class="btn d" data-del>🗑 Xóa</button>'}</div></div>`;
     renderAtt();
