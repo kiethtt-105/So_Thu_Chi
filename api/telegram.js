@@ -1,12 +1,10 @@
 const auth = require('./_auth');
 const crypto = require('crypto');
 const env = auth.env;
-const RU = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const RT = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 
 // Nhiều thiết bị cùng mở sẽ cùng gửi một thông báo: chỉ cho tin ĐẦU TIÊN đi trong 90 giây.
 // Bỏ qua các dòng số dư (💰) và giờ tạo (🕒) vì mỗi máy tính ra hơi khác nhau.
-// Không có Redis: chống trùng trong bộ nhớ của instance (cùng cách với giới hạn đăng nhập ở store.js). Tốt nhất có thể, không bền giữa các lần khởi động.
+// Không hỏi được Apps Script: chống trùng trong bộ nhớ của instance (cùng cách với giới hạn đăng nhập ở store.js). Tốt nhất có thể, không bền giữa các lần khởi động.
 const memTg = new Map();
 function memFirst(key) {
   const now = Date.now();
@@ -31,15 +29,8 @@ async function firstOf(text, dk) {
   // Có dk (khóa theo nội dung giao dịch): dedupe theo dk + tiêu đề, nên hai khoản khác nhau cùng chữ vẫn được gửi. Không có: theo nội dung như cũ.
   const base = dk ? 'k|' + dk + '|' + text.split('\n')[0] : norm;
   const key = 'stc:tgd:' + crypto.createHash('sha1').update(base).digest('hex');
-  const g = await gsFirst(key);   // ưu tiên Apps Script: dùng chung cho mọi instance Vercel, không cần Redis
-  if (g !== null) return g;
-  if (!RU || !RT) return memFirst(key);
-  try {
-    const r = await fetch(RU + '/pipeline', { method: 'POST', headers: { Authorization: 'Bearer ' + RT, 'Content-Type': 'application/json' }, body: JSON.stringify([['SET', key, '1', 'NX', 'EX', '90']]) });
-    const j = await r.json();
-    if (!Array.isArray(j) || !j[0] || j[0].error) return memFirst(key);   // Redis lỗi: quay về bộ nhớ
-    return j[0].result !== null;
-  } catch (e) { return memFirst(key); }
+  const g = await gsFirst(key);   // Apps Script: dùng chung cho mọi instance Vercel
+  return g !== null ? g : memFirst(key);
 }
 
 

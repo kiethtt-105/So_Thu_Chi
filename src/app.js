@@ -1,4 +1,3 @@
-
 const { NAME, STORE } = window.CONFIG || {}, POLL_MS = 10000; // hạn phiên (APP_TTL_HOURS, mặc định 48h) do cookie ở server quyết định
 const alive = () => { let t = 0; try { t = +sessionStorage.sess || 0; } catch (e) { } return !!t; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { sessionStorage.sess = n; } catch (e) { } }; })();
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -212,7 +211,7 @@ async function call(ops, rev, ms, fast) {
     return j;
 }
 function stamp() { }
-// ===== Đồng bộ cài đặt giữa các thiết bị (lưu ở Redis qua /api/store, trường "cfg") =====
+// ===== Đồng bộ cài đặt giữa các thiết bị (trường "cfg" qua /api/store; hiện chỉ lưu từng máy) =====
 // localStorage chỉ còn là bản sao để dùng offline. Sửa ở đâu cũng được: máy khác nhận trong vài giây.
 // Hai máy sửa cùng lúc: gộp 3 chiều (so với bản gốc đã đồng bộ lần trước), nên không đè mất thay đổi của nhau.
 const CS_KEYS = ['stcfg', 'stcx', 'tpl', 'goals', 'rvpref', 'lastAcc', 'snz', 'theme', 'sbc', 'fx', 'hidtabs', 'aicon'];
@@ -4034,7 +4033,7 @@ if (typeof notify === 'function') {
 })();
 
 const OB = { n: 0, ids: new Set(), jobs: {}, wk: new Set(), base: null, net: false };
-// ===== Đồng bộ 3 chiều: Thiết bị → Redis → Google Sheet =====
+// ===== Đồng bộ 3 chiều: Thiết bị → Google Sheet =====
 const HUB = { q: 0, ids: new Set(), tot: 0, pullAt: 0, err: '', dead: 0, init: false };
 const TXST = new Map(); // id giao dịch -> 'new' | 'edit' khi đang được gửi từ thiết bị
 let PG_X = null, BAR_BUSY = false, BAR_T = 0, KICK_T = 0;
@@ -4044,7 +4043,7 @@ function txDone(job, parked) {
     Object.values(OB.jobs).forEach(j => j.ops.forEach(x => { if (x.op === 'tx.save' && x.row) still.add(x.row.id); }));
     job.ops.forEach(x => { if (x.op === 'tx.save' && x.row && !still.has(x.row.id)) TXST.delete(x.row.id); });
 }
-// Trạng thái từng giao dịch: dev = đang gửi từ thiết bị (tạo/sửa), hub = đã nằm trong Redis nhưng chưa ghi xong vào Google Sheet
+// Trạng thái từng giao dịch: dev = đang gửi từ thiết bị (tạo/sửa), hub = đã lên máy chủ nhưng chưa ghi xong vào Google Sheet
 function rowSy(id) {
     const k = TXST.get(id);
     if (k) return ['dev', k === 'new' ? 'Đang tạo giao dịch…' : 'Đang cập nhật giao dịch…'];

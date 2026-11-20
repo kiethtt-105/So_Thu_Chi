@@ -33,7 +33,7 @@ const configJs = 'self.CONFIG = ' + JSON.stringify(cfg, null, 4) + ';\n';
 
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
-for (const f of ['index.html', 'style.css', 'app.js', 'security.js', 'sw.js', 'manifest.webmanifest']) {
+for (const f of ['index.html', 'style.css', 'app.js', 'security.js', 'limlive.js', 'sw.js', 'manifest.webmanifest']) {
   const src = path.join(SRC, f);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(OUT, f));
   else console.warn('Cảnh báo: không thấy src/' + f + ', bỏ qua');
