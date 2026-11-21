@@ -11,7 +11,7 @@ const NAME = 'stc_auth';
 const hash = s => crypto.createHash('sha256').update(String(s)).digest();
 const sig = p => crypto.createHmac('sha256', hash('stc-auth|' + APP_KEY + '|' + APP_PASS)).update(p).digest('base64url');   // đổi PASS hoặc KEY => mọi cookie cũ mất hiệu lực
 const eq = (a, b) => crypto.timingSafeEqual(hash(a), hash(b));
-const secretOk = s => !!s && ((APP_PASS && eq(s, APP_PASS)) || (APP_KEY && eq(s, APP_KEY)));   // mật khẩu hoặc KEY (liên kết nhanh)
+const secretOk = s => !!s && !!APP_PASS && eq(s, APP_PASS);   // chỉ mật khẩu APP_PASS; APP_KEY chỉ dùng nội bộ (ký cookie, gọi Apps Script), không đăng nhập được
 
 const FLAGS = '; Path=/api; HttpOnly; Secure; SameSite=Strict';
 const clear = () => NAME + '=' + FLAGS + '; Max-Age=0';

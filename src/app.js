@@ -4009,17 +4009,6 @@ if (typeof notify === 'function') {
     };
 }
 
-(function () {
-    try {
-        const u = new URL(location.href), kn = [...u.searchParams.keys()].find(x => x.toLowerCase() === 'key'), k = kn === undefined ? null : u.searchParams.get(kn);
-        if (k !== null) {
-            u.searchParams.delete(kn);
-            history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
-        }
-    }
-    catch (e) { }
-})();
-
 const OB = { n: 0, ids: new Set(), jobs: {}, wk: new Set(), base: null, net: false };
 // ===== Đồng bộ 3 chiều: Thiết bị → Google Sheet =====
 const HUB = { q: 0, ids: new Set(), tot: 0, pullAt: 0, err: '', dead: 0, init: false };
