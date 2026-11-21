@@ -1,12 +1,13 @@
-// Passkey (WebAuthn) — tự chứa, chỉ dùng module crypto của Node. KHÔNG dùng Redis.
-// Đăng nhập bằng passkey thành công => cấp đúng cookie như đăng nhập mật khẩu (auth.cookie()).
-// Thêm / xem / xóa passkey cần đang đăng nhập. Trình duyệt gửi khóa công khai dạng SPKI (getPublicKey) nên không cần đọc CBOR.
+// /api/account — passkey (WebAuthn). KHÔNG dùng Redis.
+// Đăng nhập bằng passkey thành công => cấp đúng cookie như đăng nhập mật khẩu (auth.cookie()). Thêm / xem / xóa passkey cần đang đăng nhập.
 // Kho passkey + challenge: Apps Script (Kv.gs: pk.count / pk.info / pk.opts / pk.prep / pk.save / pk.add / pk.del), challenge dùng một lần, hạn 120 giây.
+// Phần mã hóa WebAuthn nằm ở _webauthn.js.
 const crypto = require('crypto');
 const auth = require('./_auth');
+const { UErr, b64, unb, sha, parse, site, newChallenge, readClient, pubKey, verifySig } = require('./_webauthn');
 const MAX = 10, ALGS = [-7, -8, -257];   // ES256, EdDSA, RS256
+const ipOf = auth.clientIp;
 
-class UErr extends Error { }   // lỗi cho người dùng thấy; lỗi khác chỉ báo chung chung
 async function kvx(op, extra) {   // gọi Kv.gs; lỗi thì ném UErr với thông báo tiếng Việt từ Apps Script / _auth.kv
   const j = await auth.kv(op, extra);
   if (!j.ok) throw new UErr(j.err || 'Không làm việc được với Google Sheet');
@@ -14,29 +15,6 @@ async function kvx(op, extra) {   // gọi Kv.gs; lỗi thì ném UErr với th�
 }
 const rlMap = new Map();   // đếm yêu cầu authopts theo IP (trong bộ nhớ instance, chỉ làm chậm kẻ đoán mò)
 let CNT = { n: 0, t: 0 };  // cache số passkey 20 giây: màn đăng nhập hỏi "has" mỗi lần mở
-const b64 = b => Buffer.from(b).toString('base64url'), unb = s => Buffer.from(String(s || ''), 'base64url');
-const sha = b => crypto.createHash('sha256').update(b).digest();
-const parse = s => { try { return JSON.parse(s); } catch (e) { return null; } };
-const ipOf = auth.clientIp;
-function devName(req) {
-  const u = String(req.headers['user-agent'] || '');
-  const os = /Windows/.test(u) ? 'Windows' : /iPhone|iPad/.test(u) ? 'iOS' : /Android/.test(u) ? 'Android' : /Mac OS X/.test(u) ? 'macOS' : /Linux/.test(u) ? 'Linux' : '';
-  const br = /Edg\//.test(u) ? 'Edge' : /Firefox|FxiOS/.test(u) ? 'Firefox' : /CriOS|Chrome/.test(u) ? 'Chrome' : /Safari/.test(u) ? 'Safari' : 'Trình duyệt';
-  return br + (os ? ' · ' + os : '');
-}
-function site(req) {   // tên miền (rpId) và origin mà trình duyệt đang dùng
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim(), id = host.replace(/:\d+$/, '');
-  const proto = /^(localhost|127\.0\.0\.1)$/.test(id) ? String(req.headers['x-forwarded-proto'] || 'http') : 'https';
-  return { id, origin: proto + '://' + host };
-}
-const newChallenge = () => b64(crypto.randomBytes(32));
-function readClient(req, cdB64, type) {   // kiểm clientDataJSON (loại, origin); challenge do Kv.gs tiêu thụ ở bước sau
-  const buf = unb(cdB64), S = site(req), cd = parse(buf.toString('utf8'));
-  if (!cd || cd.type !== type || cd.origin !== S.origin || typeof cd.challenge !== 'string' || cd.challenge.length > 100) throw new UErr('Dữ liệu xác thực không hợp lệ');
-  return { hash: sha(buf), S, ch: cd.challenge };
-}
-function pubKey(spki) { return crypto.createPublicKey({ key: spki, format: 'der', type: 'spki' }); }
-const verifySig = (rec, data, sig) => { try { return crypto.verify(rec.a === -8 ? null : 'sha256', data, pubKey(unb(rec.k)), sig); } catch (e) { return false; } };
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -101,7 +79,7 @@ module.exports = async (req, res) => {
         if (!cid || cid.length > 400 || !ALGS.includes(alg)) throw new UErr('Passkey không hợp lệ');
         const spki = unb(cred.publicKey);
         try { pubKey(spki); } catch (e) { throw new UErr('Khóa passkey không hợp lệ'); }
-        await kvx('pk.add', { c: ch, id: cid, max: MAX, rec: { k: b64(spki), a: alg, c: 0, n: devName(req), t: Date.now(), l: 0 } });   // tiêu thụ challenge + kiểm giới hạn + lưu
+        await kvx('pk.add', { c: ch, id: cid, max: MAX, rec: { k: b64(spki), a: alg, c: 0, n: auth.devName(req), t: Date.now(), l: 0 } });   // tiêu thụ challenge + kiểm giới hạn + lưu
         CNT.t = 0;
         return send(200, { ok: true });
       }
