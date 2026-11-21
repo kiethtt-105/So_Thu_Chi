@@ -100,7 +100,8 @@ if (!window.CONFIG)
 // Nháp theo TỪNG TAB trình duyệt (sessionStorage): F5 không mất, chỉ mất khi đóng tab hoặc khóa sổ.
 const DR = (() => { try { const d = JSON.parse(sessionStorage.stc_draft || 'null'); return d && typeof d === 'object' ? d : {}; } catch (e) { return {}; } })();
 const DR_ACT = (() => { const o = {}; try { Object.keys(DR.act || {}).forEach(k => { const v = DR.act[k]; if (typeof v === 'number' && isFinite(v)) o[k] = Math.round(v); }); } catch (e) { } return o; })();
-const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: location.hash.slice(1) || (typeof DR.tab === 'string' ? DR.tab : '') || (() => { try { return localStorage.tab; } catch (e) { return ''; } })() || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: DR_ACT, ready: false, busy: 0, err: '', pg: 100 };
+let QADD = ({ chi: 'Chi', thu: 'Thu' })[(location.hash.match(/^#add-(chi|thu)$/) || [])[1]] || '';   // phím tắt từ biểu tượng app (manifest shortcuts): mở thẳng form thêm Chi / Thu
+const S = { tx: [], acc: [], cat: [], lim: [], trash: [], issues: [], rev: '', m: ymd(new Date()).slice(0, 7), tab: (QADD ? '' : location.hash.slice(1)) || (typeof DR.tab === 'string' ? DR.tab : '') || (() => { try { return localStorage.tab; } catch (e) { return ''; } })() || 'home', f: 'all', q: '', rg: 'm', so: 'dn', xa: '', xc: '', mn: '', mx: '', d1: '', d2: '', fo: false, act: DR_ACT, ready: false, busy: 0, err: '', pg: 100 };
 if (location.hash) history.replaceState(null, '', location.pathname + location.search);   // ẩn #tab khỏi thanh địa chỉ
 let E = null, ED = null;
 try {
@@ -615,7 +616,7 @@ function setUser() {
     if (g) g.textContent = n ? 'Xin chào ' + n + (pk ? ', mở sổ bằng vân tay / khuôn mặt' : ', nhập mật khẩu để mở sổ') : (pk ? 'Mở sổ bằng vân tay / khuôn mặt' : 'Nhập mật khẩu để mở sổ');
 }
 setUser();
-function boot() { try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { } setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); resumeOutbox(); sync(true); if (typeof pushInit === 'function')
+function boot() { try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { } setUser(); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); render(); resumeOutbox(); sync(true); if (QADD) { const ty = QADD; QADD = ''; setTimeout(() => openForm(null, ty), 0); } if (typeof pushInit === 'function')
     pushInit(); }
 let ACT_T = Date.now(), PT = 0;
 document.addEventListener('visibilitychange', () => { if (document.hidden)
@@ -3803,7 +3804,7 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
     TABS.splice(at < 0 ? TABS.length : at, 0, ['rc', 'Định kỳ'], ['debt', 'Sổ nợ'], ['card', 'Thẻ tín dụng']);
     VIEWS.rc = rcPage; VIEWS.debt = dbPage; VIEWS.card = cdPage;
     if (!VIEWS[S.tab]) S.tab = 'home';
-    addEventListener('hashchange', () => { const t = location.hash.slice(1); if (VIEWS[t] && t !== S.tab && alive() && !$('#app').classList.contains('hide')) go(t); });
+    addEventListener('hashchange', () => { const t = location.hash.slice(1), m = t.match(/^add-(chi|thu)$/); if (m && alive() && !$('#app').classList.contains('hide')) { history.replaceState(null, '', location.pathname + location.search); openForm(null, m[1] === 'chi' ? 'Chi' : 'Thu'); return; } if (VIEWS[t] && t !== S.tab && alive() && !$('#app').classList.contains('hide')) go(t); });
 
     document.addEventListener('change', e => {
         if (['rc_type', 'rc_freq'].includes(e.target.id) && RC.r) {
@@ -5256,3 +5257,26 @@ function promptText(title, ph, def) {
     window.addEventListener('resize', later);
     later();
 })();
+
+// ===== Đo chiều cao thật của thanh trên (.top) và thanh dưới (#bn) =====
+// Trước đây --hd cố định 60px + vùng tai thỏ, nhưng thanh thật cao khoảng 55px + tai thỏ (và đổi theo cỡ chữ / zoom), nên các thanh dính (ngày, tab, danh sách) hở hoặc bị thanh trên đè.
+(function () {
+    const R = document.documentElement;
+    const set = () => {
+        try {
+            const top = document.querySelector('.top'), bn = document.getElementById('bn');
+            if (top && top.offsetHeight) R.style.setProperty('--hd', top.offsetHeight + 'px');
+            if (bn && bn.offsetHeight) R.style.setProperty('--bn', bn.offsetHeight + 'px');
+        } catch (e) { }
+    };
+    set();
+    if (window.ResizeObserver) {
+        const ro = new ResizeObserver(set), top = document.querySelector('.top');
+        if (top) ro.observe(top);
+        const hook = () => { const bn = document.getElementById('bn'); if (bn) { ro.observe(bn); set(); return true; } return false; };
+        if (!hook()) { let n = 0; const t = setInterval(() => { if (hook() || ++n > 20) clearInterval(t); }, 500); }   // #bn do app.js dựng sau, chờ tối đa 10 giây
+    }
+    addEventListener('resize', set);
+    addEventListener('orientationchange', () => setTimeout(set, 300));
+})();
+

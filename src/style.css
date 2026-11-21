@@ -1553,3 +1553,16 @@ html.pkm #login .pwf,html.pkm #login #lb,html.pkm #login #lerr{display:none}
 @media(min-width:1280px) and (max-width:1599px){html{--z:1.1;zoom:var(--z)}}
 @media(min-width:1600px) and (max-width:2199px){html{--z:1.2;zoom:var(--z)}}
 @media print{html{zoom:1!important}}
+
+/* ═════════ v60: vá thanh ngang bị đè trên điện thoại + phóng cỡ chữ cho laptop ═════════ */
+/* --hd (chiều cao thanh trên) và --bn (chiều cao thanh dưới) được app.js đo thật; giá trị dưới đây chỉ là dự phòng */
+:root{--bn:calc(62px + env(safe-area-inset-bottom))}
+@media(max-width:699px){
+  /* Thanh "Đang offline": trước đây left = --sw (236px) và bottom = 0 nên đè lên nửa thanh điều hướng dưới. Nay nằm NGAY TRÊN thanh điều hướng, full chiều ngang */
+  #ofl{left:0;right:0;bottom:var(--bn);z-index:11;padding:8px 14px;font-size:13px}
+}
+/* Laptop: trước chỉ phóng 1.1 từ 1280px nên chữ 13-14px rất nhỏ. Mốc media dùng bề ngang thật của cửa sổ */
+@media(min-width:1280px) and (max-width:1535px){html{--z:1.2;zoom:var(--z)}}
+@media(min-width:1536px) and (max-width:2199px){html{--z:1.25;zoom:var(--z)}}
+@media print{html{zoom:1!important}}
+
