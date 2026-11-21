@@ -1564,5 +1564,14 @@ html.pkm #login .pwf,html.pkm #login #lb,html.pkm #login #lerr{display:none}
 /* Laptop: trước chỉ phóng 1.1 từ 1280px nên chữ 13-14px rất nhỏ. Mốc media dùng bề ngang thật của cửa sổ */
 @media(min-width:1280px) and (max-width:1535px){html{--z:1.2;zoom:var(--z)}}
 @media(min-width:1536px) and (max-width:2199px){html{--z:1.25;zoom:var(--z)}}
+/* ═════════ v61: khít chỗ thưa ═════════ */
+/* Thẻ số liệu (Tổng / Số giao dịch / Lớn nhất / Tháng trước): ô tối thiểu 150px làm khung chi tiết ~627px chỉ xếp được 3 cột, thẻ thứ 4 rớt xuống một mình, bên phải trống.
+   Hạ ô tối thiểu xuống 128px => 4 thẻ nằm đủ một hàng; khung hẹp hơn 560px thì xếp 2x2 (không còn thẻ mồ côi). */
+.kpis.sm{grid-template-columns:repeat(auto-fit,minmax(128px,1fr))}
+.kpis.sm .kpi{padding:12px 13px}
+.kpis.sm .kpi b{font-size:18px}
+.mdd{container-type:inline-size}
+@container (max-width:560px){.kpis.sm:has(>.kpi:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Thanh trên máy tính: các nút dồn về bên phải, không để một dải trống ở giữa/bên phải */
+@media(min-width:700px){.top{justify-content:flex-end}}
 @media print{html{zoom:1!important}}
-
