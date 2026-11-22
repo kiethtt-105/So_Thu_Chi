@@ -22,7 +22,13 @@ function cleanRow(r) {
     if (!to) return { err: 'Chuyển khoản thiếu tài khoản nhận' };
     if (to === acc) return { err: 'Tài khoản nguồn và nhận phải khác nhau' };
   }
-  return { row: Object.assign({}, r, { amount }) };
+  // Chuỗi người dùng / AI nhập đi thẳng vào Google Sheet: cắt độ dài, và nếu bắt đầu bằng ký tự công thức (= @ hoặc +/- kèm chữ) thì thêm dấu cách đầu để Sheets coi là chữ thường
+  const safe = (v, n) => { const s = String(v == null ? '' : v).slice(0, n); return /^[=@]|^[+\-](?=[A-Za-z(])/.test(s) ? ' ' + s : s; };
+  const out = { amount };
+  if ('note' in r) out.note = safe(r.note, 2000);
+  if ('cat' in r) out.cat = safe(r.cat, 100);
+  if ('sub' in r) out.sub = safe(r.sub, 100);
+  return { row: Object.assign({}, r, out) };
 }
 function cleanOps(ops) {
   if (ops.length > MAX_OPS) return { err: 'Quá nhiều thao tác trong một lần gửi' };

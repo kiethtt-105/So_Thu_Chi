@@ -16,6 +16,7 @@ async function sesCall(body) {
 function secSection() {
     return `<div class="sec">Đăng nhập và thiết bị</div>
 <div id="seccard"></div>
+<div class="menu"><label class="row sw"><span class="dot">🧹</span><span class="m"><b>Xóa bản lưu sổ trên máy này khi khóa</b><small>Giao dịch, tài khoản lưu để dùng offline sẽ bị xóa khi khóa sổ hoặc hết phiên, lần mở sau tải lại từ Google Sheet. Sổ nợ và cài đặt giữ nguyên. Nên bật trên máy dùng chung.</small></span><input type="checkbox" role="switch" id="wipeLock" ${localStorage.wipeLock === '1' ? 'checked' : ''}></label></div>
 <div class="menu"><div class="row"><span class="dot">🔒</span><span class="m"><b>Thu hồi đăng nhập trên máy khác</b><small>Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Thu hồi</button></div></div>
 <div id="histcard"></div>`;
 }
@@ -28,6 +29,19 @@ async function logoutAll() {
     toast(j.ok ? 'Đã thu hồi đăng nhập trên các máy khác' : (j.err || 'Không thực hiện được'));
     if (j.ok) secHistLoad();
 }
+
+// Gọi từ lock() trong app.js: xóa bản lưu offline của sổ (không đụng sổ nợ / cài đặt, và không xóa khi còn thay đổi chưa gửi)
+function wipeLocal() {
+    if (localStorage.wipeLock !== '1') return;
+    if (typeof OB !== 'undefined' && OB && OB.n) return;
+    try { localStorage.removeItem('cache'); } catch (e) { }
+    try { KV.put('cache', ''); } catch (e) { }
+}
+document.addEventListener('change', e => {
+    if (!e.target || e.target.id !== 'wipeLock') return;
+    try { if (e.target.checked) localStorage.wipeLock = '1'; else localStorage.removeItem('wipeLock'); } catch (x) { }
+    toast(e.target.checked ? 'Sẽ xóa bản lưu sổ trên máy này mỗi khi khóa' : 'Đã tắt xóa bản lưu khi khóa');
+});
 
 const hFmt = t => new Date(t).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 

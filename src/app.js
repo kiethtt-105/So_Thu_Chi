@@ -469,7 +469,7 @@ else {
         m.textContent = 'Lỗi: ' + r.err;
     }
 } return r; }
-function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } try { sessionStorage.clear(); localStorage.removeItem('sess'); } catch (e) { } $('#app').classList.add('hide'); $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe();  }
+function lock() { try { fetch(STORE, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify({ logout: 1 }) }).catch(() => { }); } catch (e) { } try { sessionStorage.clear(); localStorage.removeItem('sess'); } catch (e) { } $('#app').classList.add('hide'); try { if (typeof wipeLocal === 'function') wipeLocal(); } catch (e) { } $('#login').classList.remove('hide'); ($('#pw').value = '', $('#pw').type = 'password'); closeSheet(); if (typeof pkProbe === 'function') pkProbe();  }
 let LOGOUT_ALL_AT = 0;
 // logoutAll() và phần Bảo mật trong Cài đặt: xem security.js
 let LOGIN_BUSY = false;
@@ -979,9 +979,10 @@ function accs() {
         o.chi += t.amount; });
     const types = [...new Set([...ATORD, ...S.acc.map(a => a.type)])].filter(t => bs.some(x => x.a.type === t)), pie = own.filter(x => x.b > 0).sort((a, b) => b.b - a.b).map(x => [x.a.name, x.b]);
     const grp = types.map(t => { const l = bs.filter(x => x.a.type === t), sub = l.reduce((s, x) => s + x.b, 0); return `<div class="card flush"><div class="ch" style="padding-top:14px;margin:0"><span>${(ATYPE[t] || ['🏦'])[0]} ${esc(t)} <small>· ${l.length} tài khoản</small></span><b class="sens ${sub < 0 ? 'chi' : ''}">${vnd(sub)}</b></div>${l.map(({ a, b }) => { const i = S.acc.indexOf(a), m = mo[a.name] || { thu: 0, chi: 0 }; return `<button class="row" data-ed="tk:${i}">${aIco(a)}<span class="m"><b>${esc(a.name)}</b><small class="sens">${mlabel(S.m)}: <span class="thu">+${num(m.thu)}</span> · <span class="chi">−${num(m.chi)}</span></small></span><b class="sens ${b < 0 ? 'chi' : ''}">${vnd(b)}</b></button>`; }).join('')}</div>`; }).join('');
+    const dt = window.__debtTotals ? window.__debtTotals() : { owe: 0, lent: 0 };
     const th = Object.entries(mo).filter(([k]) => !heldSet().has(k)).reduce((s, [, x]) => s + x.thu, 0), ch = Object.entries(mo).filter(([k]) => !heldSet().has(k)).reduce((s, [, x]) => s + x.chi, 0);
     return head('Tài khoản', S.acc.length + ' tài khoản · bấm vào để sửa hoặc xem giao dịch', `<button class="btn p" data-ed="tk:new">${ic('pl')}Thêm tài khoản</button>`) +
-        `<div class="kpis">${kpi('Tổng tài sản ròng', vnd(tot), tot < 0 ? 'chi' : '', 'Sau khi trừ nợ', 'h')}${kpi('Tiền đang có', vnd(pos), 'thu', own.filter(x => x.b > 0).length + ' tài khoản')}${kpi('Đang nợ', vnd(neg), neg < 0 ? 'chi' : '', own.filter(x => x.b < 0).length + ' tài khoản')}${kpi('Thu − chi ' + mlabel(S.m).toLowerCase(), vnd(th - ch), th - ch < 0 ? 'chi' : 'thu', '+' + num(th) + ' / −' + num(ch))}</div>
+        `<div class="kpis">${kpi('Tổng tài sản ròng', vnd(tot), tot < 0 ? 'chi' : '', 'Sau khi trừ nợ' + (dt.lent ? ' · chưa gồm ' + short(dt.lent) + ' cho vay' : '') + (dt.owe ? ' · chưa trừ ' + short(dt.owe) + ' đang vay' : ''), 'h')}${kpi('Tiền đang có', vnd(pos), 'thu', own.filter(x => x.b > 0).length + ' tài khoản')}${kpi('Đang nợ', vnd(neg), neg < 0 ? 'chi' : '', own.filter(x => x.b < 0).length + ' tài khoản')}${kpi('Thu − chi ' + mlabel(S.m).toLowerCase(), vnd(th - ch), th - ch < 0 ? 'chi' : 'thu', '+' + num(th) + ' / −' + num(ch))}</div>
 <div class="grid a" style="align-items:start"><div class="col">${grp || `<div class="card">${empty('Chưa có tài khoản', 'Bấm “Thêm tài khoản” để bắt đầu.')}</div>`}</div><div class="card"><div class="ch">Phân bổ tài sản</div>${donut(pie, pos, 0, k => '')}</div></div>`;
 }
 function cats() {
@@ -1820,7 +1821,7 @@ $('#ov').addEventListener('click', async (e) => {
             row.at = E.at;
         }
         const wasNew = !S.tx.some(t => t.id === row.id);
-        if (wasNew && cfg().tx.dup) {
+        if (wasNew && cfg().tx.dup && !/^D/.test(String(row.id))) {   // giao dịch từ Sổ nợ (mã bắt đầu bằng D) không hỏi trùng: 3 khoản cho vay cùng số tiền là bình thường
             const dp = S.tx.find(t => t.date === row.date && t.type === row.type && +t.amount === +row.amount && t.acc === row.acc && (t.accTo || '') === (row.accTo || '') && (!t.at || Date.now() - new Date(t.at).getTime() < 30 * 60000));
             if (dp && !await ask('Có thể trùng giao dịch', 'Vừa có giao dịch ' + row.type + ' ' + num(Math.abs(row.amount)) + ' ở ' + row.acc + ' cùng ngày' + (dp.note ? ' (' + noteTxt(dp.note) + ')' : '') + '. Vẫn lưu thêm?', { icon: '🔁', ok: 'Vẫn lưu' }))
                 return;
@@ -3595,6 +3596,7 @@ document.addEventListener('click', e => {
     }
 
     const dbLeft = d => Math.max(0, d.amount - (d.paid || 0));
+    window.__debtTotals = () => { let owe = 0, lent = 0; XD.debt.forEach(d => { if (d.dir === 'owe') owe += dbLeft(d); else lent += dbLeft(d); }); return { owe, lent }; };   // cho trang Tài khoản ghi chú khoản nợ chưa tính vào tài sản ròng
     // Vay / cho vay / trả / thu nợ được ghi bằng giao dịch "Điều chỉnh" (chỉ đổi số dư, không tính thu/chi). Mỗi lần ghi có mã cố định để biết đã vào sổ chưa.
     const dbHas = id => S.tx.some(t => String(t.id) === String(id));
     function dbPending(d) {
@@ -4154,6 +4156,7 @@ function saveCache(now) {   // ghi gộp: nhiều lần gọi liên tiếp chỉ
     clearTimeout(_scT); _scT = 0;
     const go = () => {
         _scT = 0;
+        if (localStorage.wipeLock === '1' && $('#app').classList.contains('hide')) return;   // đang khóa và bật xóa bản lưu: không ghi lại
         let s; try { s = JSON.stringify({ tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, issues: S.issues, t: S.cacheT || 0 }); } catch (e) { return; }
         KV.put('cache', s);
         try { localStorage.cache = s; } catch (e) { try { localStorage.removeItem('cache'); } catch (_) { } }   // localStorage đầy: đã có bản trong IndexedDB
