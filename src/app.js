@@ -927,6 +927,7 @@ function reconUpdate() {
         e.textContent = !x.has ? '' : x.diff === 0 ? 'Khớp' : sg(x.diff).replace(' ₫', '');
         e.className = 'df ' + (!x.has ? '' : x.diff === 0 ? 'thu' : 'chi');
     } });
+    if (has.length && !bad.length) { try { localStorage.recDay = ymd(new Date()); } catch (e) { } }   // hôm nay đã khớp: không nhắc cân đối nữa
     $('#r_t').textContent = has.length ? (!bad.length ? 'Khớp' : tot === 0 ? '0 ₫ (nhưng lệch từng tài khoản)' : sg(tot)) : '–';
     $('#r_n').textContent = has.length ? (bad.length ? bad.length + '/' + has.length + ' tài khoản lệch' : 'Tất cả khớp') : '';
     $('#r_s').textContent = vnd((has.length ? has : D).reduce((s, x) => s + x.sys, 0));
@@ -2799,7 +2800,7 @@ function bkRowOk(r) {   // cùng luật với cleanRow ở máy chủ, để m�
 function bkDownload() {
     if (!S.tx.length && !S.acc.length) return toast('Chưa có dữ liệu để tải');
     const d = new Date(), p = n => String(n).padStart(2, '0'), name = 'so-thu-chi-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.json';
-    const data = { app: 'so-thu-chi', v: 1, at: d.toISOString(), src: 'device', rev: S.rev, tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, goals: GOALS, tpl: TPL };
+    const data = { app: 'so-thu-chi', v: 1, at: d.toISOString(), src: 'device', rev: S.rev, tx: S.tx, acc: S.acc, cat: S.cat, lim: S.lim, trash: S.trash, goals: GOALS, tpl: TPL, x: window.__xExport ? window.__xExport() : undefined };   // x = Sổ nợ, giao dịch định kỳ, thẻ tín dụng, bộ lọc (chỉ lưu trên máy này nên phải có trong file sao lưu)
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
     a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click();
@@ -2843,7 +2844,9 @@ async function bkRestore(file) {
     const tp = (Array.isArray(d.tpl) ? d.tpl : []).filter(t => t && typeof t === 'object' && !TPL.some(y => JSON.stringify(y) === JSON.stringify(t)));
     if (gl.length) { GOALS.push(...gl); goalsSave(); }
     if (tp.length) { TPL.push(...tp); tplSaveLS(); }
-    if (!rows.length && !accs.length && !cats.length && !lims.length) return toast(gl.length || tp.length ? 'Đã khôi phục ' + [gl.length && gl.length + ' mục tiêu', tp.length && tp.length + ' mẫu'].filter(Boolean).join(', ') : 'Sổ đã có đủ những gì trong file này');
+    const xr = window.__xImport ? window.__xImport(d.x) : null;   // Sổ nợ, định kỳ, thẻ tín dụng, bộ lọc: gộp thêm cái còn thiếu
+    const xTxt = xr ? [xr.debt && xr.debt + ' khoản nợ', xr.rec && xr.rec + ' giao dịch định kỳ', xr.card && xr.card + ' thẻ', xr.flt && xr.flt + ' bộ lọc'].filter(Boolean).join(', ') : '';
+    if (!rows.length && !accs.length && !cats.length && !lims.length) return toast(gl.length || tp.length || xTxt ? 'Đã khôi phục ' + [gl.length && gl.length + ' mục tiêu', tp.length && tp.length + ' mẫu', xTxt].filter(Boolean).join(', ') : 'Sổ đã có đủ những gì trong file này');
     const skip = [had && had + ' giao dịch đã có', inTrash && inTrash + ' đang trong Thùng rác', bad && bad + ' dòng không hợp lệ'].filter(Boolean).join(', ');
     const msg = 'Sẽ thêm ' + [rows.length && rows.length + ' giao dịch', accs.length && accs.length + ' tài khoản', cats.length && cats.length + ' hạng mục', lims.length && lims.length + ' hạn mức'].filter(Boolean).join(', ') + '.' + (skip ? ' Bỏ qua: ' + skip + '.' : '') + ' Không có gì đang có bị sửa hay xóa.';
     if (!await ask('Khôi phục từ file sao lưu?', msg, { icon: '♻️', ok: 'Khôi phục' })) return;
@@ -2862,7 +2865,7 @@ async function bkRestore(file) {
         done += part.length;
         if (rows.length > 200) toast('Đang khôi phục ' + done + '/' + rows.length);
     }
-    toast('Đã khôi phục ' + rows.length + ' giao dịch' + (accs.length || cats.length || lims.length ? ' và cài đặt' : ''));
+    toast('Đã khôi phục ' + rows.length + ' giao dịch' + (accs.length || cats.length || lims.length ? ' và cài đặt' : '') + (xTxt ? ', ' + xTxt : ''));
 }
 document.addEventListener('click', e => {
     const b = e.target.closest('[data-bk]');
@@ -3596,6 +3599,18 @@ document.addEventListener('click', e => {
     }
 
     const dbLeft = d => Math.max(0, d.amount - (d.paid || 0));
+    window.__xExport = () => ({ debt: XD.debt, rec: XD.rec, card: XD.card, flt: XD.flt });
+    window.__xImport = x => {
+        const n = { debt: 0, rec: 0, card: 0, flt: 0 };
+        if (!x || typeof x !== 'object') return n;
+        const okD = d => d && typeof d === 'object' && d.id && d.who && (d.dir === 'owe' || d.dir === 'lent') && d.amount > 0;
+        (Array.isArray(x.debt) ? x.debt : []).forEach(d => { if (okD(d) && !XD.debt.some(y => y.id === d.id)) { XD.debt.push(d); n.debt++; } });
+        (Array.isArray(x.rec) ? x.rec : []).forEach(r => { if (r && typeof r === 'object' && r.id && r.name !== undefined && !XD.rec.some(y => y.id === r.id)) { XD.rec.push(r); n.rec++; } });
+        if (x.card && typeof x.card === 'object' && !Array.isArray(x.card)) Object.keys(x.card).forEach(k => { if (!(k in XD.card)) { XD.card[k] = x.card[k]; n.card++; } });
+        (Array.isArray(x.flt) ? x.flt : []).forEach(f => { if (f && typeof f === 'object' && f.name && !XD.flt.some(y => y.name === f.name)) { XD.flt.push(f); n.flt++; } });
+        if (n.debt || n.rec || n.card || n.flt) { xsave(); render(); }
+        return n;
+    };
     window.__debtTotals = () => { let owe = 0, lent = 0; XD.debt.forEach(d => { if (d.dir === 'owe') owe += dbLeft(d); else lent += dbLeft(d); }); return { owe, lent }; };   // cho trang Tài khoản ghi chú khoản nợ chưa tính vào tài sản ròng
     // Vay / cho vay / trả / thu nợ được ghi bằng giao dịch "Điều chỉnh" (chỉ đổi số dư, không tính thu/chi). Mỗi lần ghi có mã cố định để biết đã vào sổ chưa.
     const dbHas = id => S.tx.some(t => String(t.id) === String(id));
@@ -3813,6 +3828,11 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
             if (fired(k)) return; markFired(k);
             notify(x.a.name + ': còn ' + (x.dl ? x.dl + ' ngày' : 'hôm nay') + ' đến hạn thanh toán (' + dmy(x.nd) + ')\nDư nợ ' + vnd(x.debt), { title: 'Sắp đến hạn thẻ tín dụng', ico: '💳', kind: 'remind', tag: 'card', bg: true, tab: 'card' });
         });
+        // Cân đối cuối ngày: sau 21h mà hôm nay chưa đối chiếu số dư thực tế thì nhắc một lần (tắt cùng nhóm "Nhắc nhở và đến hạn")
+        if (new Date().getHours() >= 21 && localStorage.recDay !== ymd(t)) {
+            const k = 'recnight:' + ymd(t);
+            if (!fired(k)) { markFired(k); notify('Đối chiếu số dư thực tế với sổ để chênh lệch không dồn lại nhiều ngày.', { title: 'Cân đối cuối ngày', ico: '⚖️', kind: 'remind', tag: 'recnight', bg: true, tab: 'rec' }); }
+        }
         XD.debt.forEach(d => {
             if (!dbLeft(d) || !d.due) return;
             const dl = Math.round((parseD(d.due) - t) / 864e5);
