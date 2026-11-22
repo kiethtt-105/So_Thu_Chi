@@ -1575,3 +1575,18 @@ html.pkm #login .pwf,html.pkm #login #lb,html.pkm #login #lerr{display:none}
 /* Thanh trên máy tính: các nút dồn về bên phải, không để một dải trống ở giữa/bên phải */
 @media(min-width:700px){.top{justify-content:flex-end}}
 @media print{html{zoom:1!important}}
+
+/* ───────── Thanh bên: nút menu thoáng hơn, chữ vừa phải (sửa lỗi thanh chọn quá khít khi chữ phóng to) ───────── */
+@media(min-width:960px){
+  #tb{gap:4px}
+  #tb button{height:auto;min-height:44px;padding:0 16px;gap:13px;font-size:13px;line-height:1.25;border-radius:12px}
+  #tb button.on:before{top:12px;bottom:12px}
+  #tb .sep{padding:20px 16px 8px}
+  #sd{padding-inline:14px}
+}
+/* Cửa sổ thấp: chỉ thu gọn vừa phải (trước đây ép cứng 34px nên thanh chọn bị bẹp), phần dư đã có thanh cuộn riêng */
+@media(min-width:960px) and (max-height:900px){
+  #tb{gap:3px}
+  #tb button{height:auto;min-height:40px}
+  #tb .sep{padding:14px 16px 6px}
+}

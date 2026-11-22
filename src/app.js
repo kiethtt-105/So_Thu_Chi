@@ -3595,6 +3595,26 @@ document.addEventListener('click', e => {
     }
 
     const dbLeft = d => Math.max(0, d.amount - (d.paid || 0));
+    // Vay / cho vay / trả / thu nợ được ghi bằng giao dịch "Điều chỉnh" (chỉ đổi số dư, không tính thu/chi). Mỗi lần ghi có mã cố định để biết đã vào sổ chưa.
+    const dbHas = id => S.tx.some(t => String(t.id) === String(id));
+    function dbPending(d) {
+        if (!S.ready || !S.synced) return [];   // chưa đồng bộ xong thì chưa đủ dữ liệu để kết luận là thiếu giao dịch
+        const L = [];
+        if (d.tx && !dbHas(d.tx)) L.push({ kind: 'new', a: d.amount, id: d.tx });
+        (d.pays || []).forEach(p => { if (!dbHas(p.id)) L.push({ kind: 'pay', a: p.a, id: p.id }); });
+        return L;
+    }
+    function dbRec(d, kind, a, id) {
+        const owe = d.dir === 'owe', isNew = kind === 'new';
+        qOpen({ type: 'Điều chỉnh', amount: (isNew ? owe : !owe) ? a : -a, date: todayS(), time: hm(new Date()), note: (isNew ? (owe ? 'Vay của ' : 'Cho vay ') : (owe ? 'Trả nợ ' : 'Thu nợ ')) + d.who, cat: '', sub: '', acc: d.acc || '', accTo: '' });
+        E.id = id;
+    }
+    function dbRecGo(i) {
+        const d = XD.debt[i]; if (!d) return;
+        if (!d.tx) { d.tx = 'D' + d.id + '_0'; xsave(); }
+        const p = dbPending(d)[0]; if (!p) return toast('Đã ghi vào sổ thu chi rồi');
+        closeSheet(); dbRec(d, p.kind, p.a, p.id);
+    }
     function dbPage() {
         const L = XD.debt.map((d, i) => ({ d, i })).sort((a, b) => (dbLeft(a.d) === 0) - (dbLeft(b.d) === 0) || (a.d.due || '9999').localeCompare(b.d.due || '9999'));
         const sum = dir => XD.debt.filter(d => d.dir === dir).reduce((s, d) => s + dbLeft(d), 0), today = ymd(new Date());
@@ -3604,8 +3624,8 @@ document.addEventListener('click', e => {
                 const left = dbLeft(d), pct = Math.min(100, Math.floor((d.paid || 0) / d.amount * 100)), late = left && d.due && d.due < today;
                 return `<div class="card dcard"><div class="dtop"><span class="dot lg">${d.dir === 'owe' ? '🔴' : '🟢'}</span><div class="dtt"><h2>${esc(d.who)}</h2><p>${d.dir === 'owe' ? 'Mình nợ' : 'Họ nợ mình'} ${vnd(d.amount)}${d.acc ? ' · ' + esc(d.acc) : ''}${d.due ? ' · hạn ' + d.due.slice(8) + '/' + d.due.slice(5, 7) + '/' + d.due.slice(0, 4) : ''}${d.note ? ' · ' + esc(d.note) : ''}</p></div><div class="dbal"><small>Còn lại</small><b class="sens ${left ? (d.dir === 'owe' ? 'chi' : 'thu') : ''}">${vnd(left)}</b></div></div>
 <div class="bar" style="--bc:${left ? 'var(--acc)' : 'var(--thu)'};margin-top:14px"><div><span>${pct}%</span><span class="mut sens">${num(d.paid || 0)} / ${num(d.amount)}</span></div><i><s style="width:${pct}%"></s></i></div>
-${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu">Đã tất toán</p>' : ''}
-<div class="cg" style="margin-top:12px">${left ? `<button class="btn p" data-dbpay="${i}">${d.dir === 'owe' ? 'Ghi nhận đã trả' : 'Ghi nhận đã thu'}</button>` : ''}<button class="btn" data-dbe="${i}">Sửa</button></div></div>`;
+${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu">Đã tất toán</p>' : ''}${dbPending(d).length ? '<p class="note chi">Chưa ghi vào sổ thu chi (' + dbPending(d).length + ' giao dịch): số dư tài khoản chưa đổi</p>' : ''}
+<div class="cg" style="margin-top:12px">${left ? `<button class="btn p" data-dbpay="${i}">${d.dir === 'owe' ? 'Ghi nhận đã trả' : 'Ghi nhận đã thu'}</button>` : ''}${dbPending(d).length ? `<button class="btn" data-dbrec="${i}">Ghi vào sổ</button>` : ''}<button class="btn" data-dbe="${i}">Sửa</button></div></div>`;
             }).join('')}</div>` : `<div class="card">${empty('Chưa có khoản nợ nào', 'Thêm khoản bạn nợ hoặc cho vay để theo dõi ngày hẹn và số còn lại.')}</div>`);
     }
     let DB = { i: null };
@@ -3616,7 +3636,7 @@ ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu
 <label class="w">Loại${pkSel('db_dir', [{ v: 'owe', t: 'Mình nợ người khác' }, { v: 'lent', t: 'Người khác nợ mình' }], d.dir)}</label>
 <label class="w">Tài khoản${pkSel('db_acc', S.acc.map(a => ({ v: a.name, t: a.name })), d.acc)}</label><p class="hint w" style="margin:-4px 0 4px">Mình nợ: tiền được cộng vào tài khoản này. Người khác nợ mình: tiền bị trừ khỏi tài khoản này.</p>
 <label>Số tiền<input class="money" id="db_amt" inputmode="numeric" value="${d.amount ? num(d.amount) : ''}" placeholder="0"></label><label>Hạn trả, không bắt buộc<input type="date" id="db_due" value="${esc(d.due || '')}"></label>
-<label class="w">Ghi chú<input id="db_note" value="${esc(d.note || '')}" placeholder="Không bắt buộc"></label></div><button class="btn p w" data-dbsave>Lưu</button>${i == null ? '' : '<button class="btn d w" data-dbdel style="margin-top:6px">Xóa khoản này</button>'}`;
+<label class="w">Ghi chú<input id="db_note" value="${esc(d.note || '')}" placeholder="Không bắt buộc"></label></div><button class="btn p w" data-dbsave>Lưu</button>${i == null || d.tx ? '' : `<button class="btn w" data-dbrec="${i}" style="margin-top:6px">Ghi khoản này vào sổ thu chi</button>`}${i == null ? '' : '<button class="btn d w" data-dbdel style="margin-top:6px">Xóa khoản này</button>'}`;
         openSheet();
     }
     async function dbSave() {
@@ -3625,13 +3645,22 @@ ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu
         if (!acc) return toast('Chọn tài khoản');
         if (!(amount > 0)) return toast('Nhập số tiền lớn hơn 0');
         const o = { who, dir: val('db_dir'), amount, acc, due: val('db_due') || '', note: val('db_note').trim() }, isNew = DB.i == null;
-        if (isNew) XD.debt.push({ id: xid(), paid: 0, at: Date.now(), ...o }); else Object.assign(XD.debt[DB.i], o);
+        let d, changed = false;
+        if (isNew) { const id = xid(); d = { id, paid: 0, at: Date.now(), tx: 'D' + id + '_0', ...o }; XD.debt.push(d); }
+        else { d = XD.debt[DB.i]; changed = d.amount !== o.amount || d.dir !== o.dir || d.acc !== o.acc; Object.assign(d, o); }
         xsave(); closeSheet(); render(); toast('Đã lưu');
-        if (isNew && await ask('Ghi vào sổ thu chi?', (o.dir === 'owe' ? 'Tạo giao dịch Thu ' + num(amount) + ' vào ' + acc : 'Tạo giao dịch Chi ' + num(amount) + ' từ ' + acc) + ' để số dư tài khoản khớp.', { icon: '🧾', ok: 'Ghi', cancel: 'Để sau' }))
-            qOpen({ type: o.dir === 'owe' ? 'Thu' : 'Chi', amount, date: todayS(), time: hm(new Date()), note: (o.dir === 'owe' ? 'Vay của ' : 'Cho vay ') + who, cat: '', sub: '', acc, accTo: '' });
+        if (isNew) {
+            if (await ask('Ghi vào sổ thu chi?', 'Tạo giao dịch Điều chỉnh ' + (o.dir === 'owe' ? '+' : '−') + num(amount) + ' ' + (o.dir === 'owe' ? 'vào ' : 'từ ') + acc + ' để số dư khớp (không tính là thu/chi).', { icon: '🧾', ok: 'Ghi', cancel: 'Để sau' }))
+                dbRec(d, 'new', amount, d.tx);
+        } else if (changed && (dbHas(d.tx) || (d.pays || []).some(x => dbHas(x.id)))) {
+            // Đổi số tiền / chiều / tài khoản: giao dịch đã ghi không tự đổi theo
+            if (await ask('Giao dịch đã ghi chưa đổi theo', 'Bạn vừa sửa số tiền, chiều hoặc tài khoản của khoản nợ. Các giao dịch Điều chỉnh đã ghi trước đó vẫn giữ nguyên nên số dư có thể lệch. Mở giao dịch ban đầu để sửa?', { icon: '⚠️', ok: 'Mở giao dịch', cancel: 'Để sau' })) {
+                const t = S.tx.find(x => String(x.id) === String(d.tx)); if (t) openForm(t);
+            }
+        }
     }
     async function dbDel() {
-        if (!await ask('Xóa khoản này?', 'Chỉ xóa ghi chú trong Sổ nợ, không ảnh hưởng giao dịch.', { danger: 1, ok: 'Xóa' })) return;
+        if (!await ask('Xóa khoản này?', 'Chỉ xóa ghi chú trong Sổ nợ. Các giao dịch Điều chỉnh đã ghi vẫn giữ nguyên, số dư tài khoản không đổi.', { danger: 1, ok: 'Xóa' })) return;
         XD.debt.splice(DB.i, 1); xsave(); closeSheet(); render();
     }
     function dbPay(i) {
@@ -3642,9 +3671,10 @@ ${late ? '<p class="note chi">Đã quá hạn</p>' : !left ? '<p class="note thu
     async function dbPayGo() {
         const d = XD.debt[DB.i], a = Math.min(pm(val('db_pay')), dbLeft(d));
         if (!(a > 0)) return toast('Nhập số tiền');
-        d.paid = (d.paid || 0) + a; xsave(); closeSheet(); render();
-        if (await ask('Ghi vào sổ thu chi?', 'Tạo giao dịch ' + (d.dir === 'owe' ? 'Chi' : 'Thu') + ' ' + num(a) + ' để số dư tài khoản khớp.', { icon: '🧾', ok: 'Ghi', cancel: 'Để sau' }))
-            qOpen({ type: d.dir === 'owe' ? 'Chi' : 'Thu', amount: a, date: todayS(), time: hm(new Date()), note: (d.dir === 'owe' ? 'Trả nợ ' : 'Thu nợ ') + d.who, cat: '', sub: '', acc: d.acc || '', accTo: '' });
+        const pid = 'D' + d.id + '_' + Date.now().toString(36);
+        d.pays = (d.pays || []).concat({ id: pid, a }); d.paid = (d.paid || 0) + a; xsave(); closeSheet(); render();
+        if (await ask('Ghi vào sổ thu chi?', 'Tạo giao dịch Điều chỉnh ' + (d.dir === 'owe' ? '−' : '+') + num(a) + ' để số dư khớp (không tính là thu/chi).', { icon: '🧾', ok: 'Ghi', cancel: 'Để sau' }))
+            dbRec(d, 'pay', a, pid);
     }
 
     const cdLast = (day, t) => { let d = new Date(t.getFullYear(), t.getMonth(), Math.min(day, dimOf(t.getFullYear(), t.getMonth()))); if (d > t) { const p = new Date(t.getFullYear(), t.getMonth() - 1, 1); d = new Date(p.getFullYear(), p.getMonth(), Math.min(day, dimOf(p.getFullYear(), p.getMonth()))); } return d; };
@@ -3825,6 +3855,7 @@ ${x.nd ? `<p class="note ${warn ? 'chi' : ''}">${x.dl === 0 ? 'Hôm nay là hạ
         if (g('[data-dbnew]')) return dbForm(null);
         if ((b = g('[data-dbe]'))) return dbForm(+b.dataset.dbe);
         if ((b = g('[data-dbpay]'))) return dbPay(+b.dataset.dbpay);
+        if ((b = g('[data-dbrec]'))) return dbRecGo(+b.dataset.dbrec);
         if (g('[data-dbsave]')) return dbSave();
         if (g('[data-dbdel]')) return dbDel();
         if (g('[data-dbpaygo]')) return dbPayGo();
