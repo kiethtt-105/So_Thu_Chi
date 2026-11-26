@@ -1,4 +1,4 @@
-// Phần "Đăng nhập và thiết bị" trong Cài đặt: lịch sử đăng nhập + thu hồi đăng nhập trên máy khác.
+// Phần "Đăng nhập và thiết bị" trong Cài đặt: thiết bị tin cậy, lịch sử đăng nhập, thu hồi đăng nhập trên máy khác.
 // Nạp sau app.js (dùng chung $, esc, ask, toast, STORE, lockExpired, LOGOUT_ALL_AT).
 const SES = STORE ? STORE.replace(/[^/]*$/, 'sessions') : '';
 let HIST_ALL = false;
@@ -16,8 +16,9 @@ async function sesCall(body) {
 function secSection() {
     return `<div class="sec">Đăng nhập và thiết bị</div>
 <div id="seccard"></div>
+<div id="trustcard"></div>
 <div class="menu"><label class="row sw"><span class="dot">🧹</span><span class="m"><b>Xóa bản lưu sổ trên máy này khi khóa</b><small>Giao dịch, tài khoản lưu để dùng offline sẽ bị xóa khi khóa sổ hoặc hết phiên, lần mở sau tải lại từ Google Sheet. Sổ nợ và cài đặt giữ nguyên. Nên bật trên máy dùng chung.</small></span><input type="checkbox" role="switch" id="wipeLock" ${localStorage.wipeLock === '1' ? 'checked' : ''}></label></div>
-<div class="menu"><div class="row"><span class="dot">🔒</span><span class="m"><b>Thu hồi đăng nhập trên máy khác</b><small>Giữ lại máy này. Phiên hết hạn sau 48 giờ không hoạt động.</small></span><button type="button" class="btn" data-a="logoutall">Thu hồi</button></div></div>
+<div class="menu"><div class="row"><span class="dot">🔒</span><span class="m"><b>Thu hồi đăng nhập trên máy khác</b><small>Giữ lại máy này. Các máy khác phải nhập lại mật khẩu và bị bỏ khỏi danh sách tin cậy.</small></span><button type="button" class="btn" data-a="logoutall">Thu hồi</button></div></div>
 <div id="histcard"></div>`;
 }
 
@@ -41,6 +42,38 @@ document.addEventListener('change', e => {
     if (!e.target || e.target.id !== 'wipeLock') return;
     try { if (e.target.checked) localStorage.wipeLock = '1'; else localStorage.removeItem('wipeLock'); } catch (x) { }
     toast(e.target.checked ? 'Sẽ xóa bản lưu sổ trên máy này mỗi khi khóa' : 'Đã tắt xóa bản lưu khi khóa');
+});
+
+// ---- Thiết bị tin cậy: mặc định KHÔNG tin cậy (phiên 12 giờ). Tin cậy = phiên tự gia hạn khi còn dùng, hết hạn nếu 24 giờ không mở (tối đa 30 ngày). ----
+async function secTrustLoad() {
+    const box = $('#trustcard'); if (!box) return;
+    box.innerHTML = '<div class="sec">Thiết bị tin cậy</div><p class="hint">Đang tải…</p>';
+    const j = await sesCall({ act: 'devices' });
+    const b2 = $('#trustcard'); if (!b2) return;
+    if (!j.ok) { b2.innerHTML = `<div class="sec">Thiết bị tin cậy</div><p class="hint">${esc(j.err || 'Không tải được danh sách thiết bị')}</p>`; return; }
+    const me = j.me || '-', list = j.list || [];
+    try { if (me !== '-') { localStorage.trust = '1'; localStorage.did = me; } else { localStorage.removeItem('trust'); localStorage.removeItem('did'); } } catch (e) { }   // đồng bộ cờ trên máy với server
+    const row = x => `<div class="row"><span class="dot">${x.id === me ? '💻' : '🖥️'}</span><span class="m"><b>${esc(x.n || 'Thiết bị')}</b><small>Dùng lần cuối ${hFmt(x.l || x.t)}${x.ip ? ' · IP ' + esc(x.ip) : ''}</small></span>${x.id === me ? '<span class="chip on">Máy này</span>' : `<button type="button" class="btn" data-trust="del:${esc(x.id)}">Bỏ tin cậy</button>`}</div>`;
+    b2.innerHTML = `<div class="sec">Thiết bị tin cậy</div>
+<div class="menu"><label class="row sw"><span class="dot">🛡️</span><span class="m"><b>Tin cậy thiết bị này</b><small>Tắt (mặc định): phiên hết hạn sau 12 giờ kể từ lúc đăng nhập. Bật: phiên tự gia hạn khi bạn còn dùng, chỉ hết hạn nếu 24 giờ không mở, tối đa 30 ngày. Chỉ bật trên máy của riêng bạn.</small></span><input type="checkbox" role="switch" id="trustHere" ${me !== '-' ? 'checked' : ''}></label></div>`
+        + (list.length ? `<div class="menu">${list.map(row).join('')}</div>` : '<p class="hint">Chưa có thiết bị nào được tin cậy.</p>');
+}
+document.addEventListener('change', async e => {
+    if (!e.target || e.target.id !== 'trustHere') return;
+    const on = e.target.checked; e.target.disabled = true;
+    const j = await sesCall({ act: on ? 'trust' : 'untrust' });
+    if (j.ok) {
+        try { if (on) { localStorage.trust = '1'; localStorage.did = j.id; localStorage.sess = Date.now(); } else { localStorage.removeItem('trust'); localStorage.removeItem('did'); localStorage.sess = Date.now(); } } catch (x) { }
+        toast(on ? 'Đã tin cậy thiết bị này' : 'Đã bỏ tin cậy, phiên hết hạn sau 12 giờ');
+    } else toast(j.err || 'Không thực hiện được');
+    secTrustLoad();
+});
+document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-trust]'); if (!b || !/^del:/.test(b.dataset.trust)) return;
+    if (!await ask('Bỏ tin cậy thiết bị này?', 'Thiết bị đó sẽ phải đăng nhập lại và chỉ giữ phiên 12 giờ.', { icon: '🛡️', ok: 'Bỏ tin cậy' })) return;
+    const j = await sesCall({ act: 'untrust', id: b.dataset.trust.slice(4) });
+    toast(j.ok ? 'Đã bỏ tin cậy thiết bị' : (j.err || 'Không thực hiện được'));
+    secTrustLoad();
 });
 
 const hFmt = t => new Date(t).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });

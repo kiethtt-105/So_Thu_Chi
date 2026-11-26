@@ -57,8 +57,9 @@ module.exports = async (req, res) => {
         if (!verifySig(rec, Buffer.concat([ad, hash]), unb(r.signature)) || ((cnt || rec.c) && cnt <= rec.c)) throw new UErr('Passkey không hợp lệ');
         rec.c = cnt; rec.l = Date.now();
         await Promise.all([auth.kv('pk.save', { id: cid, rec }), auth.logLogin(req, 'Passkey', true)]);   // ghi bộ đếm lỗi thì vẫn cho đăng nhập
-        res.setHeader('Set-Cookie', auth.cookie());   // giống đăng nhập mật khẩu
-        return send(200, { ok: true });
+        const did = String(b.did || '').slice(0, 40), trusted = await auth.deviceTrusted(did);
+        res.setHeader('Set-Cookie', auth.cookie(trusted ? did : '-'));   // giống đăng nhập mật khẩu: mặc định không tin cậy
+        return send(200, { ok: true, trusted });
       }
       case 'info': {
         const list = ((await kvx('pk.info')).list || []).slice();

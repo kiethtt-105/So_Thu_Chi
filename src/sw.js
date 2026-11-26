@@ -1,7 +1,7 @@
 
 let CFG = {};
 try { importScripts('config.js'); CFG = self.CONFIG || {}; } catch (e) { }
-const V = 'stc-v60';
+const V = 'stc-v61';
 const RT = 'stc-rt', RT_MAX = 80;   // cache nền: ảnh đính kèm, thư viện CDN (đọc ảnh HEIC / quét chữ) để dùng lại khi offline
 const isLib = h => h === 'cdn.jsdelivr.net' || h === 'cdnjs.cloudflare.com' || h === 'unpkg.com';
 const isImg = h => h === 'drive.google.com' || /(^|\.)googleusercontent\.com$/.test(h);

@@ -1590,3 +1590,37 @@ html.pkm #login .pwf,html.pkm #login #lb,html.pkm #login #lerr{display:none}
   #tb button{height:auto;min-height:40px}
   #tb .sep{padding:14px 16px 6px}
 }
+
+
+/* ═════════ v61: Cài đặt gọn lại, cỡ chữ thống nhất ═════════ */
+/* Vấn đề cũ: màn 1920px bị phóng 1.2 lần, bảng 1280px nên phình gần kín màn hình; tiêu đề/nhãn to nhưng mô tả, chú thích nhỏ và mờ; nút không thấy viền; công tắc tắt gần như chìm vào nền. */
+@media(min-width:1280px) and (max-width:1599px){html{--z:1;zoom:1}}
+@media(min-width:1600px) and (max-width:2199px){html{--z:1.1;zoom:var(--z)}}
+.ov.open .sheet:has(.stg){width:min(1040px,calc(94vw / var(--z,1)));height:min(740px,calc(90dvh / var(--z,1)));max-height:calc(94dvh / var(--z,1));padding:22px 28px 14px;font-size:15px}
+.sheet:has(.stg)>.shh{margin-bottom:12px;padding-right:44px}
+.sheet:has(.stg)>.shh h3{font-size:22px;line-height:1.2}
+.sheet:has(.stg)>.shh .chip{min-height:36px;padding:0 14px;font-size:13.5px;font-weight:600;border:1px solid var(--line2);background:var(--card)}
+.sheet:has(.stg)>.stg{grid-template-columns:208px minmax(0,1fr);gap:24px}
+.sheet .stn button{min-height:44px;padding:0 12px;gap:10px;font-size:15px}
+.stn .si{font-size:18px;width:22px}
+.stb{padding:0 10px 24px 2px}
+.stb>*{max-width:760px}
+.stb .sec{margin:24px 0 8px;font:700 12px var(--fd)}
+.stb .menu{padding:2px 16px}
+.stb .menu .row{padding:13px 0;gap:12px}
+.stb .row .m b{font-size:15px;line-height:1.35}
+.stb .row .m small{font-size:13px;line-height:1.45}
+.stb .hint{font-size:13px;line-height:1.55;padding:10px 12px;margin-top:10px}
+.stb .btn,.stb .chip{min-height:36px;padding:0 14px;font-size:13.5px;font-weight:600;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:10px}
+.stb .chip.on{border-color:transparent;background:var(--accl);color:var(--acc)}
+.stb .btn:hover,.stb .chip:not(.on):hover{border-color:var(--acc);color:var(--acc)}
+.stb .btn.w{width:100%;justify-content:center;border-style:dashed;margin-top:8px;font-size:14px}
+.stb :where(input:not([type=checkbox]),select){height:40px;font-size:15px}
+.stb input[type=time],.stb .tm{width:auto;min-width:112px;font-size:15px}
+.stb .sw input:not(:checked){background:var(--line2);box-shadow:inset 0 0 0 1px var(--mut)}
+@media(max-width:759px){
+  .ov.open .sheet:has(.stg){width:calc(100vw - 16px);height:min(92dvh,100dvh - 16px);padding:16px 14px 10px;font-size:15px}
+  .sheet:has(.stg)>.stg{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:10px}
+  .sheet .stn button{min-height:42px;padding:0 14px;font-size:14.5px}
+  .stb .menu{padding:2px 14px}
+}

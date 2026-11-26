@@ -24,16 +24,22 @@ module.exports = async (req, res) => {
 
     if (body.logout) { res.setHeader('Set-Cookie', auth.clear()); return res.status(200).json({ ok: true }); }
     if (body.login !== undefined) return await doLogin(req, res, body);
-    if (!(await auth.ok(req, res))) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
+    const S = await auth.session(req, res);
+    if (!S) return res.status(401).json({ ok: false, auth: true, err: 'Chưa đăng nhập hoặc phiên đã hết hạn' });
 
     if (body.logoutAll) {   // ghi mốc thu hồi vào Apps Script; cấp lại cookie cho máy này (iat mới >= mốc) nên máy này vẫn đăng nhập
       if (!(await auth.revokeAll())) return res.status(200).json({ ok: false, err: 'Không ghi được mốc thu hồi lên Google Sheet (đã thêm Kv.gs và Deploy phiên bản mới chưa?). Cách khác: đổi APP_PASS hoặc APP_KEY trên Vercel rồi Redeploy.' });
-      res.setHeader('Set-Cookie', auth.cookie());
+      await auth.devKeep(S.tid);
+      res.setHeader('Set-Cookie', auth.cookie(S.tid));
       return res.status(200).json({ ok: true });
     }
     if (body.backupNow) return res.status(200).json(await backupDrive().catch(e => ({ ok: false, err: String(e && e.message || e) })));
     if (body.img) return res.status(200).json(await sheet({ img: body.img }, 45000));
-    if (body.cfg) return res.status(200).json({ ok: true, off: true });   // cài đặt chỉ còn lưu trên từng máy (localStorage)
+    if (body.cfg) {   // cài đặt đồng bộ giữa các máy: lưu ở tab CauHinh của Google Sheet (Kv.gs: cfg.sync)
+      const c = body.cfg && typeof body.cfg === 'object' ? body.cfg : {};
+      const j = await auth.kv('cfg.sync', { cfg: c.set ? { set: c.set } : { get: true } }, 25000);
+      return res.status(200).json(j.ok ? j : { ok: false, err: j.err || 'Không đồng bộ được cài đặt với Google Sheet' });
+    }
 
     if (Array.isArray(body.ops) && body.ops.length) {
       const v = cleanOps(body.ops);

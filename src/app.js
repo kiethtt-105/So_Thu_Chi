@@ -1,6 +1,7 @@
-const { NAME, STORE } = window.CONFIG || {}, POLL_MS = 10000; // hạn phiên (APP_TTL_HOURS, mặc định 48h) do cookie ở server quyết định
-const SESS_MS = (+(window.CONFIG || {}).TTL_H || 48) * 3600e3;   // đăng nhập lưu ở localStorage để mở tab mới không bị hỏi lại
-const alive = () => { let t = 0; try { t = +localStorage.sess || 0; } catch (e) { } return t > 0 && Date.now() - t < SESS_MS; }, touch = (() => { let last = 0; return () => { const n = Date.now(); if (n - last < 30000) return; last = n; try { localStorage.sess = n; } catch (e) { } }; })();
+const { NAME, STORE } = window.CONFIG || {}, POLL_MS = 10000; // hạn phiên do cookie ở server quyết định: 12 giờ (thiết bị không tin cậy) hoặc 24 giờ không hoạt động (thiết bị tin cậy)
+const TRUST = () => { try { return localStorage.trust === '1'; } catch (e) { return false; } };   // máy này đã được đưa vào danh sách thiết bị tin cậy (Cài đặt → Bảo mật)
+const SESS_MS = () => (TRUST() ? 24 : 12) * 3600e3;   // đăng nhập lưu ở localStorage để mở tab mới không bị hỏi lại; chỉ để quyết định hiện màn hình nào, server mới là nơi kiểm hạn
+const alive = () => { let t = 0; try { t = +localStorage.sess || 0; } catch (e) { } return t > 0 && Date.now() - t < SESS_MS(); }, touch = (() => { let last = 0; return () => { if (!TRUST()) return; const n = Date.now(); if (n - last < 30000) return; last = n; try { localStorage.sess = n; } catch (e) { } }; })();   // không tin cậy: hạn cố định từ lúc đăng nhập nên không trượt
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const NF = new Intl.NumberFormat('vi-VN'), num = n => NF.format(n), vnd = n => num(Math.round(n)) + ' ₫';
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -350,6 +351,9 @@ async function csRun() {
 }
 function csSee(c) { if (CS.off || c == null) return; if (String(c) !== CS.crev || csD().length) csRun(); }
 addEventListener('online', () => { if (csD().length) csRun(); });
+// Máy chủ không đẩy báo thay đổi cài đặt: tự hỏi lại mỗi 60 giây khi đang mở app (và 3 giây sau khi mở), để sổ nợ / định kỳ / nhắc nhở sửa ở máy khác hiện sang đây
+setTimeout(() => { if (!document.hidden && !$('#app').classList.contains('hide')) csRun(); }, 3000);
+setInterval(() => { if (!document.hidden && !$('#app').classList.contains('hide')) csRun(); }, 60000);
 function apply(j) {
     stamp();
     if (j.same)
@@ -490,14 +494,14 @@ $('#lf').onsubmit = async ev => {
     lb.disabled = true; lb.textContent = 'Đang mở sổ…'; $('#lerr').textContent = '';   // báo đang xử lý: máy chủ khởi động nguội có thể mất vài giây
     let j;
     try {
-        const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: pw }) });
+        const r = await fetch(STORE, { method: 'POST', credentials: 'same-origin', body: JSON.stringify({ login: pw, did: (() => { try { return localStorage.did || ''; } catch (e) { return ''; } })() }) });
         try { j = await r.json(); }
         catch (e) { j = { ok: false, net: true, err: 'Máy chủ trả lỗi ' + r.status + (r.status === 404 ? ' (không thấy /api/store, kiểm tra thư mục api/ và deploy lại)' : ' (xem Logs trên Vercel)') }; }
     }
     catch (e) { j = { ok: false, net: true, err: 'Không kết nối được máy chủ' }; }
     LOGIN_BUSY = false; lb.disabled = false; lb.textContent = lbt;
     if (j.ok) {
-        try { localStorage.sess = Date.now(); } catch (e) { }
+        try { localStorage.sess = Date.now(); if (j.trusted) localStorage.trust = '1'; else { localStorage.removeItem('trust'); localStorage.removeItem('did'); } } catch (e) { }
         boot();
     }
     else {
@@ -559,8 +563,8 @@ async function pkLogin() {
         const cr = await navigator.credentials.get({ publicKey: { challenge: unb64u(o.challenge), rpId: o.rpId, allowCredentials: (o.allow || []).map(id => ({ type: 'public-key', id: unb64u(id) })), userVerification: 'required', timeout: 60000 }, signal: PK_AC.signal });
         if (!cr) return;
         const r = cr.response;
-        const j = await accCall({ act: 'authverify', cred: { id: cr.id, response: { clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) } } });
-        if (j.ok) { try { localStorage.sess = Date.now(); } catch (e) { } touch(); boot(); }
+        const j = await accCall({ act: 'authverify', did: (() => { try { return localStorage.did || ''; } catch (e) { return ''; } })(), cred: { id: cr.id, response: { clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) } } });
+        if (j.ok) { try { localStorage.sess = Date.now(); if (j.trusted) localStorage.trust = '1'; else { localStorage.removeItem('trust'); localStorage.removeItem('did'); } } catch (e) { } touch(); boot(); }
         else fail(j.err || 'Passkey không hợp lệ');
     } catch (e) {
         const n = e && e.name;
@@ -2785,7 +2789,7 @@ ${sw('tx.dup', '🔁', 'Cảnh báo giao dịch có thể trùng', 'Hỏi lại 
     const nb = $('#sh .stb'); if (nb && keepTop) nb.scrollTop = keepTop;
     const on = $('#sh .stn .on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
     openSheet();
-    if (SET_TAB === 'sec') { secLoad(); secHistLoad(); }
+    if (SET_TAB === 'sec') { secLoad(); secTrustLoad(); secHistLoad(); }
 }
 // ===== Sao lưu / khôi phục JSON =====
 const BK_TYPES = ['Chi', 'Thu', 'Chuyển khoản', 'Điều chỉnh'];
